@@ -1,9 +1,10 @@
 package spring
 
 import (
-	"encoding/xml"
+	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/spencercjh/spec-forge/internal/extractor"
@@ -76,22 +77,35 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 	}
 }
 
-// patchMaven patches a Maven project.
+// patchMaven patches a Maven project using pure text manipulation to preserve formatting.
 func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
 	result := &PatchResult{
 		BuildFilePath: info.BuildFilePath,
 	}
 
+	// Read original content as bytes to preserve exact formatting
+	content, err := os.ReadFile(info.BuildFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read pom.xml: %w", err)
+	}
+	originalContent := string(content)
+
+	// Parse with gopom just for detection (not for modification)
 	parser := NewMavenParser()
 	pom, err := parser.Parse(info.BuildFilePath)
 	if err != nil {
 		return nil, err
 	}
 
+	modified := originalContent
+
 	// Add dependency if needed
 	if opts.Force || !info.HasSpringdocDeps {
 		if !parser.HasSpringdocDependency(pom) {
-			parser.AddDependency(pom, SpringdocGroupID, SpringdocWebMVCArtifactID, opts.SpringdocVersion)
+			modified, err = p.addMavenDependencyText(modified, opts.SpringdocVersion, pom)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add dependency: %w", err)
+			}
 			result.DependencyAdded = true
 		}
 	}
@@ -99,188 +113,342 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 	// Add plugin if needed
 	if opts.Force || !info.HasSpringdocPlugin {
 		if !parser.HasSpringdocPlugin(pom) {
-			parser.AddPlugin(pom, SpringdocGroupID, SpringdocMavenPluginArtifact, opts.MavenPluginVersion)
+			modified, err = p.addMavenPluginText(modified, opts.MavenPluginVersion, pom)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add plugin: %w", err)
+			}
 			result.PluginAdded = true
 		}
 	}
 
-	// Write changes if not dry-run
-	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
-		if err := p.writePom(info.BuildFilePath, pom); err != nil {
-			return nil, err
+	// Write changes if not dry-run and content actually changed
+	if !opts.DryRun && modified != originalContent {
+		if err := os.WriteFile(info.BuildFilePath, []byte(modified), 0644); err != nil {
+			return nil, fmt.Errorf("failed to write pom.xml: %w", err)
 		}
 	}
 
 	return result, nil
 }
 
-// patchGradle patches a Gradle project.
+// addMavenDependencyText adds springdoc dependency using pure text manipulation.
+func (p *Patcher) addMavenDependencyText(content, version string, pom *gopom.Project) (string, error) {
+	// Create the dependency XML with proper indentation (4 spaces per level)
+	depLines := []string{
+		`        <dependency>`,
+		fmt.Sprintf(`            <groupId>%s</groupId>`, SpringdocGroupID),
+		fmt.Sprintf(`            <artifactId>%s</artifactId>`, SpringdocWebMVCArtifactID),
+		fmt.Sprintf(`            <version>%s</version>`, version),
+		`        </dependency>`,
+	}
+	depXML := "\n" + strings.Join(depLines, "\n")
+
+	// Check if it's a parent POM with modules
+	isParentPOM := strings.Contains(content, "<modules>")
+
+	// For parent POMs, prefer adding to dependencyManagement
+	if isParentPOM && strings.Contains(content, "<dependencyManagement>") {
+		// Find <dependencyManagement><dependencies>
+		pattern := regexp.MustCompile(`(?s)<dependencyManagement>\s*<dependencies>`)
+		if loc := pattern.FindStringIndex(content); loc != nil {
+			return content[:loc[1]] + depXML + content[loc[1]:], nil
+		}
+	}
+
+	// Find regular <dependencies> section (not inside dependencyManagement)
+	// We need to find the first <dependencies> that's NOT inside <dependencyManagement>
+	if idx := findDependenciesSection(content); idx != -1 {
+		insertPos := idx + len("<dependencies>")
+		// Find end of line
+		if eol := strings.Index(content[insertPos:], "\n"); eol != -1 {
+			insertPos += eol + 1
+		}
+		return content[:insertPos] + depXML + content[insertPos:], nil
+	}
+
+	// No dependencies section - create one after </properties>, </packaging>, or </description>
+	depBlock := fmt.Sprintf(`
+
+    <dependencies>
+%s
+    </dependencies>`, depXML)
+
+	// Try to find a good insertion point
+	for _, tag := range []string{"</properties>", "</packaging>", "</description>"} {
+		if idx := strings.LastIndex(content, tag); idx != -1 {
+			// Find end of line
+			eol := strings.Index(content[idx:], "\n")
+			if eol != -1 {
+				return content[:idx+eol+1] + depBlock + content[idx+eol+1:], nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("could not find suitable location to add dependency")
+}
+
+// findDependenciesSection finds the <dependencies> section that is NOT inside <dependencyManagement>.
+func findDependenciesSection(content string) int {
+	// Strategy: find all <dependencies> tags and return the first one that's not inside dependencyManagement
+	depsPattern := regexp.MustCompile(`<dependencies>`)
+	dmPattern := regexp.MustCompile(`<dependencyManagement>`)
+
+	depsMatches := depsPattern.FindAllStringIndex(content, -1)
+	dmMatches := dmPattern.FindAllStringIndex(content, -1)
+
+	// If no dependencyManagement, return first <dependencies>
+	if len(dmMatches) == 0 {
+		if len(depsMatches) > 0 {
+			return depsMatches[0][0]
+		}
+		return -1
+	}
+
+	// Find <dependencies> that's NOT inside any <dependencyManagement>...<build> block
+	for _, depsMatch := range depsMatches {
+		depsStart := depsMatch[0]
+		insideDM := false
+		for i := 0; i < len(dmMatches); i++ {
+			dmStart := dmMatches[i][0]
+			// Find the matching </dependencyManagement>
+			dmEnd := strings.Index(content[dmStart:], "</dependencyManagement>")
+			if dmEnd != -1 {
+				dmEnd += dmStart + len("</dependencyManagement>")
+				if depsStart > dmStart && depsStart < dmEnd {
+					insideDM = true
+					break
+				}
+			}
+		}
+		if !insideDM {
+			return depsStart
+		}
+	}
+
+	return -1
+}
+
+// addMavenPluginText adds springdoc maven plugin using pure text manipulation.
+func (p *Patcher) addMavenPluginText(content, version string, pom *gopom.Project) (string, error) {
+	// Create the plugin XML with proper indentation
+	pluginLines := []string{
+		`            <plugin>`,
+		fmt.Sprintf(`                <groupId>%s</groupId>`, SpringdocGroupID),
+		fmt.Sprintf(`                <artifactId>%s</artifactId>`, SpringdocMavenPluginArtifact),
+		fmt.Sprintf(`                <version>%s</version>`, version),
+		`                <executions>`,
+		`                    <execution>`,
+		`                        <goals>`,
+		`                            <goal>generate</goal>`,
+		`                        </goals>`,
+		`                    </execution>`,
+		`                </executions>`,
+		`            </plugin>`,
+	}
+	pluginXML := "\n" + strings.Join(pluginLines, "\n")
+
+	// Strategy 1: Find <build><plugins> that is NOT inside <pluginManagement>
+	// Look for pattern: <build>...<plugins> where there's no <pluginManagement> between them
+	buildStart := strings.Index(content, "<build>")
+	if buildStart != -1 {
+		afterBuild := content[buildStart:]
+
+		// Check if there's a <plugins> directly under <build> (not in pluginManagement)
+		// by looking for </pluginManagement> before <plugins> or no pluginManagement at all
+		pmEnd := strings.Index(afterBuild, "</pluginManagement>")
+		firstPlugins := strings.Index(afterBuild, "<plugins>")
+
+		// Determine if the first <plugins> is inside or outside pluginManagement
+		hasDirectPlugins := false
+		var pluginsPos int
+
+		if firstPlugins != -1 {
+			if pmEnd == -1 || firstPlugins < pmEnd {
+				// No pluginManagement or plugins comes before pluginManagement ends
+				// This means plugins is inside pluginManagement
+				// Look for plugins after pluginManagement
+				if pmEnd != -1 {
+					afterPM := afterBuild[pmEnd+len("</pluginManagement>"):]
+					if nextPlugins := strings.Index(afterPM, "<plugins>"); nextPlugins != -1 {
+						hasDirectPlugins = true
+						pluginsPos = pmEnd + len("</pluginManagement>") + nextPlugins
+					}
+				}
+			} else {
+				// plugins comes after pluginManagement ends - it's a direct plugins section
+				hasDirectPlugins = true
+				pluginsPos = firstPlugins
+			}
+		}
+
+		if hasDirectPlugins {
+			insertPos := buildStart + pluginsPos + len("<plugins>")
+			// Find end of line
+			if eol := strings.Index(content[insertPos:], "\n"); eol != -1 {
+				insertPos += eol + 1
+			}
+			return content[:insertPos] + pluginXML + content[insertPos:], nil
+		}
+
+		// Strategy 2: Has <build> with only <pluginManagement>, add <plugins> after </pluginManagement>
+		if pmEnd != -1 {
+			pluginsBlock := fmt.Sprintf(`
+
+        <plugins>
+%s
+        </plugins>
+`, pluginXML)
+
+			insertPos := buildStart + pmEnd + len("</pluginManagement>")
+			// Find end of line
+			if eol := strings.Index(content[insertPos:], "\n"); eol != -1 {
+				insertPos += eol + 1
+			}
+			return content[:insertPos] + pluginsBlock + content[insertPos:], nil
+		}
+
+		// Strategy 3: Has <build> but no <plugins> at all, add after <build> opening
+		pluginsBlock := fmt.Sprintf(`
+        <plugins>
+%s
+        </plugins>`, pluginXML)
+
+		buildEndTag := strings.Index(content[buildStart:], ">")
+		if buildEndTag != -1 {
+			insertPos := buildStart + buildEndTag + 1
+			// Find end of line
+			if eol := strings.Index(content[insertPos:], "\n"); eol != -1 {
+				insertPos += eol + 1
+			}
+			return content[:insertPos] + pluginsBlock + content[insertPos:], nil
+		}
+	}
+
+	// Strategy 4: No <build> section - create one before </project>
+	pluginsBlock := fmt.Sprintf(`
+    <build>
+        <plugins>
+%s
+        </plugins>
+    </build>`, pluginXML)
+
+	if projectEnd := strings.Index(content, "</project>"); projectEnd != -1 {
+		return content[:projectEnd] + pluginsBlock + "\n" + content[projectEnd:], nil
+	}
+
+	return "", fmt.Errorf("could not find suitable location to add plugin")
+}
+
+// patchGradle patches a Gradle project using pure text manipulation.
 func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
 	result := &PatchResult{
 		BuildFilePath: info.BuildFilePath,
 	}
 
-	// Gradle modification is more complex due to the parser limitations
-	// For now, we'll use text-based modification
+	// Read original content
+	content, err := os.ReadFile(info.BuildFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read build.gradle: %w", err)
+	}
+	originalContent := string(content)
+
+	// Check what needs to be added using parsed data
 	parser := NewGradleParser()
 	build, err := parser.Parse(info.BuildFilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check what needs to be added
+	modified := originalContent
+
+	// Add dependency if needed
 	if opts.Force || !info.HasSpringdocDeps {
 		if !parser.HasSpringdocDependency(build) {
+			modified = p.addGradleDependencyText(modified, opts.SpringdocVersion)
 			result.DependencyAdded = true
 		}
 	}
 
+	// Add plugin if needed
 	if opts.Force || !info.HasSpringdocPlugin {
 		if !parser.HasSpringdocPlugin(build) {
+			modified = p.addGradlePluginText(modified, opts.GradlePluginVersion)
 			result.PluginAdded = true
 		}
 	}
 
-	// Write changes if not dry-run
-	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
-		if err := p.patchGradleFile(info.BuildFilePath, opts, result); err != nil {
-			return nil, err
+	// Write changes if not dry-run and content actually changed
+	if !opts.DryRun && modified != originalContent {
+		if err := os.WriteFile(info.BuildFilePath, []byte(modified), 0644); err != nil {
+			return nil, fmt.Errorf("failed to write build.gradle: %w", err)
 		}
 	}
 
 	return result, nil
 }
 
-// writePom serializes the pom back to XML and writes to file.
-func (p *Patcher) writePom(path string, pom *gopom.Project) error {
-	// Set XMLName if not set to ensure proper root element
-	if pom.XMLName == nil {
-		pom.XMLName = &xml.Name{Space: "http://maven.apache.org/POM/4.0.0", Local: "project"}
-	}
+// addGradleDependencyText adds springdoc dependency using text manipulation.
+func (p *Patcher) addGradleDependencyText(content, version string) string {
+	dep := fmt.Sprintf("implementation '%s:%s:%s'", SpringdocGroupID, SpringdocWebMVCArtifactID, version)
 
-	// Marshal with indentation
-	output, err := xml.MarshalIndent(pom, "    ", "    ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal pom: %w", err)
-	}
-
-	// Construct the final content with XML header
-	var sb strings.Builder
-	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
-	sb.WriteString("\n")
-	sb.WriteString(`<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"`)
-	sb.WriteString("\n")
-	sb.WriteString(`         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">`)
-	sb.WriteString("\n")
-
-	// Skip the <project> tag from marshaled output since we added it manually
-	lines := strings.Split(string(output), "\n")
-	startIndex := 0
-	for i, line := range lines {
-		if strings.Contains(line, "<project") {
-			startIndex = i + 1
-			break
-		}
-	}
-
-	// Find the end of project tag in marshaled output
-	endIndex := len(lines)
-	for i := startIndex; i < len(lines); i++ {
-		if strings.Contains(lines[i], "</project>") {
-			endIndex = i
-			break
-		}
-	}
-
-	// Write content between project tags
-	for i := startIndex; i < endIndex; i++ {
-		sb.WriteString(lines[i])
-		sb.WriteString("\n")
-	}
-	sb.WriteString("</project>\n")
-
-	// Write to file
-	if err := os.WriteFile(path, []byte(sb.String()), 0644); err != nil {
-		return fmt.Errorf("failed to write pom: %w", err)
-	}
-
-	return nil
-}
-
-// patchGradleFile modifies the build.gradle file using text manipulation.
-func (p *Patcher) patchGradleFile(path string, opts *extractor.PatchOptions, result *PatchResult) error {
-	content, err := readFile(path)
-	if err != nil {
-		return err
-	}
-
-	// Add dependency if needed
-	if result.DependencyAdded {
-		// Find the dependencies block and add the springdoc dependency
-		content = p.addGradleDependency(content, SpringdocGroupID+":"+SpringdocWebMVCArtifactID+":"+opts.SpringdocVersion)
-	}
-
-	// Add plugin if needed
-	if result.PluginAdded {
-		// Find the plugins block and add the springdoc plugin
-		content = p.addGradlePlugin(content, SpringdocGradlePluginID, opts.GradlePluginVersion)
-	}
-
-	return writeFile(path, []byte(content))
-}
-
-// addGradleDependency adds a dependency to the dependencies block.
-func (p *Patcher) addGradleDependency(content, dep string) string {
 	// Find the dependencies block
-	lines := strings.Split(content, "\n")
-	var result []string
-	inserted := false
-
-	for _, line := range lines {
-		result = append(result, line)
-		if !inserted && strings.TrimSpace(line) == "dependencies {" {
-			// Find proper indentation
-			indent := ""
-			for _, c := range line {
-				if c == ' ' || c == '\t' {
-					indent += string(c)
-				} else {
-					break
-				}
-			}
-			// Add dependency with proper indentation
-			result = append(result, indent+"    implementation '"+dep+"'")
-			inserted = true
-		}
+	depsIdx := strings.Index(content, "dependencies {")
+	if depsIdx == -1 {
+		depsIdx = strings.Index(content, "dependencies{")
+	}
+	if depsIdx == -1 {
+		return content
 	}
 
-	return strings.Join(result, "\n")
+	// Find the end of the line
+	lineEnd := strings.Index(content[depsIdx:], "\n")
+	if lineEnd == -1 {
+		return content
+	}
+
+	// Get the indentation of the "dependencies" line
+	lineStart := bytes.LastIndexByte([]byte(content[:depsIdx]), '\n')
+	if lineStart == -1 {
+		lineStart = 0
+	} else {
+		lineStart++ // Move past the newline
+	}
+	indent := content[lineStart:depsIdx]
+
+	// Insert the dependency
+	insertPos := depsIdx + lineEnd + 1
+	return content[:insertPos] + indent + "    " + dep + "\n" + content[insertPos:]
 }
 
-// addGradlePlugin adds a plugin to the plugins block.
-func (p *Patcher) addGradlePlugin(content, pluginID, version string) string {
-	// Find the plugins block
-	lines := strings.Split(content, "\n")
-	var result []string
-	inserted := false
+// addGradlePluginText adds springdoc plugin using text manipulation.
+func (p *Patcher) addGradlePluginText(content, version string) string {
+	plugin := fmt.Sprintf("id '%s' version \"%s\"", SpringdocGradlePluginID, version)
 
-	for _, line := range lines {
-		result = append(result, line)
-		if !inserted && strings.TrimSpace(line) == "plugins {" {
-			// Find proper indentation
-			indent := ""
-			for _, c := range line {
-				if c == ' ' || c == '\t' {
-					indent += string(c)
-				} else {
-					break
-				}
-			}
-			// Add plugin with proper indentation
-			result = append(result, indent+"    id '"+pluginID+"' version \""+version+"\"")
-			inserted = true
-		}
+	// Find the plugins block
+	pluginsIdx := strings.Index(content, "plugins {")
+	if pluginsIdx == -1 {
+		pluginsIdx = strings.Index(content, "plugins{")
+	}
+	if pluginsIdx == -1 {
+		return content
 	}
 
-	return strings.Join(result, "\n")
+	// Find the end of the line
+	lineEnd := strings.Index(content[pluginsIdx:], "\n")
+	if lineEnd == -1 {
+		return content
+	}
+
+	// Get the indentation of the "plugins" line
+	lineStart := bytes.LastIndexByte([]byte(content[:pluginsIdx]), '\n')
+	if lineStart == -1 {
+		lineStart = 0
+	} else {
+		lineStart++
+	}
+	indent := content[lineStart:pluginsIdx]
+
+	// Insert the plugin
+	insertPos := pluginsIdx + lineEnd + 1
+	return content[:insertPos] + indent + "    " + plugin + "\n" + content[insertPos:]
 }
