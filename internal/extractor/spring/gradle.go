@@ -1,16 +1,14 @@
 package spring
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/scagogogo/gradle-parser/pkg/api"
 	"github.com/scagogogo/gradle-parser/pkg/model"
-)
-
-// Gradle parser constants.
-const (
-	SpringdocGradlePluginID = "org.springdoc.openapi-gradle-plugin"
 )
 
 // GradleParser parses and modifies Gradle build.gradle files.
@@ -102,6 +100,16 @@ func (p *GradleParser) HasSpringdocPlugin(project *model.Project) bool {
 	return false
 }
 
+// HasSpringBootPlugin checks if build.gradle has the Spring Boot plugin.
+func (p *GradleParser) HasSpringBootPlugin(project *model.Project) bool {
+	for _, plugin := range project.Plugins {
+		if plugin.ID == "org.springframework.boot" || plugin.ID == "spring-boot" {
+			return true
+		}
+	}
+	return false
+}
+
 // FindDependency finds a dependency by name pattern.
 func (p *GradleParser) FindDependency(project *model.Project, namePattern string) *model.Dependency {
 	for i := range project.Dependencies {
@@ -122,12 +130,141 @@ func (p *GradleParser) FindPlugin(project *model.Project, pluginID string) *mode
 	return nil
 }
 
-// HasSpringBootPlugin checks if build.gradle has the Spring Boot plugin.
-func (p *GradleParser) HasSpringBootPlugin(project *model.Project) bool {
-	for _, plugin := range project.Plugins {
-		if plugin.ID == "org.springframework.boot" || plugin.ID == "spring-boot" {
-			return true
+// ParseModules parses settings.gradle to find included modules.
+func (p *GradleParser) ParseModules(settingsPath string) []string {
+	file, err := os.Open(settingsPath)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+
+	var modules []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// Skip comments and empty lines
+		if line == "" || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "/*") {
+			continue
+		}
+		// Parse include statements
+		// Formats: include 'module1', 'module2' or include 'module1', "module2"
+		if after, ok := strings.CutPrefix(line, "include"); ok {
+			line = strings.TrimSpace(after)
+			// Split by comma and clean up
+			parts := strings.SplitSeq(line, ",")
+			for part := range parts {
+				part = strings.TrimSpace(part)
+				// Remove quotes
+				part = strings.Trim(part, "'\"")
+				if part != "" {
+					modules = append(modules, part)
+				}
+			}
 		}
 	}
-	return false
+
+	return modules
+}
+
+// FindMainModule finds the main module that contains the Spring Boot application.
+func (p *GradleParser) FindMainModule(projectPath string, modules []string) (string, string) {
+	for _, module := range modules {
+		// Try build.gradle first
+		modulePath := filepath.Join(projectPath, module, "build.gradle")
+		if _, err := os.Stat(modulePath); err != nil {
+			// Try build.gradle.kts
+			modulePath = filepath.Join(projectPath, module, "build.gradle.kts")
+			if _, err := os.Stat(modulePath); err != nil {
+				continue
+			}
+		}
+
+		build, err := p.Parse(modulePath)
+		if err != nil {
+			continue
+		}
+
+		// Check if this module has Spring Boot plugin
+		if p.HasSpringBootPlugin(build) {
+			return module, modulePath
+		}
+	}
+
+	return "", ""
+}
+
+// AddDependencyText adds springdoc dependency using text manipulation.
+func (p *GradleParser) AddDependencyText(content, version string) string {
+	dep := fmt.Sprintf("implementation '%s:%s:%s'", SpringdocGroupID, SpringdocWebMVCArtifactID, version)
+
+	// Find the dependencies block
+	depsIdx := strings.Index(content, "dependencies {")
+	if depsIdx == -1 {
+		depsIdx = strings.Index(content, "dependencies{")
+	}
+	if depsIdx == -1 {
+		return content
+	}
+
+	// Find the end of the line
+	lineEnd := strings.Index(content[depsIdx:], "\n")
+	if lineEnd == -1 {
+		return content
+	}
+
+	// Get the indentation of the "dependencies" line
+	lineStart := lastIndexOf(content[:depsIdx], '\n')
+	if lineStart == -1 {
+		lineStart = 0
+	} else {
+		lineStart++ // Move past the newline
+	}
+	indent := content[lineStart:depsIdx]
+
+	// Insert the dependency
+	insertPos := depsIdx + lineEnd + 1
+	return content[:insertPos] + indent + "    " + dep + "\n" + content[insertPos:]
+}
+
+// AddPluginText adds springdoc plugin using text manipulation.
+func (p *GradleParser) AddPluginText(content, version string) string {
+	plugin := fmt.Sprintf("id '%s' version \"%s\"", SpringdocGradlePluginID, version)
+
+	// Find the plugins block
+	pluginsIdx := strings.Index(content, "plugins {")
+	if pluginsIdx == -1 {
+		pluginsIdx = strings.Index(content, "plugins{")
+	}
+	if pluginsIdx == -1 {
+		return content
+	}
+
+	// Find the end of the line
+	lineEnd := strings.Index(content[pluginsIdx:], "\n")
+	if lineEnd == -1 {
+		return content
+	}
+
+	// Get the indentation of the "plugins" line
+	lineStart := lastIndexOf(content[:pluginsIdx], '\n')
+	if lineStart == -1 {
+		lineStart = 0
+	} else {
+		lineStart++
+	}
+	indent := content[lineStart:pluginsIdx]
+
+	// Insert the plugin
+	insertPos := pluginsIdx + lineEnd + 1
+	return content[:insertPos] + indent + "    " + plugin + "\n" + content[insertPos:]
+}
+
+// lastIndexOf finds the last occurrence of a byte in a string.
+func lastIndexOf(s string, c byte) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == c {
+			return i
+		}
+	}
+	return -1
 }

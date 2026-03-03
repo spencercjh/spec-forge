@@ -1,22 +1,16 @@
 package spring
 
 import (
+	"encoding/xml"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/vifraa/gopom"
 )
 
-// Springdoc group and artifact constants.
-const (
-	SpringdocGroupID             = "org.springdoc"
-	SpringdocWebMVCArtifactID    = "springdoc-openapi-starter-webmvc-ui"
-	SpringdocMavenPluginArtifact = "springdoc-openapi-maven-plugin"
-	SpringBootParentGroupID      = "org.springframework.boot"
-	SpringBootParentArtifactID   = "spring-boot-starter-parent"
-)
-
-// MavenParser parses and modifies Maven pom.xml files.
+// MavenParser parses and analyzes Maven pom.xml files.
 type MavenParser struct{}
 
 // NewMavenParser creates a new MavenParser instance.
@@ -30,7 +24,6 @@ func (p *MavenParser) Parse(pomPath string) (*gopom.Project, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse pom.xml: %w", err)
 	}
-
 	return project, nil
 }
 
@@ -70,8 +63,8 @@ func (p *MavenParser) HasSpringdocDependency(pom *gopom.Project) bool {
 func (p *MavenParser) GetSpringdocVersion(pom *gopom.Project) string {
 	dep := p.FindDependency(pom, SpringdocGroupID, SpringdocWebMVCArtifactID)
 	if dep != nil && dep.Version != nil {
-		// Handle ${springdoc.version} style references
 		version := *dep.Version
+		// Handle ${springdoc.version} style references
 		if strings.HasPrefix(version, "${") && strings.HasSuffix(version, "}") {
 			propName := strings.Trim(version, "${}")
 			if pom.Properties != nil {
@@ -102,6 +95,23 @@ func (p *MavenParser) HasSpringdocPlugin(pom *gopom.Project) bool {
 	return false
 }
 
+// HasSpringBootPlugin checks if the pom has the Spring Boot Maven plugin.
+func (p *MavenParser) HasSpringBootPlugin(pom *gopom.Project) bool {
+	if pom.Build == nil || pom.Build.Plugins == nil {
+		return false
+	}
+
+	for _, plugin := range *pom.Build.Plugins {
+		if plugin.GroupID != nil && *plugin.GroupID == SpringBootParentGroupID {
+			if plugin.ArtifactID != nil && *plugin.ArtifactID == "spring-boot-maven-plugin" {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // FindDependency finds a dependency by groupId and artifactId.
 func (p *MavenParser) FindDependency(pom *gopom.Project, groupID, artifactID string) *gopom.Dependency {
 	if pom.Dependencies == nil {
@@ -118,6 +128,43 @@ func (p *MavenParser) FindDependency(pom *gopom.Project, groupID, artifactID str
 	}
 
 	return nil
+}
+
+// GetModules returns the list of modules in a multi-module Maven project.
+func (p *MavenParser) GetModules(pom *gopom.Project) []string {
+	if pom.Modules == nil {
+		return nil
+	}
+
+	var modules []string
+	for _, module := range *pom.Modules {
+		if module != "" {
+			modules = append(modules, module)
+		}
+	}
+	return modules
+}
+
+// FindMainModule finds the main module that contains the Spring Boot application.
+func (p *MavenParser) FindMainModule(projectPath string, modules []string) (string, string) {
+	for _, module := range modules {
+		modulePath := filepath.Join(projectPath, module, "pom.xml")
+		if _, err := os.Stat(modulePath); err != nil {
+			continue
+		}
+
+		pom, err := p.Parse(modulePath)
+		if err != nil {
+			continue
+		}
+
+		// Check if this module has Spring Boot plugin
+		if p.HasSpringBootPlugin(pom) {
+			return module, modulePath
+		}
+	}
+
+	return "", ""
 }
 
 // AddDependency adds a dependency to the pom.
@@ -159,34 +206,37 @@ func (p *MavenParser) AddPlugin(pom *gopom.Project, groupID, artifactID, version
 	}
 }
 
-// GetModules returns the list of modules in a multi-module Maven project.
-func (p *MavenParser) GetModules(pom *gopom.Project) []string {
-	if pom.Modules == nil {
-		return nil
+// HasDependency checks if springdoc dependency exists (for patcher).
+func (p *MavenParser) HasDependency(pom *gopom.Project) bool {
+	if pom.Dependencies == nil {
+		return false
 	}
-
-	var modules []string
-	for _, module := range *pom.Modules {
-		if module != "" {
-			modules = append(modules, module)
+	for _, dep := range *pom.Dependencies {
+		if dep.GroupID != nil && *dep.GroupID == SpringdocGroupID {
+			return true
 		}
 	}
-	return modules
+	return false
 }
 
-// HasSpringBootPlugin checks if the pom has the Spring Boot Maven plugin.
-func (p *MavenParser) HasSpringBootPlugin(pom *gopom.Project) bool {
+// HasPlugin checks if springdoc plugin exists (for patcher).
+func (p *MavenParser) HasPlugin(pom *gopom.Project) bool {
 	if pom.Build == nil || pom.Build.Plugins == nil {
 		return false
 	}
-
 	for _, plugin := range *pom.Build.Plugins {
-		if plugin.GroupID != nil && *plugin.GroupID == SpringBootParentGroupID {
-			if plugin.ArtifactID != nil && *plugin.ArtifactID == "spring-boot-maven-plugin" {
-				return true
-			}
+		if plugin.GroupID != nil && *plugin.GroupID == SpringdocGroupID {
+			return true
 		}
 	}
-
 	return false
+}
+
+// MarshalPom marshals a pom to XML bytes.
+func (p *MavenParser) MarshalPom(pom *gopom.Project) ([]byte, error) {
+	output, err := xml.MarshalIndent(pom, "  ", "    ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal pom.xml: %w", err)
+	}
+	return []byte(xml.Header + string(output) + "\n"), nil
 }
