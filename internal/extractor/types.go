@@ -35,4 +35,5 @@ type PatchOptions struct {
 	SpringdocVersion    string // springdoc version (default: built-in)
 	MavenPluginVersion  string // Maven plugin version (default: built-in)
 	GradlePluginVersion string // Gradle plugin version (default: built-in)
+	KeepPatched         bool   // If false (default for generate), restore original file after extraction
 }

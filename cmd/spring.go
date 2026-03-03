@@ -102,9 +102,12 @@ func runSpringPatch(_ *cobra.Command, args []string) error {
 		path = args[0]
 	}
 
+	// spring patch defaults to keeping the patched file (KeepPatched=true)
+	// unlike generate command which defaults to restoring
 	opts := &extractor.PatchOptions{
-		DryRun: patchDryRun,
-		Force:  patchForce,
+		DryRun:      patchDryRun,
+		Force:       patchForce,
+		KeepPatched: true, // spring patch keeps changes by default
 	}
 
 	patcher := spring.NewPatcher()
@@ -134,6 +137,8 @@ func runSpringPatch(_ *cobra.Command, args []string) error {
 
 	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
 		fmt.Println("\nPatch applied successfully!")
+		fmt.Println("Note: Build file format may differ from original due to XML serialization.")
+		fmt.Println("Use 'spec-forge generate' to extract specs while preserving original file format.")
 	} else if !result.DependencyAdded && !result.PluginAdded {
 		fmt.Println("\nNo changes needed.")
 	}
