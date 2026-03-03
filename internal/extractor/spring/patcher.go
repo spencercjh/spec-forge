@@ -226,12 +226,18 @@ func strPtr(s string) *string {
 
 // patchGradle patches a Gradle project.
 func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
+	// For multi-module projects, patch the main module instead of root
+	buildFilePath := info.BuildFilePath
+	if info.IsMultiModule && info.MainModulePath != "" {
+		buildFilePath = info.MainModulePath
+	}
+
 	result := &PatchResult{
-		BuildFilePath: info.BuildFilePath,
+		BuildFilePath: buildFilePath,
 	}
 
 	// Read and save original content
-	content, err := os.ReadFile(info.BuildFilePath)
+	content, err := os.ReadFile(buildFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read build.gradle: %w", err)
 	}
@@ -240,7 +246,7 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 	if opts.DryRun {
 		// In dry-run mode, don't modify anything
 		parser := NewGradleParser()
-		build, err := parser.Parse(info.BuildFilePath)
+		build, err := parser.Parse(buildFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -255,7 +261,7 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 	// Add dependency if needed
 	if opts.Force || !info.HasSpringdocDeps {
 		parser := NewGradleParser()
-		build, err := parser.Parse(info.BuildFilePath)
+		build, err := parser.Parse(buildFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -271,7 +277,7 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 	// Add plugin if needed
 	if opts.Force || !info.HasSpringdocPlugin {
 		parser := NewGradleParser()
-		build, err := parser.Parse(info.BuildFilePath)
+		build, err := parser.Parse(buildFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +292,7 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 
 	// Write changes if modified
 	if result.DependencyAdded || result.PluginAdded {
-		if err := os.WriteFile(info.BuildFilePath, []byte(modified), 0644); err != nil {
+		if err := os.WriteFile(buildFilePath, []byte(modified), 0644); err != nil {
 			return nil, fmt.Errorf("failed to write build.gradle: %w", err)
 		}
 	}

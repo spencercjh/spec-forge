@@ -1050,3 +1050,264 @@ func TestPatcher_DryRunMode(t *testing.T) {
 		}
 	})
 }
+
+// ============================================
+// Multi-Module Gradle Tests
+// ============================================
+
+// multiModuleSettingsGradle is a settings.gradle for multi-module project
+const multiModuleSettingsGradle = `
+rootProject.name = 'multi-module-demo'
+
+include 'shared-lib'
+include 'user-service'
+`
+
+// rootBuildGradle is a root build.gradle for multi-module project
+const rootBuildGradle = `
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.0.3' apply false
+    id 'io.spring.dependency-management' version '1.1.7' apply false
+}
+
+group = 'com.example'
+version = '1.0.0-SNAPSHOT'
+
+subprojects {
+    apply plugin: 'java'
+    repositories {
+        mavenCentral()
+    }
+}
+`
+
+// sharedLibBuildGradle is a build.gradle for shared-lib module (no Spring Boot)
+const sharedLibBuildGradle = `
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    api 'org.springframework.boot:spring-boot-starter-web'
+}
+`
+
+// userServiceBuildGradle is a build.gradle for user-service module (with Spring Boot)
+const userServiceBuildGradle = `
+plugins {
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    implementation project(':shared-lib')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+}
+`
+
+// TestDetector_MultiModuleGradle tests detection of multi-module Gradle projects
+func TestDetector_MultiModuleGradle(t *testing.T) {
+	// Create a multi-module Gradle project structure
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	settingsDir := tmpDir
+	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
+	userServiceDir := filepath.Join(tmpDir, "user-service")
+
+	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+		t.Fatalf("Failed to create shared-lib dir: %v", err)
+	}
+	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+		t.Fatalf("Failed to create user-service dir: %v", err)
+	}
+
+	// Create settings.gradle
+	if err := os.WriteFile(filepath.Join(settingsDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0644); err != nil {
+		t.Fatalf("Failed to create settings.gradle: %v", err)
+	}
+
+	// Create root build.gradle
+	if err := os.WriteFile(filepath.Join(settingsDir, "build.gradle"), []byte(rootBuildGradle), 0644); err != nil {
+		t.Fatalf("Failed to create root build.gradle: %v", err)
+	}
+
+	// Create shared-lib build.gradle
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0644); err != nil {
+		t.Fatalf("Failed to create shared-lib build.gradle: %v", err)
+	}
+
+	// Create user-service build.gradle
+	if err := os.WriteFile(filepath.Join(userServiceDir, "build.gradle"), []byte(userServiceBuildGradle), 0644); err != nil {
+		t.Fatalf("Failed to create user-service build.gradle: %v", err)
+	}
+
+	// Test detection
+	detector := spring.NewDetector()
+	info, err := detector.Detect(tmpDir)
+	if err != nil {
+		t.Fatalf("Detection failed: %v", err)
+	}
+
+	// Verify multi-module detection
+	if !info.IsMultiModule {
+		t.Error("Expected IsMultiModule to be true")
+	}
+	if len(info.Modules) != 2 {
+		t.Errorf("Expected 2 modules, got %d", len(info.Modules))
+	}
+	if info.MainModule != "user-service" {
+		t.Errorf("Expected MainModule to be 'user-service', got '%s'", info.MainModule)
+	}
+	if info.MainModulePath == "" {
+		t.Error("Expected MainModulePath to be set")
+	}
+}
+
+// TestPatcher_MultiModuleGradle tests patching of multi-module Gradle projects
+func TestPatcher_MultiModuleGradle(t *testing.T) {
+	// Create a multi-module Gradle project structure
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
+	userServiceDir := filepath.Join(tmpDir, "user-service")
+
+	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+		t.Fatalf("Failed to create shared-lib dir: %v", err)
+	}
+	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+		t.Fatalf("Failed to create user-service dir: %v", err)
+	}
+
+	// Create settings.gradle
+	if err := os.WriteFile(filepath.Join(tmpDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0644); err != nil {
+		t.Fatalf("Failed to create settings.gradle: %v", err)
+	}
+
+	// Create root build.gradle
+	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte(rootBuildGradle), 0644); err != nil {
+		t.Fatalf("Failed to create root build.gradle: %v", err)
+	}
+
+	// Create shared-lib build.gradle
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0644); err != nil {
+		t.Fatalf("Failed to create shared-lib build.gradle: %v", err)
+	}
+
+	// Create user-service build.gradle
+	userServiceBuildPath := filepath.Join(userServiceDir, "build.gradle")
+	if err := os.WriteFile(userServiceBuildPath, []byte(userServiceBuildGradle), 0644); err != nil {
+		t.Fatalf("Failed to create user-service build.gradle: %v", err)
+	}
+
+	// Patch the project
+	patcher := spring.NewPatcher()
+	opts := &extractor.PatchOptions{
+		SpringdocVersion:    extractor.DefaultSpringdocVersion,
+		GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+	}
+
+	result, err := patcher.Patch(tmpDir, opts)
+	if err != nil {
+		t.Fatalf("Patch failed: %v", err)
+	}
+
+	// Verify patch was applied to user-service module, not root
+	if result.BuildFilePath != userServiceBuildPath {
+		t.Errorf("Expected patch on user-service module, got: %s", result.BuildFilePath)
+	}
+	if !result.DependencyAdded {
+		t.Error("Expected DependencyAdded to be true")
+	}
+	if !result.PluginAdded {
+		t.Error("Expected PluginAdded to be true")
+	}
+
+	// Verify user-service/build.gradle was modified
+	content, err := os.ReadFile(userServiceBuildPath)
+	if err != nil {
+		t.Fatalf("Failed to read user-service build.gradle: %v", err)
+	}
+	if !strings.Contains(string(content), "springdoc-openapi") {
+		t.Error("user-service build.gradle should contain springdoc dependency")
+	}
+
+	// Verify root build.gradle was NOT modified
+	rootContent, err := os.ReadFile(filepath.Join(tmpDir, "build.gradle"))
+	if err != nil {
+		t.Fatalf("Failed to read root build.gradle: %v", err)
+	}
+	if strings.Contains(string(rootContent), "springdoc-openapi") {
+		t.Error("Root build.gradle should NOT be modified")
+	}
+}
+
+// TestPatcher_MultiModuleGradle_Restore tests restore functionality for multi-module projects
+func TestPatcher_MultiModuleGradle_Restore(t *testing.T) {
+	// Create a multi-module Gradle project structure
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
+	userServiceDir := filepath.Join(tmpDir, "user-service")
+
+	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+		t.Fatalf("Failed to create shared-lib dir: %v", err)
+	}
+	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+		t.Fatalf("Failed to create user-service dir: %v", err)
+	}
+
+	// Create settings.gradle
+	if err := os.WriteFile(filepath.Join(tmpDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0644); err != nil {
+		t.Fatalf("Failed to create settings.gradle: %v", err)
+	}
+
+	// Create root build.gradle
+	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte(rootBuildGradle), 0644); err != nil {
+		t.Fatalf("Failed to create root build.gradle: %v", err)
+	}
+
+	// Create shared-lib build.gradle
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0644); err != nil {
+		t.Fatalf("Failed to create shared-lib build.gradle: %v", err)
+	}
+
+	// Create user-service build.gradle
+	userServiceBuildPath := filepath.Join(userServiceDir, "build.gradle")
+	originalContent := userServiceBuildGradle
+	if err := os.WriteFile(userServiceBuildPath, []byte(originalContent), 0644); err != nil {
+		t.Fatalf("Failed to create user-service build.gradle: %v", err)
+	}
+
+	// Patch the project
+	patcher := spring.NewPatcher()
+	opts := &extractor.PatchOptions{
+		SpringdocVersion:    extractor.DefaultSpringdocVersion,
+		GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+	}
+
+	result, err := patcher.Patch(tmpDir, opts)
+	if err != nil {
+		t.Fatalf("Patch failed: %v", err)
+	}
+
+	// Verify file was modified
+	content, _ := os.ReadFile(userServiceBuildPath)
+	if string(content) == originalContent {
+		t.Error("File should have been modified")
+	}
+
+	// Restore original content
+	err = patcher.Restore(result.BuildFilePath, result.OriginalContent)
+	if err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+
+	// Verify file was restored
+	restoredContent, _ := os.ReadFile(userServiceBuildPath)
+	if string(restoredContent) != originalContent {
+		t.Error("File should be restored to original content")
+	}
+}

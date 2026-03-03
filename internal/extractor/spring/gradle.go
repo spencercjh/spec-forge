@@ -121,3 +121,13 @@ func (p *GradleParser) FindPlugin(project *model.Project, pluginID string) *mode
 	}
 	return nil
 }
+
+// HasSpringBootPlugin checks if build.gradle has the Spring Boot plugin.
+func (p *GradleParser) HasSpringBootPlugin(project *model.Project) bool {
+	for _, plugin := range project.Plugins {
+		if plugin.ID == "org.springframework.boot" || plugin.ID == "spring-boot" {
+			return true
+		}
+	}
+	return false
+}

@@ -63,6 +63,17 @@ func printProjectInfo(info *extractor.ProjectInfo) {
 	fmt.Printf("Build File:           %s\n", info.BuildFilePath)
 	fmt.Printf("Spring Boot:          %s\n", info.SpringBootVersion)
 
+	if info.IsMultiModule {
+		fmt.Printf("Multi-Module:         ✅ Yes\n")
+		fmt.Printf("Modules:              %v\n", info.Modules)
+		if info.MainModule != "" {
+			fmt.Printf("Main Module:          %s\n", info.MainModule)
+			fmt.Printf("Main Module Path:     %s\n", info.MainModulePath)
+		}
+	} else {
+		fmt.Printf("Multi-Module:         ❌ No\n")
+	}
+
 	if info.HasSpringdocDeps {
 		fmt.Printf("springdoc Dependency: ✅ Present (%s)\n", info.SpringdocVersion)
 	} else {

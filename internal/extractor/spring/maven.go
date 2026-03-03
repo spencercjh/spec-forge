@@ -158,3 +158,18 @@ func (p *MavenParser) AddPlugin(pom *gopom.Project, groupID, artifactID, version
 		*pom.Build.Plugins = append(*pom.Build.Plugins, plugin)
 	}
 }
+
+// GetModules returns the list of modules in a multi-module Maven project.
+func (p *MavenParser) GetModules(pom *gopom.Project) []string {
+	if pom.Modules == nil {
+		return nil
+	}
+
+	var modules []string
+	for _, module := range *pom.Modules {
+		if module != "" {
+			modules = append(modules, module)
+		}
+	}
+	return modules
+}

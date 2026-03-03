@@ -1,0 +1,4 @@
+rootProject.name = 'gradle-multi-module-demo'
+
+include 'shared-lib'
+include 'user-service'
