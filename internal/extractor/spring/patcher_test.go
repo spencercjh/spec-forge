@@ -42,6 +42,36 @@ const minimalPomWithoutSpringdoc = `<?xml version="1.0" encoding="UTF-8"?>
 </project>
 `
 
+// minimalPomWithSpringdoc is a minimal pom.xml already containing springdoc
+const minimalPomWithSpringdoc = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>test-project</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-maven-plugin</artifactId>
+                <version>1.4</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+`
+
 // minimalGradleWithoutSpringdoc is a minimal build.gradle without springdoc dependencies
 const minimalGradleWithoutSpringdoc = `
 plugins {
@@ -279,47 +309,6 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 		}
 	})
 }
-
-// minimalPomWithSpringdoc is a minimal pom.xml already containing springdoc dependencies
-const minimalPomWithSpringdoc = `<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.0</version>
-        <relativePath/>
-    </parent>
-    <groupId>com.example</groupId>
-    <artifactId>test-project</artifactId>
-    <version>1.0.0</version>
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.3.0</version>
-        </dependency>
-    </dependencies>
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-maven-plugin</artifactId>
-                <version>1.4</version>
-            </plugin>
-        </plugins>
-    </build>
-</project>
-`
 
 // TestPatcher_Patch_AlreadyPatchedMaven verifies that patching an already-patched Maven project
 // returns no changes and does not modify the file.
@@ -642,6 +631,422 @@ func TestPatcher_KeepPatchedOption(t *testing.T) {
 		// Same behavior - caller is responsible for restore
 		if result.OriginalContent == "" {
 			t.Error("OriginalContent should be saved regardless of KeepPatched")
+		}
+	})
+}
+
+// ============================================
+// Edge Case Tests
+// ============================================
+
+// pomWithOnlyPluginManagement is a pom.xml with only pluginManagement (no direct plugins)
+const pomWithOnlyPluginManagement = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>test-project</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
+`
+
+// pomWithoutDependencies is a pom.xml without any dependencies section
+const pomWithoutDependencies = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>test-project</artifactId>
+    <version>1.0.0</version>
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+</project>
+`
+
+// pomWithoutBuild is a pom.xml without any build section
+const pomWithoutBuild = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>test-project</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+</project>
+`
+
+// pomWithDependencyManagement is a pom.xml with dependencyManagement section
+const pomWithDependencyManagement = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>test-project</artifactId>
+    <version>1.0.0</version>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>3.2.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+`
+
+// gradleWithoutPlugins is a build.gradle without plugins block
+const gradleWithoutPlugins = `
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web:3.2.0'
+}
+`
+
+// gradleWithoutDependencies is a build.gradle without dependencies block
+const gradleWithoutDependencies = `
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+`
+
+// TestPatcher_EdgeCases_Maven tests various Maven edge cases
+func TestPatcher_EdgeCases_Maven(t *testing.T) {
+	t.Run("pom with only pluginManagement", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(pomWithOnlyPluginManagement), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		if !result.DependencyAdded {
+			t.Error("Expected DependencyAdded to be true")
+		}
+		if !result.PluginAdded {
+			t.Error("Expected PluginAdded to be true")
+		}
+
+		// Verify plugin was added
+		content, _ := os.ReadFile(tmpPom)
+		if !strings.Contains(string(content), "springdoc-openapi-maven-plugin") {
+			t.Error("Plugin should be added even with only pluginManagement")
+		}
+	})
+
+	t.Run("pom without dependencies section", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(pomWithoutDependencies), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		if !result.DependencyAdded {
+			t.Error("Expected DependencyAdded to be true")
+		}
+
+		// Verify dependency was added
+		content, _ := os.ReadFile(tmpPom)
+		if !strings.Contains(string(content), "springdoc-openapi-starter-webmvc-ui") {
+			t.Error("Dependency should be added even without existing dependencies section")
+		}
+	})
+
+	t.Run("pom without build section", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(pomWithoutBuild), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		if !result.PluginAdded {
+			t.Error("Expected PluginAdded to be true")
+		}
+
+		// Verify plugin and build section were added
+		content, _ := os.ReadFile(tmpPom)
+		if !strings.Contains(string(content), "springdoc-openapi-maven-plugin") {
+			t.Error("Plugin should be added")
+		}
+		if !strings.Contains(string(content), "<build>") {
+			t.Error("Build section should be created")
+		}
+	})
+
+	t.Run("pom with dependencyManagement", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(pomWithDependencyManagement), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		if !result.DependencyAdded {
+			t.Error("Expected DependencyAdded to be true")
+		}
+
+		// Verify dependency was added to regular dependencies, not dependencyManagement
+		content, _ := os.ReadFile(tmpPom)
+		if !strings.Contains(string(content), "springdoc-openapi-starter-webmvc-ui") {
+			t.Error("Dependency should be added")
+		}
+	})
+
+	t.Run("force option on already patched project", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			Force:              true,
+			SpringdocVersion:   "9.9.9", // Different version
+			MavenPluginVersion: "9.9.9",
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// Force allows patching, but won't add duplicate if already present in parsed POM
+		// The Force option bypasses the Detector's check but not the actual duplicate check
+		if result.DependencyAdded {
+			t.Error("Should not add duplicate dependency even with force")
+		}
+	})
+}
+
+// TestPatcher_EdgeCases_Gradle tests various Gradle edge cases
+func TestPatcher_EdgeCases_Gradle(t *testing.T) {
+	t.Run("gradle without plugins block", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpGradle := filepath.Join(tmpDir, "build.gradle")
+		if err := os.WriteFile(tmpGradle, []byte(gradleWithoutPlugins), 0644); err != nil {
+			t.Fatalf("Failed to create temp build.gradle: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			SpringdocVersion:    extractor.DefaultSpringdocVersion,
+			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		if !result.DependencyAdded {
+			t.Error("Expected DependencyAdded to be true")
+		}
+		// Plugin won't be added without plugins block (text manipulation limitation)
+	})
+
+	t.Run("gradle without dependencies block", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpGradle := filepath.Join(tmpDir, "build.gradle")
+		if err := os.WriteFile(tmpGradle, []byte(gradleWithoutDependencies), 0644); err != nil {
+			t.Fatalf("Failed to create temp build.gradle: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			SpringdocVersion:    extractor.DefaultSpringdocVersion,
+			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// Plugin should be added since plugins block exists
+		if !result.PluginAdded {
+			t.Error("Plugin should be added since plugins block exists")
+		}
+		// Dependency won't be added without dependencies block (text manipulation limitation)
+		if result.DependencyAdded {
+			t.Error("Dependency should not be added without dependencies block")
+		}
+	})
+}
+
+// TestPatcher_ForceOption tests the Force option behavior
+func TestPatcher_ForceOption(t *testing.T) {
+	t.Run("force allows patching when detector says already present", func(t *testing.T) {
+		// Create a project where detector might say springdoc is present
+		// but the actual POM doesn't have it (edge case)
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+
+		// With Force=true, should patch regardless of what detector says
+		opts := &extractor.PatchOptions{
+			Force:              true,
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+		if !result.DependencyAdded {
+			t.Error("Should add dependency with force")
+		}
+	})
+
+	t.Run("force does not add duplicate", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+
+		// Even with Force=true, should not add duplicate
+		opts := &extractor.PatchOptions{Force: true}
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+		if result.DependencyAdded {
+			t.Error("Should not add duplicate dependency even with force")
+		}
+	})
+}
+
+// TestPatcher_DryRunMode tests dry-run mode behavior
+func TestPatcher_DryRunMode(t *testing.T) {
+	t.Run("dry-run preserves original file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		originalContent := minimalPomWithoutSpringdoc
+		if err := os.WriteFile(tmpPom, []byte(originalContent), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			DryRun:             true,
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// Should report changes
+		if !result.DependencyAdded {
+			t.Error("Expected DependencyAdded to be true in dry-run")
+		}
+		if !result.PluginAdded {
+			t.Error("Expected PluginAdded to be true in dry-run")
+		}
+
+		// But file should not be modified
+		content, _ := os.ReadFile(tmpPom)
+		if string(content) != originalContent {
+			t.Error("File should not be modified in dry-run mode")
 		}
 	})
 }

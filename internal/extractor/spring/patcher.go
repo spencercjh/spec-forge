@@ -6,8 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/vifraa/gopom"
+
+	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
 // PatchResult contains the result of a patch operation.
@@ -259,8 +260,11 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 			return nil, err
 		}
 		if !parser.HasSpringdocDependency(build) {
-			modified = addGradleDependencyText(modified, opts.SpringdocVersion)
-			result.DependencyAdded = true
+			newContent := addGradleDependencyText(modified, opts.SpringdocVersion)
+			if newContent != modified {
+				modified = newContent
+				result.DependencyAdded = true
+			}
 		}
 	}
 
@@ -272,8 +276,11 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 			return nil, err
 		}
 		if !parser.HasSpringdocPlugin(build) {
-			modified = addGradlePluginText(modified, opts.GradlePluginVersion)
-			result.PluginAdded = true
+			newContent := addGradlePluginText(modified, opts.GradlePluginVersion)
+			if newContent != modified {
+				modified = newContent
+				result.PluginAdded = true
+			}
 		}
 	}
 
