@@ -15,7 +15,7 @@ BINARY_NAME=spec-forge
 BINARY_UNIX=$(BINARY_NAME)_unix
 
 # Main package
-MAIN_PACKAGE=./cmd/spec-forge
+MAIN_PACKAGE=.
 
 # Build directory
 BUILD_DIR=./build
