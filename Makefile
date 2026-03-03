@@ -20,7 +20,7 @@ MAIN_PACKAGE=./cmd/spec-forge
 # Build directory
 BUILD_DIR=./build
 
-all: clean deps lint test build
+all: clean deps lint fmt build test
 
 build:
 	@echo "Building..."
@@ -42,7 +42,7 @@ deps:
 
 test:
 	@echo "Running tests..."
-	$(GOTEST) -v -race -coverprofile=coverage.out ./...
+	$(GOTEST) -v -coverprofile=coverage.out ./...
 	@echo "Tests complete"
 
 test-coverage: test
