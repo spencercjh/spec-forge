@@ -1,6 +1,4 @@
-/*
-Copyright © 2026 Spencer Cjh <spencercjh@gmail.com>
-*/
+// Package cmd contains all CLI commands for spec-forge.
 package cmd
 
 import (

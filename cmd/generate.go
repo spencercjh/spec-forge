@@ -1,6 +1,4 @@
-/*
-Copyright © 2026 Spencer Cjh <spencercjh@gmail.com>
-*/
+// Package cmd contains all CLI commands for spec-forge.
 package cmd
 
 import (
@@ -18,7 +16,7 @@ extract -> enrich -> publish
 
 This is the main command that orchestrates the entire workflow.`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		path := "."
 		if len(args) > 0 {
 			path = args[0]

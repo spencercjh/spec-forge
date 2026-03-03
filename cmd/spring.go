@@ -1,6 +1,4 @@
-/*
-Copyright © 2026 Spencer Cjh <spencercjh@gmail.com>
-*/
+// Package cmd contains all CLI commands for spec-forge.
 package cmd
 
 import (
@@ -36,7 +34,7 @@ This command will identify:
 - Spring Boot version
 - springdoc-openapi dependency status`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
@@ -46,6 +44,11 @@ This command will identify:
 		return nil
 	},
 }
+
+var (
+	patchDryRun bool
+	patchForce  bool
+)
 
 // springPatchCmd represents the spring patch command
 var springPatchCmd = &cobra.Command{
@@ -59,24 +62,16 @@ This command will:
 - Add the appropriate springdoc dependency
 - Optionally update existing dependencies`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
 		}
-		dryRun, err := cmd.Flags().GetBool("dry-run")
-		if err != nil {
-			return err
-		}
-		force, err := cmd.Flags().GetBool("force")
-		if err != nil {
-			return err
-		}
 		fmt.Printf("Patching Spring project in %s...\n", path)
-		if dryRun {
+		if patchDryRun {
 			fmt.Println("Dry run mode - showing changes without modifying files")
 		}
-		if force {
+		if patchForce {
 			fmt.Println("Force mode - will overwrite existing dependencies")
 		}
 		fmt.Println("patch called - implementation coming soon")
@@ -88,6 +83,6 @@ func init() {
 	springCmd.AddCommand(springDetectCmd)
 	springCmd.AddCommand(springPatchCmd)
 
-	springPatchCmd.Flags().Bool("dry-run", false, "show changes without modifying files")
-	springPatchCmd.Flags().Bool("force", false, "force overwrite existing dependencies")
+	springPatchCmd.Flags().BoolVar(&patchDryRun, "dry-run", false, "show changes without modifying files")
+	springPatchCmd.Flags().BoolVar(&patchForce, "force", false, "force overwrite existing dependencies")
 }

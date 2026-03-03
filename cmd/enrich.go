@@ -1,6 +1,4 @@
-/*
-Copyright © 2026 Spencer Cjh <spencercjh@gmail.com>
-*/
+// Package cmd contains all CLI commands for spec-forge.
 package cmd
 
 import (
@@ -25,7 +23,7 @@ for APIs and fields.
 
 Supports multiple LLM providers: OpenAI, Anthropic, Ollama, and Zhipu GLM.`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		specFile := "openapi.yaml"
 		if len(args) > 0 {
 			specFile = args[0]

@@ -1,6 +1,4 @@
-/*
-Copyright © 2026 Spencer Cjh <spencercjh@gmail.com>
-*/
+// Package cmd contains all CLI commands for spec-forge.
 package cmd
 
 import (
@@ -19,7 +17,7 @@ var extractCmd = &cobra.Command{
 
 Supports multiple frameworks including Spring (Java), Go frameworks, and more.`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
