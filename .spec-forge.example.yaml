@@ -1,0 +1,25 @@
+# Spec Forge Example Configuration
+# Copy this file to .spec-forge.yaml and customize as needed
+
+# LLM Enrichment Settings
+enrich:
+  # Enable/disable LLM enrichment
+  enabled: true
+  # LLM provider: openai, anthropic, azure
+  provider: openai
+  # Model to use for enrichment
+  model: gpt-4
+  # API key (can also be set via SPEC_FORGE_LLM_API_KEY environment variable)
+  # apiKey: sk-xxx
+
+# Output Settings
+output:
+  # Output directory for generated OpenAPI specs
+  dir: ./openapi
+  # Output format: yaml or json
+  format: yaml
+
+# Extraction Settings
+extract:
+  # Enable strict mode (fail on warnings)
+  strict: false
