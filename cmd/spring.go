@@ -4,6 +4,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/spencercjh/spec-forge/internal/extractor"
+	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 	"github.com/spf13/cobra"
 )
 
@@ -34,15 +36,44 @@ This command will identify:
 - Spring Boot version
 - springdoc-openapi dependency status`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		path := "."
-		if len(args) > 0 {
-			path = args[0]
-		}
-		fmt.Printf("Detecting Spring project in %s...\n", path)
-		fmt.Println("detect called - implementation coming soon")
-		return nil
-	},
+	RunE: runSpringDetect,
+}
+
+func runSpringDetect(_ *cobra.Command, args []string) error {
+	path := "."
+	if len(args) > 0 {
+		path = args[0]
+	}
+
+	detector := spring.NewDetector()
+	info, err := detector.Detect(path)
+	if err != nil {
+		return fmt.Errorf("detection failed: %w", err)
+	}
+
+	// Print human-readable output
+	printProjectInfo(info)
+	return nil
+}
+
+func printProjectInfo(info *extractor.ProjectInfo) {
+	fmt.Println("Spring Project Detection Results")
+	fmt.Println("================================")
+	fmt.Printf("Build Tool:           %s\n", info.BuildTool)
+	fmt.Printf("Build File:           %s\n", info.BuildFilePath)
+	fmt.Printf("Spring Boot:          %s\n", info.SpringBootVersion)
+
+	if info.HasSpringdocDeps {
+		fmt.Printf("springdoc Dependency: ✅ Present (%s)\n", info.SpringdocVersion)
+	} else {
+		fmt.Println("springdoc Dependency: ❌ Not found")
+	}
+
+	if info.HasSpringdocPlugin {
+		fmt.Println("springdoc Plugin:     ✅ Configured")
+	} else {
+		fmt.Println("springdoc Plugin:     ❌ Not configured")
+	}
 }
 
 var (
@@ -62,21 +93,52 @@ This command will:
 - Add the appropriate springdoc dependency
 - Optionally update existing dependencies`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		path := "."
-		if len(args) > 0 {
-			path = args[0]
-		}
-		fmt.Printf("Patching Spring project in %s...\n", path)
-		if patchDryRun {
-			fmt.Println("Dry run mode - showing changes without modifying files")
-		}
-		if patchForce {
-			fmt.Println("Force mode - will overwrite existing dependencies")
-		}
-		fmt.Println("patch called - implementation coming soon")
-		return nil
-	},
+	RunE: runSpringPatch,
+}
+
+func runSpringPatch(_ *cobra.Command, args []string) error {
+	path := "."
+	if len(args) > 0 {
+		path = args[0]
+	}
+
+	opts := &extractor.PatchOptions{
+		DryRun: patchDryRun,
+		Force:  patchForce,
+	}
+
+	patcher := spring.NewPatcher()
+	result, err := patcher.Patch(path, opts)
+	if err != nil {
+		return fmt.Errorf("patch failed: %w", err)
+	}
+
+	// Print results
+	if opts.DryRun {
+		fmt.Println("Dry run mode - showing changes without modifying files")
+	}
+
+	fmt.Printf("Build file: %s\n", result.BuildFilePath)
+
+	if result.DependencyAdded {
+		fmt.Println("✅ springdoc dependency will be added")
+	} else {
+		fmt.Println("⏭️  springdoc dependency already present")
+	}
+
+	if result.PluginAdded {
+		fmt.Println("✅ springdoc plugin will be added")
+	} else {
+		fmt.Println("⏭️  springdoc plugin already configured")
+	}
+
+	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
+		fmt.Println("\nPatch applied successfully!")
+	} else if !result.DependencyAdded && !result.PluginAdded {
+		fmt.Println("\nNo changes needed.")
+	}
+
+	return nil
 }
 
 func init() {
