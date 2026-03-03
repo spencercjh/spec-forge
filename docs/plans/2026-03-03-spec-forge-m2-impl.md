@@ -1,1524 +1,375 @@
-# M2: Spring Detection and Patch Implementation Plan
+# M2: Spring Detection and Patch Implementation Summary
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
-**Goal:** Implement Spring project detection and patching functionality for Maven and Gradle projects.
-
-**Architecture:** Layered architecture under `internal/extractor/spring/` with detector, patcher, maven, and gradle modules. Detector identifies project info, Patcher modifies build files using maven/gradle parsers.
-
-**Tech Stack:** Go 1.26, `vifraa/gopom` for Maven, `scagogogo/gradle-parser` for Gradle
+> **日期：** 2026-03-03
+> **状态：** 已完成
+> **里程碑：** M2
 
 ---
 
-## Task 1: Add Dependencies
+## 概述
 
-**Files:**
-- Modify: `go.mod`
+本文档记录 M2 里程碑的实际实现细节，与设计文档 `2026-03-03-spec-forge-m2-design.md` 配套阅读。
 
-**Step 1: Add required dependencies**
+---
 
-Run:
-```bash
-go get github.com/vifraa/gopom@latest
-go get github.com/scagogogo/gradle-parser@latest
+## 1. 实现的文件结构
+
 ```
+internal/
+└── extractor/
+    ├── types.go                    # 核心类型定义
+    ├── types_test.go               # 类型测试
+    └── spring/
+        ├── springdoc.go            # 共享常量
+        ├── detector.go             # 项目检测
+        ├── detector_test.go        # 检测测试
+        ├── patcher.go              # Patch 逻辑
+        ├── patcher_test.go         # Patch 测试
+        ├── maven.go                # Maven 解析器
+        ├── maven_test.go           # Maven 测试
+        ├── gradle.go               # Gradle 解析器
+        └── gradle_test.go          # Gradle 测试
 
-**Step 2: Verify dependencies**
+cmd/
+├── spring.go                       # spring detect/patch 命令
+└── generate.go                     # generate 命令（含 --keep-patched）
 
-Run: `cat go.mod | grep -E "gopom|gradle-parser"`
-Expected: Both dependencies listed
-
-**Step 3: Commit**
-
-```bash
-git add go.mod go.sum
-git commit -m "chore: add gopom and gradle-parser dependencies"
+integration-tests/
+├── maven-springboot-openapi-demo/  # 单模块 Maven 示例
+├── gradle-springboot-openapi-demo/ # 单模块 Gradle 示例
+├── maven-multi-module-demo/        # 多模块 Maven 示例
+└── gradle-multi-module-demo/       # 多模块 Gradle 示例
 ```
 
 ---
 
-## Task 2: Create Types and Interfaces
+## 2. 核心类型实现
 
-**Files:**
-- Create: `internal/extractor/types.go`
-- Create: `internal/extractor/types_test.go`
-
-**Step 1: Write the failing test**
+### types.go
 
 ```go
-// Package extractor_test tests the extractor types and interfaces.
-package extractor_test
-
-import (
-	"testing"
-
-	"github.com/spencercjh/spec-forge/internal/extractor"
-)
-
-func TestBuildToolConstants(t *testing.T) {
-	tests := []struct {
-		name     string
-		tool     extractor.BuildTool
-		expected string
-	}{
-		{"maven", extractor.BuildToolMaven, "maven"},
-		{"gradle", extractor.BuildToolGradle, "gradle"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if string(tt.tool) != tt.expected {
-				t.Errorf("BuildTool %s = %s, want %s", tt.name, tt.tool, tt.expected)
-			}
-		})
-	}
-}
-
-func TestDefaultVersions(t *testing.T) {
-	if extractor.DefaultSpringdocVersion == "" {
-		t.Error("DefaultSpringdocVersion should not be empty")
-	}
-	if extractor.DefaultSpringdocMavenPlugin == "" {
-		t.Error("DefaultSpringdocMavenPlugin should not be empty")
-	}
-	if extractor.DefaultSpringdocGradlePlugin == "" {
-		t.Error("DefaultSpringdocGradlePlugin should not be empty")
-	}
-}
-
-func TestProjectInfoDefaults(t *testing.T) {
-	info := extractor.ProjectInfo{}
-	if info.BuildTool != "" {
-		t.Error("BuildTool should default to empty")
-	}
-	if info.HasSpringdocDeps {
-		t.Error("HasSpringdocDeps should default to false")
-	}
-}
-
-func TestPatchOptionsDefaults(t *testing.T) {
-	opts := extractor.PatchOptions{}
-	if opts.DryRun {
-		t.Error("DryRun should default to false")
-	}
-	if opts.Force {
-		t.Error("Force should default to false")
-	}
-}
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `go test ./internal/extractor/... -v`
-Expected: FAIL with "package not found"
-
-**Step 3: Create the types file**
-
-```go
-// Package extractor provides interfaces and types for extracting OpenAPI specs from projects.
 package extractor
 
-// BuildTool represents the build tool type for a project.
+// BuildTool 表示构建工具类型
 type BuildTool string
 
 const (
-	// BuildToolMaven represents Maven build tool.
-	BuildToolMaven BuildTool = "maven"
-	// BuildToolGradle represents Gradle build tool.
-	BuildToolGradle BuildTool = "gradle"
+    BuildToolMaven  BuildTool = "maven"
+    BuildToolGradle BuildTool = "gradle"
 )
 
-// Default version constants (convention over configuration).
+// 默认版本常量
 const (
-	DefaultSpringdocVersion       = "3.0.2"
-	DefaultSpringdocMavenPlugin   = "1.5"
-	DefaultSpringdocGradlePlugin  = "1.9.0"
+    DefaultSpringdocVersion      = "3.0.2"
+    DefaultSpringdocMavenPlugin  = "1.5"
+    DefaultSpringdocGradlePlugin = "1.9.0"
 )
 
-// ProjectInfo contains detected information about a Spring project.
+// ProjectInfo 包含检测到的项目信息
 type ProjectInfo struct {
-	BuildTool          BuildTool // Maven or Gradle
-	BuildFilePath      string    // pom.xml or build.gradle path
-	SpringBootVersion  string    // Spring Boot version
-	HasSpringdocDeps   bool      // Whether springdoc dependencies exist
-	HasSpringdocPlugin bool      // Whether springdoc plugin is configured
-	SpringdocVersion   string    // Existing springdoc version if any
+    BuildTool          BuildTool
+    BuildFilePath      string
+    SpringBootVersion  string
+    HasSpringdocDeps   bool
+    HasSpringdocPlugin bool
+    SpringdocVersion   string
+
+    // 多模块项目支持
+    IsMultiModule    bool
+    Modules          []string
+    MainModule       string
+    MainModulePath   string
 }
 
-// PatchOptions configures the patch behavior.
+// PatchOptions 配置 patch 行为
 type PatchOptions struct {
-	DryRun              bool   // Only print changes, don't write
-	Force               bool   // Force overwrite existing dependencies
-	SpringdocVersion    string // springdoc version (default: built-in)
-	MavenPluginVersion  string // Maven plugin version (default: built-in)
-	GradlePluginVersion string // Gradle plugin version (default: built-in)
+    DryRun              bool
+    Force               bool
+    SpringdocVersion    string
+    MavenPluginVersion  string
+    GradlePluginVersion string
+    KeepPatched         bool  // 新增：控制是否保留修改
 }
 ```
 
-**Step 4: Run test to verify it passes**
-
-Run: `go test ./internal/extractor/... -v`
-Expected: PASS
-
-**Step 5: Commit**
-
-```bash
-git add internal/extractor/types.go internal/extractor/types_test.go
-git commit -m "feat(extractor): add types and constants for project detection"
-```
-
----
-
-## Task 3: Create Detector Interface and Implementation
-
-**Files:**
-- Create: `internal/extractor/spring/detector.go`
-- Create: `internal/extractor/spring/detector_test.go`
-
-**Step 1: Write the failing test for detector**
-
-```go
-// Package spring_test tests the Spring extractor implementation.
-package spring_test
-
-import (
-	"os"
-	"path/filepath"
-	"testing"
-
-	"github.com/spencercjh/spec-forge/internal/extractor"
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
-)
-
-func TestDetector_Detect_NoBuildFile(t *testing.T) {
-	// Create temp dir without build files
-	tmpDir := t.TempDir()
-
-	detector := spring.NewDetector()
-	_, err := detector.Detect(tmpDir)
-
-	if err == nil {
-		t.Error("Expected error when no build file found")
-	}
-}
-
-func TestDetector_Detect_MavenProject(t *testing.T) {
-	// Use the integration test project
-	projectPath := "../../../integration-tests/maven-springboot-openapi-demo"
-
-	// Skip if project doesn't exist (CI environment)
-	if _, err := os.Stat(filepath.Join(projectPath, "pom.xml")); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	detector := spring.NewDetector()
-	info, err := detector.Detect(projectPath)
-
-	if err != nil {
-		t.Fatalf("Detect failed: %v", err)
-	}
-
-	if info.BuildTool != extractor.BuildToolMaven {
-		t.Errorf("BuildTool = %s, want %s", info.BuildTool, extractor.BuildToolMaven)
-	}
-
-	if info.BuildFilePath == "" {
-		t.Error("BuildFilePath should not be empty")
-	}
-
-	if !info.HasSpringdocDeps {
-		t.Error("HasSpringdocDeps should be true for this project")
-	}
-}
-
-func TestDetector_Detect_GradleProject(t *testing.T) {
-	// Use the integration test project
-	projectPath := "../../../integration-tests/gradle-springboot-openapi-demo"
-
-	// Skip if project doesn't exist (CI environment)
-	if _, err := os.Stat(filepath.Join(projectPath, "build.gradle")); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	detector := spring.NewDetector()
-	info, err := detector.Detect(projectPath)
-
-	if err != nil {
-		t.Fatalf("Detect failed: %v", err)
-	}
-
-	if info.BuildTool != extractor.BuildToolGradle {
-		t.Errorf("BuildTool = %s, want %s", info.BuildTool, extractor.BuildToolGradle)
-	}
-
-	if info.BuildFilePath == "" {
-		t.Error("BuildFilePath should not be empty")
-	}
-
-	if !info.HasSpringdocDeps {
-		t.Error("HasSpringdocDeps should be true for this project")
-	}
-}
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `go test ./internal/extractor/spring/... -v`
-Expected: FAIL with "package not found"
-
-**Step 3: Create the detector implementation**
-
-```go
-// Package spring provides Spring framework specific extraction functionality.
-package spring
-
-import (
-	"fmt"
-	"os"
-	"path/filepath"
-
-	"github.com/spencercjh/spec-forge/internal/extractor"
-)
-
-// Detector detects Spring project information.
-type Detector struct{}
-
-// NewDetector creates a new Detector instance.
-func NewDetector() *Detector {
-	return &Detector{}
-}
-
-// Detect analyzes a Spring project and returns its information.
-func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
-	absPath, err := filepath.Abs(projectPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve path: %w", err)
-	}
-
-	// Check for Maven project first
-	pomPath := filepath.Join(absPath, "pom.xml")
-	if _, err := os.Stat(pomPath); err == nil {
-		return d.detectMavenProject(absPath, pomPath)
-	}
-
-	// Check for Gradle project
-	gradlePath := filepath.Join(absPath, "build.gradle")
-	if _, err := os.Stat(gradlePath); err == nil {
-		return d.detectGradleProject(absPath, gradlePath)
-	}
-
-	return nil, fmt.Errorf("no build file found (pom.xml or build.gradle) in %s", absPath)
-}
-
-// detectMavenProject analyzes a Maven project.
-func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.ProjectInfo, error) {
-	info := &extractor.ProjectInfo{
-		BuildTool:     extractor.BuildToolMaven,
-		BuildFilePath: pomPath,
-	}
-
-	// Parse pom.xml using maven parser
-	mavenParser := NewMavenParser()
-	pom, err := mavenParser.Parse(pomPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse pom.xml: %w", err)
-	}
-
-	// Extract Spring Boot version
-	info.SpringBootVersion = mavenParser.GetSpringBootVersion(pom)
-
-	// Check for springdoc dependencies
-	info.HasSpringdocDeps = mavenParser.HasSpringdocDependency(pom)
-	info.SpringdocVersion = mavenParser.GetSpringdocVersion(pom)
-
-	// Check for springdoc plugin
-	info.HasSpringdocPlugin = mavenParser.HasSpringdocPlugin(pom)
-
-	return info, nil
-}
-
-// detectGradleProject analyzes a Gradle project.
-func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extractor.ProjectInfo, error) {
-	info := &extractor.ProjectInfo{
-		BuildTool:     extractor.BuildToolGradle,
-		BuildFilePath: gradlePath,
-	}
-
-	// Parse build.gradle using gradle parser
-	gradleParser := NewGradleParser()
-	build, err := gradleParser.Parse(gradlePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse build.gradle: %w", err)
-	}
-
-	// Extract Spring Boot version
-	info.SpringBootVersion = gradleParser.GetSpringBootVersion(build)
-
-	// Check for springdoc dependencies
-	info.HasSpringdocDeps = gradleParser.HasSpringdocDependency(build)
-	info.SpringdocVersion = gradleParser.GetSpringdocVersion(build)
-
-	// Check for springdoc plugin
-	info.HasSpringdocPlugin = gradleParser.HasSpringdocPlugin(build)
-
-	return info, nil
-}
-```
-
-**Step 4: Run test to verify it fails (parser not implemented)**
-
-Run: `go test ./internal/extractor/spring/... -v`
-Expected: FAIL with "undefined: NewMavenParser" or similar
-
-**Step 5: Commit detector (will fix in next task)**
-
-```bash
-git add internal/extractor/spring/detector.go internal/extractor/spring/detector_test.go
-git commit -m "feat(spring): add detector skeleton for Spring project detection"
-```
-
----
-
-## Task 4: Implement Maven Parser
-
-**Files:**
-- Create: `internal/extractor/spring/maven.go`
-- Create: `internal/extractor/spring/maven_test.go`
-
-**Step 1: Write the failing test for Maven parser**
-
-```go
-// Package spring_test tests the Spring extractor implementation.
-package spring_test
-
-import (
-	"os"
-	"path/filepath"
-	"testing"
-
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
-	"github.com/vifraa/gopom"
-)
-
-func TestMavenParser_Parse(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
-
-	// Skip if project doesn't exist
-	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewMavenParser()
-	pom, err := parser.Parse(pomPath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if pom == nil {
-		t.Fatal("Parsed pom should not be nil")
-	}
-}
-
-func TestMavenParser_GetSpringBootVersion(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
-
-	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewMavenParser()
-	pom, err := parser.Parse(pomPath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	version := parser.GetSpringBootVersion(pom)
-	if version == "" {
-		t.Error("Spring Boot version should not be empty")
-	}
-	// The demo project uses Spring Boot 4.0.3
-	if version != "4.0.3" {
-		t.Logf("Warning: Expected Spring Boot 4.0.3, got %s", version)
-	}
-}
-
-func TestMavenParser_HasSpringdocDependency(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
-
-	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewMavenParser()
-	pom, err := parser.Parse(pomPath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if !parser.HasSpringdocDependency(pom) {
-		t.Error("HasSpringdocDependency should be true for demo project")
-	}
-}
-
-func TestMavenParser_GetSpringdocVersion(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
-
-	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewMavenParser()
-	pom, err := parser.Parse(pomPath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	version := parser.GetSpringdocVersion(pom)
-	if version == "" {
-		t.Error("Springdoc version should not be empty for demo project")
-	}
-}
-
-func TestMavenParser_HasSpringdocPlugin(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
-
-	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewMavenParser()
-	pom, err := parser.Parse(pomPath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if !parser.HasSpringdocPlugin(pom) {
-		t.Error("HasSpringdocPlugin should be true for demo project")
-	}
-}
-
-func TestMavenParser_FindDependency(t *testing.T) {
-	parser := spring.NewMavenParser()
-
-	// Create a minimal pom for testing
-	pom := &gopom.Model{
-		Dependencies: &gopom.Dependencies{
-			Dependencies: []gopom.Dependency{
-				{
-					GroupId:    ptr("org.springframework.boot"),
-					ArtifactId: ptr("spring-boot-starter-web"),
-					Version:    ptr("4.0.3"),
-				},
-			},
-		},
-	}
-
-	dep := parser.FindDependency(pom, "org.springframework.boot", "spring-boot-starter-web")
-	if dep == nil {
-		t.Fatal("Should find spring-boot-starter-web dependency")
-	}
-	if *dep.Version != "4.0.3" {
-		t.Errorf("Version = %s, want 4.0.3", *dep.Version)
-	}
-}
-
-// ptr is a helper to create string pointers.
-func ptr(s string) *string {
-	return &s
-}
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `go test ./internal/extractor/spring/... -v -run MavenParser`
-Expected: FAIL with "undefined: NewMavenParser"
-
-**Step 3: Implement Maven parser**
+### spring/springdoc.go
 
 ```go
 package spring
 
-import (
-	"fmt"
-	"os"
-	"strings"
-
-	"github.com/vifraa/gopom"
-)
-
-// Springdoc group and artifact constants.
+// Springdoc 常量（Maven/Gradle 通用）
 const (
-	SpringdocGroupID             = "org.springdoc"
-	SpringdocWebMVCArtifactID    = "springdoc-openapi-starter-webmvc-ui"
-	SpringdocMavenPluginArtifact = "springdoc-openapi-maven-plugin"
-	SpringBootParentGroupID      = "org.springframework.boot"
-	SpringBootParentArtifactID   = "spring-boot-starter-parent"
+    SpringdocGroupID             = "org.springdoc"
+    SpringdocWebMVCArtifactID    = "springdoc-openapi-starter-webmvc-ui"
+    SpringdocMavenPluginArtifact = "springdoc-openapi-maven-plugin"
+    SpringdocGradlePluginID      = "org.springdoc.openapi-gradle-plugin"
 )
 
-// MavenParser parses and modifies Maven pom.xml files.
+// Spring Boot 常量
+const (
+    SpringBootParentGroupID    = "org.springframework.boot"
+    SpringBootParentArtifactID = "spring-boot-starter-parent"
+)
+```
+
+---
+
+## 3. 核心组件实现
+
+### spring/detector.go
+
+**职责：** 项目检测入口，组合 Maven/Gradle 解析器
+
+```go
+type Detector struct {
+    mavenParser  *MavenParser
+    gradleParser *GradleParser
+}
+
+func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error)
+func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.ProjectInfo, error)
+func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extractor.ProjectInfo, error)
+```
+
+**检测流程：**
+1. 检查 `pom.xml` 或 `build.gradle` 是否存在
+2. 解析构建文件
+3. 检测多模块项目（Maven: `<modules>`, Gradle: `settings.gradle`）
+4. 如果是多模块，查找主模块（有 Spring Boot 插件的模块）
+5. 提取 Spring Boot 版本、springdoc 依赖/插件状态
+
+### spring/patcher.go
+
+**职责：** Patch 逻辑，包含文件恢复机制
+
+```go
+type PatchResult struct {
+    DependencyAdded bool
+    PluginAdded     bool
+    BuildFilePath   string
+    OriginalContent string  // 原始文件内容，用于恢复
+}
+
+type Patcher struct {
+    detector     *Detector
+    mavenParser  *MavenParser
+    gradleParser *GradleParser
+}
+
+func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*PatchResult, error)
+func (p *Patcher) Restore(buildFilePath, originalContent string) error
+```
+
+**Patch 流程：**
+1. 调用 `detector.Detect()` 获取项目信息
+2. 确定目标构建文件（多模块用主模块路径）
+3. **保存原始文件内容到 `OriginalContent`**
+4. 根据构建工具调用相应的 patch 方法
+5. 返回 `PatchResult`
+
+**恢复机制：**
+```go
+// generate 命令中的使用
+if !generateKeepPatched && result.OriginalContent != "" {
+    defer func() {
+        patcher.Restore(result.BuildFilePath, result.OriginalContent)
+    }()
+}
+```
+
+### spring/maven.go
+
+**职责：** Maven pom.xml 解析、修改、多模块支持
+
+```go
 type MavenParser struct{}
 
-// NewMavenParser creates a new MavenParser instance.
-func NewMavenParser() *MavenParser {
-	return &MavenParser{}
-}
+// 解析方法
+func (p *MavenParser) Parse(pomPath string) (*gopom.Project, error)
+func (p *MavenParser) GetSpringBootVersion(pom *gopom.Project) string
+func (p *MavenParser) HasSpringdocDependency(pom *gopom.Project) bool
+func (p *MavenParser) GetSpringdocVersion(pom *gopom.Project) string
+func (p *MavenParser) HasSpringdocPlugin(pom *gopom.Project) bool
 
-// Parse reads and parses a pom.xml file.
-func (p *MavenParser) Parse(pomPath string) (*gopom.Model, error) {
-	file, err := os.Open(pomPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open pom.xml: %w", err)
-	}
-	defer file.Close()
+// 多模块支持
+func (p *MavenParser) GetModules(pom *gopom.Project) []string
+func (p *MavenParser) HasSpringBootPlugin(pom *gopom.Project) bool
+func (p *MavenParser) FindMainModule(projectPath string, modules []string) (string, string)
 
-	pom, err := gopom.Parse(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse pom.xml: %w", err)
-	}
-
-	return pom, nil
-}
-
-// GetSpringBootVersion extracts the Spring Boot version from a pom.
-func (p *MavenParser) GetSpringBootVersion(pom *gopom.Model) string {
-	// Check parent version (most common case)
-	if pom.Parent != nil && pom.Parent.Version != nil {
-		if pom.Parent.GroupId != nil && *pom.Parent.GroupId == SpringBootParentGroupID {
-			if pom.Parent.ArtifactId != nil && *pom.Parent.ArtifactId == SpringBootParentArtifactID {
-				return *pom.Parent.Version
-			}
-		}
-	}
-
-	// Check dependency management
-	if pom.DependencyManagement != nil && pom.DependencyManagement.Dependencies != nil {
-		for _, dep := range pom.DependencyManagement.Dependencies.Dependencies {
-			if dep.GroupId != nil && *dep.GroupId == SpringBootParentGroupID {
-				if dep.ArtifactId != nil && *dep.ArtifactId == SpringBootParentArtifactID {
-					if dep.Version != nil {
-						return *dep.Version
-					}
-				}
-			}
-		}
-	}
-
-	return ""
-}
-
-// HasSpringdocDependency checks if the pom has springdoc dependencies.
-func (p *MavenParser) HasSpringdocDependency(pom *gopom.Model) bool {
-	return p.FindDependency(pom, SpringdocGroupID, SpringdocWebMVCArtifactID) != nil
-}
-
-// GetSpringdocVersion returns the springdoc version if present.
-func (p *MavenParser) GetSpringdocVersion(pom *gopom.Model) string {
-	dep := p.FindDependency(pom, SpringdocGroupID, SpringdocWebMVCArtifactID)
-	if dep != nil && dep.Version != nil {
-		// Handle ${springdoc.version} style references
-		version := *dep.Version
-		if strings.HasPrefix(version, "${") && strings.HasSuffix(version, "}") {
-			propName := strings.Trim(version, "${}")
-			if pom.Properties != nil {
-				if val, ok := pom.Properties.Properties[propName]; ok {
-					return val
-				}
-			}
-		}
-		return version
-	}
-	return ""
-}
-
-// HasSpringdocPlugin checks if the pom has the springdoc maven plugin.
-func (p *MavenParser) HasSpringdocPlugin(pom *gopom.Model) bool {
-	if pom.Build == nil || pom.Build.Plugins == nil {
-		return false
-	}
-
-	for _, plugin := range pom.Build.Plugins.Plugins {
-		if plugin.GroupId != nil && *plugin.GroupId == SpringdocGroupID {
-			if plugin.ArtifactId != nil && *plugin.ArtifactId == SpringdocMavenPluginArtifact {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// FindDependency finds a dependency by groupId and artifactId.
-func (p *MavenParser) FindDependency(pom *gopom.Model, groupID, artifactID string) *gopom.Dependency {
-	if pom.Dependencies == nil {
-		return nil
-	}
-
-	for i := range pom.Dependencies.Dependencies {
-		dep := &pom.Dependencies.Dependencies[i]
-		if dep.GroupId != nil && *dep.GroupId == groupID {
-			if dep.ArtifactId != nil && *dep.ArtifactId == artifactID {
-				return dep
-			}
-		}
-	}
-
-	return nil
-}
-
-// AddDependency adds a dependency to the pom.
-func (p *MavenParser) AddDependency(pom *gopom.Model, groupID, artifactID, version string) {
-	if pom.Dependencies == nil {
-		pom.Dependencies = &gopom.Dependencies{}
-	}
-
-	pom.Dependencies.Dependencies = append(pom.Dependencies.Dependencies, gopom.Dependency{
-		GroupId:    &groupID,
-		ArtifactId: &artifactID,
-		Version:    &version,
-	})
-}
-
-// AddPlugin adds a plugin to the pom build section.
-func (p *MavenParser) AddPlugin(pom *gopom.Model, groupID, artifactID, version string) {
-	if pom.Build == nil {
-		pom.Build = &gopom.Build{}
-	}
-	if pom.Build.Plugins == nil {
-		pom.Build.Plugins = &gopom.Plugins{}
-	}
-
-	pom.Build.Plugins.Plugins = append(pom.Build.Plugins.Plugins, gopom.Plugin{
-		GroupId:    &groupID,
-		ArtifactId: &artifactID,
-		Version:    &version,
-		Executions: &gopom.Executions{
-			Executions: []gopom.Execution{
-				{
-					Goals: &gopom.Goals{
-						Goals: []string{"generate"},
-					},
-				},
-			},
-		},
-	})
-}
+// Patch 方法
+func (p *MavenParser) AddDependency(pom *gopom.Project, groupID, artifactID, version string)
+func (p *MavenParser) AddPlugin(pom *gopom.Project, groupID, artifactID, version string)
+func (p *MavenParser) HasDependency(pom *gopom.Project) bool
+func (p *MavenParser) HasPlugin(pom *gopom.Project) bool
+func (p *MavenParser) MarshalPom(pom *gopom.Project) ([]byte, error)
 ```
 
-**Step 4: Run test to verify it passes**
+### spring/gradle.go
 
-Run: `go test ./internal/extractor/spring/... -v -run MavenParser`
-Expected: PASS
-
-**Step 5: Commit**
-
-```bash
-git add internal/extractor/spring/maven.go internal/extractor/spring/maven_test.go
-git commit -m "feat(spring): implement Maven parser with gopom"
-```
-
----
-
-## Task 5: Implement Gradle Parser
-
-**Files:**
-- Create: `internal/extractor/spring/gradle.go`
-- Create: `internal/extractor/spring/gradle_test.go`
-
-**Step 1: Write the failing test for Gradle parser**
+**职责：** Gradle build.gradle 解析、文本修改、多模块支持
 
 ```go
-// Package spring_test tests the Spring extractor implementation.
-package spring_test
-
-import (
-	"os"
-	"testing"
-
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
-)
-
-func TestGradleParser_Parse(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
-
-	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewGradleParser()
-	build, err := parser.Parse(gradlePath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if build == nil {
-		t.Fatal("Parsed build.gradle should not be nil")
-	}
-}
-
-func TestGradleParser_HasSpringdocDependency(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
-
-	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewGradleParser()
-	build, err := parser.Parse(gradlePath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if !parser.HasSpringdocDependency(build) {
-		t.Error("HasSpringdocDependency should be true for demo project")
-	}
-}
-
-func TestGradleParser_HasSpringdocPlugin(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
-
-	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewGradleParser()
-	build, err := parser.Parse(gradlePath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if !parser.HasSpringdocPlugin(build) {
-		t.Error("HasSpringdocPlugin should be true for demo project")
-	}
-}
-
-func TestGradleParser_GetSpringdocVersion(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
-
-	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
-		t.Skip("Integration test project not found")
-	}
-
-	parser := spring.NewGradleParser()
-	build, err := parser.Parse(gradlePath)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	version := parser.GetSpringdocVersion(build)
-	if version == "" {
-		t.Error("Springdoc version should not be empty for demo project")
-	}
-}
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `go test ./internal/extractor/spring/... -v -run GradleParser`
-Expected: FAIL with "undefined: NewGradleParser"
-
-**Step 3: Implement Gradle parser**
-
-```go
-package spring
-
-import (
-	"fmt"
-	"os"
-	"strings"
-
-	gradleparser "github.com/scagogogo/gradle-parser"
-)
-
-// Gradle parser constants.
-const (
-	SpringdocGradlePluginID = "org.springdoc.openapi-gradle-plugin"
-)
-
-// GradleParser parses and modifies Gradle build.gradle files.
 type GradleParser struct{}
 
-// NewGradleParser creates a new GradleParser instance.
-func NewGradleParser() *GradleParser {
-	return &GradleParser{}
-}
+// 解析方法
+func (p *GradleParser) Parse(gradlePath string) (*model.Project, error)
+func (p *GradleParser) ParseString(content string) (*model.Project, error)
+func (p *GradleParser) GetSpringBootVersion(project *model.Project) string
+func (p *GradleParser) HasSpringdocDependency(project *model.Project) bool
+func (p *GradleParser) GetSpringdocVersion(project *model.Project) string
+func (p *GradleParser) HasSpringdocPlugin(project *model.Project) bool
 
-// Parse reads and parses a build.gradle file.
-func (p *GradleParser) Parse(gradlePath string) (*gradleparser.GradleModule, error) {
-	content, err := os.ReadFile(gradlePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read build.gradle: %w", err)
-	}
+// 多模块支持
+func (p *GradleParser) ParseModules(settingsPath string) []string
+func (p *GradleParser) HasSpringBootPlugin(project *model.Project) bool
+func (p *GradleParser) FindMainModule(projectPath string, modules []string) (string, string)
 
-	module, err := gradleparser.Parse(string(content))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse build.gradle: %w", err)
-	}
-
-	return module, nil
-}
-
-// GetSpringBootVersion extracts the Spring Boot version from build.gradle.
-func (p *GradleParser) GetSpringBootVersion(build *gradleparser.GradleModule) string {
-	// Check plugins block for spring-boot
-	for _, plugin := range build.Plugins {
-		if plugin.ID == "org.springframework.boot" || plugin.ID == "spring-boot" {
-			if plugin.Version != "" {
-				return plugin.Version
-			}
-		}
-	}
-
-	// Check dependencies for spring-boot-starter
-	for _, dep := range build.Dependencies {
-		if strings.Contains(dep.Name, "spring-boot-starter") {
-			if dep.Version != "" {
-				return dep.Version
-			}
-		}
-	}
-
-	return ""
-}
-
-// HasSpringdocDependency checks if build.gradle has springdoc dependencies.
-func (p *GradleParser) HasSpringdocDependency(build *gradleparser.GradleModule) bool {
-	for _, dep := range build.Dependencies {
-		if strings.Contains(dep.Name, "springdoc-openapi") {
-			return true
-		}
-	}
-	return false
-}
-
-// GetSpringdocVersion returns the springdoc version if present.
-func (p *GradleParser) GetSpringdocVersion(build *gradleparser.GradleModule) string {
-	for _, dep := range build.Dependencies {
-		if strings.Contains(dep.Name, "springdoc-openapi-starter-webmvc-ui") {
-			return dep.Version
-		}
-	}
-	return ""
-}
-
-// HasSpringdocPlugin checks if build.gradle has the springdoc gradle plugin.
-func (p *GradleParser) HasSpringdocPlugin(build *gradleparser.GradleModule) bool {
-	for _, plugin := range build.Plugins {
-		if plugin.ID == SpringdocGradlePluginID {
-			return true
-		}
-	}
-	return false
-}
-
-// FindDependency finds a dependency by name pattern.
-func (p *GradleParser) FindDependency(build *gradleparser.GradleModule, namePattern string) *gradleparser.Dependency {
-	for i := range build.Dependencies {
-		if strings.Contains(build.Dependencies[i].Name, namePattern) {
-			return &build.Dependencies[i]
-		}
-	}
-	return nil
-}
-
-// FindPlugin finds a plugin by ID.
-func (p *GradleParser) FindPlugin(build *gradleparser.GradleModule, pluginID string) *gradleparser.Plugin {
-	for i := range build.Plugins {
-		if build.Plugins[i].ID == pluginID {
-			return &build.Plugins[i]
-		}
-	}
-	return nil
-}
+// 文本修改方法（保留原始格式）
+func (p *GradleParser) AddDependencyText(content, version string) string
+func (p *GradleParser) AddPluginText(content, version string) string
 ```
 
-**Step 4: Run test to verify it passes**
-
-Run: `go test ./internal/extractor/spring/... -v -run GradleParser`
-Expected: PASS
-
-**Step 5: Commit**
-
-```bash
-git add internal/extractor/spring/gradle.go internal/extractor/spring/gradle_test.go
-git commit -m "feat(spring): implement Gradle parser with gradle-parser"
-```
+**注意：** Gradle 使用文本操作而非 AST 修改，以保留原始格式。
 
 ---
 
-## Task 6: Implement Patcher
+## 4. 关键设计决策
 
-**Files:**
-- Create: `internal/extractor/spring/patcher.go`
-- Create: `internal/extractor/spring/patcher_test.go`
+### 4.1 gopom 格式问题解决方案
 
-**Step 1: Write the failing test for Patcher**
+**问题：** `vifraa/gopom` 序列化 XML 时会丢失注释、格式化等原始内容。
 
-```go
-// Package spring_test tests the Spring extractor implementation.
-package spring_test
+**解决方案：**
+1. 在 `PatchResult` 中保存 `OriginalContent`
+2. 提供 `Restore()` 方法恢复原始文件
+3. `generate` 命令默认恢复，`spring patch` 默认保留
 
-import (
-	"os"
-	"path/filepath"
-	"testing"
+### 4.2 Gradle 文本修改
 
-	"github.com/spencercjh/spec-forge/internal/extractor"
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
-)
+**决策：** 使用文本操作而非 AST 修改
 
-func TestPatcher_Patch_MavenDryRun(t *testing.T) {
-	// Read original pom.xml content
-	origContent, err := os.ReadFile("../../../integration-tests/maven-springboot-openapi-demo/pom.xml")
-	if err != nil {
-		t.Skip("Integration test project not found")
-	}
+**原因：**
+- gradle-parser 不支持修改
+- 文本操作可以保留原始格式
+- 通过检测内容变化避免重复添加
 
-	// Create a temp copy for testing
-	tmpDir := t.TempDir()
-	tmpPom := filepath.Join(tmpDir, "pom.xml")
-	if err := os.WriteFile(tmpPom, origContent, 0644); err != nil {
-		t.Fatalf("Failed to create temp pom.xml: %v", err)
-	}
+### 4.3 多模块项目处理
 
-	// First, remove springdoc from the copy to test patching
-	// (This would require implementing a remove function - skip for now)
+**决策：** Patch 主模块而非父 POM
 
-	patcher := spring.NewPatcher()
-	opts := &extractor.PatchOptions{
-		DryRun:           true,
-		SpringdocVersion: extractor.DefaultSpringdocVersion,
-		MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
-	}
+**逻辑：**
+1. 检测模块列表
+2. 查找有 Spring Boot 插件的模块
+3. Patch 该模块的构建文件
 
-	changes, err := patcher.Patch(tmpDir, opts)
-	if err != nil {
-		t.Fatalf("Patch failed: %v", err)
-	}
-
-	// In dry-run mode, changes should be reported
-	t.Logf("Changes: %+v", changes)
-}
-
-func TestPatcher_NeedsPatch(t *testing.T) {
-	patcher := spring.NewPatcher()
-
-	t.Run("needs patch when missing deps", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
-			HasSpringdocDeps:   false,
-			HasSpringdocPlugin: false,
-		}
-		if !patcher.NeedsPatch(info, false) {
-			t.Error("Should need patch when missing deps")
-		}
-	})
-
-	t.Run("needs patch when force is true", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
-			HasSpringdocDeps:   true,
-			HasSpringdocPlugin: true,
-		}
-		if !patcher.NeedsPatch(info, true) {
-			t.Error("Should need patch when force is true")
-		}
-	})
-
-	t.Run("no patch needed when already configured", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
-			HasSpringdocDeps:   true,
-			HasSpringdocPlugin: true,
-		}
-		if patcher.NeedsPatch(info, false) {
-			t.Error("Should not need patch when already configured")
-		}
-	})
-}
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `go test ./internal/extractor/spring/... -v -run Patcher`
-Expected: FAIL with "undefined: NewPatcher"
-
-**Step 3: Implement Patcher**
-
-```go
-package spring
-
-import (
-	"fmt"
-
-	"github.com/spencercjh/spec-forge/internal/extractor"
-	"github.com/vifraa/gopom"
-)
-
-// PatchResult contains the result of a patch operation.
-type PatchResult struct {
-	DependencyAdded bool
-	PluginAdded     bool
-	BuildFilePath   string
-}
-
-// Patcher modifies Spring projects to add springdoc dependencies.
-type Patcher struct {
-	detector *Detector
-}
-
-// NewPatcher creates a new Patcher instance.
-func NewPatcher() *Patcher {
-	return &Patcher{
-		detector: NewDetector(),
-	}
-}
-
-// NeedsPatch checks if the project needs to be patched.
-func (p *Patcher) NeedsPatch(info *extractor.ProjectInfo, force bool) bool {
-	if force {
-		return true
-	}
-	return !info.HasSpringdocDeps || !info.HasSpringdocPlugin
-}
-
-// Patch adds springdoc dependencies to the project.
-func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*PatchResult, error) {
-	// Detect project info
-	info, err := p.detector.Detect(projectPath)
-	if err != nil {
-		return nil, fmt.Errorf("detection failed: %w", err)
-	}
-
-	// Check if patch is needed
-	if !p.NeedsPatch(info, opts.Force) {
-		return &PatchResult{
-			DependencyAdded: false,
-			PluginAdded:     false,
-			BuildFilePath:   info.BuildFilePath,
-		}, nil
-	}
-
-	// Apply defaults
-	if opts.SpringdocVersion == "" {
-		opts.SpringdocVersion = extractor.DefaultSpringdocVersion
-	}
-	if opts.MavenPluginVersion == "" {
-		opts.MavenPluginVersion = extractor.DefaultSpringdocMavenPlugin
-	}
-	if opts.GradlePluginVersion == "" {
-		opts.GradlePluginVersion = extractor.DefaultSpringdocGradlePlugin
-	}
-
-	// Patch based on build tool
-	switch info.BuildTool {
-	case extractor.BuildToolMaven:
-		return p.patchMaven(info, opts)
-	case extractor.BuildToolGradle:
-		return p.patchGradle(info, opts)
-	default:
-		return nil, fmt.Errorf("unsupported build tool: %s", info.BuildTool)
-	}
-}
-
-// patchMaven patches a Maven project.
-func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
-	result := &PatchResult{
-		BuildFilePath: info.BuildFilePath,
-	}
-
-	parser := NewMavenParser()
-	pom, err := parser.Parse(info.BuildFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add dependency if needed
-	if opts.Force || !info.HasSpringdocDeps {
-		if !parser.HasSpringdocDependency(pom) {
-			parser.AddDependency(pom, SpringdocGroupID, SpringdocWebMVCArtifactID, opts.SpringdocVersion)
-			result.DependencyAdded = true
-		}
-	}
-
-	// Add plugin if needed
-	if opts.Force || !info.HasSpringdocPlugin {
-		if !parser.HasSpringdocPlugin(pom) {
-			parser.AddPlugin(pom, SpringdocGroupID, SpringdocMavenPluginArtifact, opts.MavenPluginVersion)
-			result.PluginAdded = true
-		}
-	}
-
-	// Write changes if not dry-run
-	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
-		if err := p.writePom(info.BuildFilePath, pom); err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
-}
-
-// patchGradle patches a Gradle project.
-func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
-	result := &PatchResult{
-		BuildFilePath: info.BuildFilePath,
-	}
-
-	// Gradle modification is more complex due to the parser limitations
-	// For now, we'll use text-based modification
-	parser := NewGradleParser()
-	build, err := parser.Parse(info.BuildFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check what needs to be added
-	if opts.Force || !info.HasSpringdocDeps {
-		if !parser.HasSpringdocDependency(build) {
-			result.DependencyAdded = true
-		}
-	}
-
-	if opts.Force || !info.HasSpringdocPlugin {
-		if !parser.HasSpringdocPlugin(build) {
-			result.PluginAdded = true
-		}
-	}
-
-	// Write changes if not dry-run
-	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
-		if err := p.patchGradleFile(info.BuildFilePath, opts, result); err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
-}
-
-// writePom writes the pom model back to file.
-func (p *Patcher) writePom(pomPath string, pom *gopom.Model) error {
-	content, err := gopom.Marshal(pom)
-	if err != nil {
-		return fmt.Errorf("failed to marshal pom.xml: %w", err)
-	}
-
-	return writeFile(pomPath, content)
-}
-
-// patchGradleFile modifies the build.gradle file using text manipulation.
-func (p *Patcher) patchGradleFile(gradlePath string, opts *extractor.PatchOptions, result *PatchResult) error {
-	content, err := readFile(gradlePath)
-	if err != nil {
-		return err
-	}
-
-	// Add plugin if needed
-	if result.PluginAdded {
-		pluginLine := fmt.Sprintf("id '%s' version \"%s\"", SpringdocGradlePluginID, opts.GradlePluginVersion)
-		content = insertAfter(content, "plugins {", pluginLine)
-	}
-
-	// Add dependency if needed
-	if result.DependencyAdded {
-		depLine := fmt.Sprintf("implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:%s'", opts.SpringdocVersion)
-		content = insertAfter(content, "dependencies {", depLine)
-	}
-
-	return writeFile(gradlePath, []byte(content))
-}
-```
-
-**Step 4: Add helper functions file**
-
-Create `internal/extractor/spring/helpers.go`:
-
-```go
-package spring
-
-import (
-	"fmt"
-	"os"
-	"strings"
-)
-
-// readFile reads file content as string.
-func readFile(path string) (string, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
-	}
-	return string(content), nil
-}
-
-// writeFile writes content to file.
-func writeFile(path string, content []byte) error {
-	return os.WriteFile(path, content, 0644)
-}
-
-// insertAfter inserts a line after the target line in content.
-func insertAfter(content, target, newLine string) string {
-	lines := strings.Split(content, "\n")
-	var result []string
-	inserted := false
-
-	for _, line := range lines {
-		result = append(result, line)
-		if !inserted && strings.Contains(line, target) {
-			// Calculate indentation from the next line if available
-			indent := ""
-			if len(result) > 1 {
-				prevLine := result[len(result)-2]
-				for _, c := range prevLine {
-					if c == ' ' || c == '\t' {
-						indent += string(c)
-					} else {
-						break
-					}
-				}
-				// Add one level of indentation
-				indent += "    "
-			}
-			result = append(result, indent+newLine)
-			inserted = true
-		}
-	}
-
-	return strings.Join(result, "\n")
-}
-```
-
-**Step 5: Run tests**
-
-Run: `go test ./internal/extractor/spring/... -v -run Patcher`
-Expected: PASS
-
-**Step 6: Commit**
-
-```bash
-git add internal/extractor/spring/patcher.go internal/extractor/spring/patcher_test.go internal/extractor/spring/helpers.go
-git commit -m "feat(spring): implement Patcher for adding springdoc dependencies"
-```
+**原因：**
+- Spring Boot 应用通常在子模块中
+- 父 POM 用于依赖管理，不应添加应用依赖
 
 ---
 
-## Task 7: Update CLI Commands
+## 5. 测试覆盖
 
-**Files:**
-- Modify: `cmd/spring.go`
+### 单元测试
 
-**Step 1: Update spring detect command**
+| 测试文件 | 覆盖内容 |
+|----------|----------|
+| `types_test.go` | 类型常量验证 |
+| `detector_test.go` | 单模块/多模块检测 |
+| `maven_test.go` | Maven 解析、Patch、多模块 |
+| `gradle_test.go` | Gradle 解析、文本修改、多模块 |
+| `patcher_test.go` | Patch 逻辑、边缘情况 |
+
+### 边缘情况测试
+
+- pom 只有 pluginManagement
+- pom 没有 dependencies 节点
+- pom 没有 build 节点
+- build.gradle 没有 plugins block
+- build.gradle 没有 dependencies block
+- Force 选项
+- DryRun 模式
+- OriginalContent 保存和 Restore
+
+### 集成测试项目
+
+| 项目 | 类型 | 用途 |
+|------|------|------|
+| `maven-springboot-openapi-demo` | 单模块 Maven | 基本功能验证 |
+| `gradle-springboot-openapi-demo` | 单模块 Gradle | 基本功能验证 |
+| `maven-multi-module-demo` | 多模块 Maven | 多模块支持验证 |
+| `gradle-multi-module-demo` | 多模块 Gradle | 多模块支持验证 |
+
+---
+
+## 6. CLI 命令实现
+
+### spring detect
 
 ```go
-// Package cmd contains all CLI commands for spec-forge.
-package cmd
-
-import (
-	"fmt"
-	"os"
-
-	"github.com/spencercjh/spec-forge/internal/extractor"
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
-	"github.com/spf13/cobra"
-)
-
-// springCmd represents the spring command group
+// cmd/spring.go
 var springCmd = &cobra.Command{
-	Use:   "spring",
-	Short: "Spring framework specific commands",
-	Long: `Commands for working with Spring (Java) projects.
-
-These commands help you:
-- Detect Spring project configuration
-- Patch projects with springdoc dependencies
-- Extract OpenAPI specs from Spring controllers`,
+    Use:   "spring",
+    Short: "Spring framework commands",
 }
 
-func init() {
-	rootCmd.AddCommand(springCmd)
-}
-
-// springDetectCmd represents the spring detect command
 var springDetectCmd = &cobra.Command{
-	Use:   "detect [path]",
-	Short: "Detect Spring project information",
-	Long: `Analyze the current directory to detect Spring project type, build tool, and dependencies.
-
-This command will identify:
-- Build tool (Maven or Gradle)
-- Spring Boot version
-- springdoc-openapi dependency status`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runSpringDetect,
+    Use:   "detect [path]",
+    Short: "Detect Spring project information",
+    RunE:  runSpringDetect,
 }
+```
 
-func runSpringDetect(_ *cobra.Command, args []string) error {
-	path := "."
-	if len(args) > 0 {
-		path = args[0]
-	}
+**输出包含：**
+- Build Tool 和 Build File
+- Spring Boot 版本
+- springdoc 依赖/插件状态
+- 多模块信息（如果是多模块项目）
 
-	detector := spring.NewDetector()
-	info, err := detector.Detect(path)
-	if err != nil {
-		return fmt.Errorf("detection failed: %w", err)
-	}
+### spring patch
 
-	// Print human-readable output
-	printProjectInfo(info)
-	return nil
-}
-
-func printProjectInfo(info *extractor.ProjectInfo) {
-	fmt.Println("Spring Project Detection Results")
-	fmt.Println("================================")
-	fmt.Printf("Build Tool:           %s\n", info.BuildTool)
-	fmt.Printf("Build File:           %s\n", info.BuildFilePath)
-	fmt.Printf("Spring Boot:          %s\n", info.SpringBootVersion)
-
-	if info.HasSpringdocDeps {
-		fmt.Printf("springdoc Dependency: ✅ Present (%s)\n", info.SpringdocVersion)
-	} else {
-		fmt.Println("springdoc Dependency: ❌ Not found")
-	}
-
-	if info.HasSpringdocPlugin {
-		fmt.Println("springdoc Plugin:     ✅ Configured")
-	} else {
-		fmt.Println("springdoc Plugin:     ❌ Not configured")
-	}
-}
-
-var (
-	patchDryRun bool
-	patchForce  bool
-)
-
-// springPatchCmd represents the spring patch command
+```go
 var springPatchCmd = &cobra.Command{
-	Use:   "patch [path]",
-	Short: "Add springdoc dependencies to Spring project",
-	Long: `Add springdoc-openapi dependencies to the Spring project's build file.
-Supports both Maven (pom.xml) and Gradle (build.gradle) projects.
-
-This command will:
-- Detect the build tool
-- Add the appropriate springdoc dependency
-- Optionally update existing dependencies`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runSpringPatch,
-}
-
-func runSpringPatch(_ *cobra.Command, args []string) error {
-	path := "."
-	if len(args) > 0 {
-		path = args[0]
-	}
-
-	opts := &extractor.PatchOptions{
-		DryRun: patchDryRun,
-		Force:  patchForce,
-	}
-
-	patcher := spring.NewPatcher()
-	result, err := patcher.Patch(path, opts)
-	if err != nil {
-		return fmt.Errorf("patch failed: %w", err)
-	}
-
-	// Print results
-	if opts.DryRun {
-		fmt.Println("Dry run mode - showing changes without modifying files")
-	}
-
-	fmt.Printf("Build file: %s\n", result.BuildFilePath)
-
-	if result.DependencyAdded {
-		fmt.Println("✅ springdoc dependency will be added")
-	} else {
-		fmt.Println("⏭️  springdoc dependency already present")
-	}
-
-	if result.PluginAdded {
-		fmt.Println("✅ springdoc plugin will be added")
-	} else {
-		fmt.Println("⏭️  springdoc plugin already configured")
-	}
-
-	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
-		fmt.Println("\nPatch applied successfully!")
-	} else if !result.DependencyAdded && !result.PluginAdded {
-		fmt.Println("\nNo changes needed.")
-	}
-
-	return nil
-}
-
-func init() {
-	springCmd.AddCommand(springDetectCmd)
-	springCmd.AddCommand(springPatchCmd)
-
-	springPatchCmd.Flags().BoolVar(&patchDryRun, "dry-run", false, "show changes without modifying files")
-	springPatchCmd.Flags().BoolVar(&patchForce, "force", false, "force overwrite existing dependencies")
+    Use:   "patch [path]",
+    Short: "Add springdoc dependencies to Spring project",
+    RunE:  runSpringPatch,
 }
 ```
 
-**Step 2: Run build and test**
+**参数：**
+- `--dry-run`: 只打印修改
+- `--force`: 强制覆盖
 
-Run: `make all`
-Expected: Build succeeds, all tests pass
+### generate
 
-**Step 3: Manual test**
-
-```bash
-./bin/spec-forge spring detect integration-tests/maven-springboot-openapi-demo
-./bin/spec-forge spring detect integration-tests/gradle-springboot-openapi-demo
+```go
+// cmd/generate.go
+var generateCmd = &cobra.Command{
+    Use:   "generate [path]",
+    Short: "Generate OpenAPI specification",
+    RunE:  runGenerate,
+}
 ```
 
-**Step 4: Commit**
+**参数：**
+- `--keep-patched`: 保留修改后的构建文件（默认恢复）
 
-```bash
-git add cmd/spring.go
-git commit -m "feat(cli): wire up spring detect and patch commands"
+---
+
+## 7. 依赖
+
+```go
+// go.mod
+require (
+    github.com/vifraa/gopom v0.5.0
+    github.com/scagogogo/gradle-parser v1.0.2
+)
 ```
 
 ---
 
-## Task 8: Run All Tests and Final Verification
+## 8. 后续工作
 
-**Step 1: Run all tests**
-
-Run: `make all`
-Expected: All tests pass, build succeeds, lint passes
-
-**Step 2: Test detect on integration projects**
-
-```bash
-./bin/spec-forge spring detect integration-tests/maven-springboot-openapi-demo
-./bin/spec-forge spring detect integration-tests/gradle-springboot-openapi-demo
-```
-
-**Step 3: Test patch dry-run**
-
-```bash
-./bin/spec-forge spring patch --dry-run integration-tests/maven-springboot-openapi-demo
-./bin/spec-forge spring patch --dry-run integration-tests/gradle-springboot-openapi-demo
-```
-
-**Step 4: Final commit**
-
-```bash
-git status
-# Ensure all changes are committed
-```
-
----
-
-## Summary
-
-This plan implements M2: Spring Detection and Patch with:
-
-1. **Types and constants** - BuildTool, ProjectInfo, PatchOptions
-2. **Detector** - Detects Maven/Gradle projects and their springdoc status
-3. **Maven Parser** - Uses gopom to parse and modify pom.xml
-4. **Gradle Parser** - Uses gradle-parser to parse build.gradle
-5. **Patcher** - Adds springdoc dependencies and plugins
-6. **CLI integration** - Wires up detect and patch commands
-
-Each task follows TDD: write test first, implement, verify, commit.
+M2 已完成，M3 将实现：
+- Generator: 调用 Maven/Gradle 插件生成 OpenAPI Spec
+- Validator: 验证生成的 OpenAPI Spec
