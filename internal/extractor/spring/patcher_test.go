@@ -446,3 +446,202 @@ func TestPatcher_Patch_NoBuildFile(t *testing.T) {
 		t.Errorf("Expected 'no build file found' error, got: %v", err)
 	}
 }
+
+// TestPatcher_OriginalContent tests that OriginalContent is correctly saved
+func TestPatcher_OriginalContent(t *testing.T) {
+	t.Run("Maven: saves original content", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		originalContent := minimalPomWithoutSpringdoc
+		if err := os.WriteFile(tmpPom, []byte(originalContent), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			DryRun:             false,
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// Verify original content was saved
+		if result.OriginalContent == "" {
+			t.Error("OriginalContent should not be empty after patch")
+		}
+		if result.OriginalContent != originalContent {
+			t.Errorf("OriginalContent mismatch:\nGot: %s\nWant: %s", result.OriginalContent, originalContent)
+		}
+	})
+
+	t.Run("Gradle: saves original content", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpGradle := filepath.Join(tmpDir, "build.gradle")
+		originalContent := minimalGradleWithoutSpringdoc
+		if err := os.WriteFile(tmpGradle, []byte(originalContent), 0644); err != nil {
+			t.Fatalf("Failed to create temp build.gradle: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			DryRun:              false,
+			SpringdocVersion:    extractor.DefaultSpringdocVersion,
+			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// Verify original content was saved
+		if result.OriginalContent == "" {
+			t.Error("OriginalContent should not be empty after patch")
+		}
+		if result.OriginalContent != originalContent {
+			t.Errorf("OriginalContent mismatch")
+		}
+	})
+
+	t.Run("No changes: empty OriginalContent", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			DryRun: false,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// When no changes are made, OriginalContent should be empty
+		if result.OriginalContent != "" {
+			t.Error("OriginalContent should be empty when no changes are made")
+		}
+	})
+}
+
+// TestPatcher_Restore tests the Restore functionality
+func TestPatcher_Restore(t *testing.T) {
+	t.Run("restores original Maven content", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		originalContent := minimalPomWithoutSpringdoc
+		if err := os.WriteFile(tmpPom, []byte(originalContent), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		// Patch the file
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// Verify file was modified
+		content, _ := os.ReadFile(tmpPom)
+		if strings.Contains(string(content), "springdoc-openapi") {
+			// File was modified as expected
+		} else {
+			t.Fatal("File should have been modified with springdoc")
+		}
+
+		// Restore original content
+		err = patcher.Restore(result.BuildFilePath, result.OriginalContent)
+		if err != nil {
+			t.Fatalf("Restore failed: %v", err)
+		}
+
+		// Verify file was restored
+		restoredContent, err := os.ReadFile(tmpPom)
+		if err != nil {
+			t.Fatalf("Failed to read restored pom.xml: %v", err)
+		}
+		if string(restoredContent) != originalContent {
+			t.Error("File content should be restored to original")
+		}
+	})
+
+	t.Run("restore with empty content does nothing", func(t *testing.T) {
+		patcher := spring.NewPatcher()
+		err := patcher.Restore("/some/path", "")
+		if err != nil {
+			t.Errorf("Restore with empty content should not error, got: %v", err)
+		}
+	})
+}
+
+// TestPatcher_KeepPatchedOption tests the KeepPatched option behavior
+func TestPatcher_KeepPatchedOption(t *testing.T) {
+	// Note: KeepPatched is used by the caller (generate command) to decide
+	// whether to call Restore(). The patcher itself always saves OriginalContent.
+	// This test verifies that the option exists and doesn't break anything.
+
+	t.Run("patcher works with KeepPatched=true", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			KeepPatched:        true,
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// OriginalContent should still be saved (for potential restore by caller)
+		if result.OriginalContent == "" {
+			t.Error("OriginalContent should be saved regardless of KeepPatched")
+		}
+		if !result.DependencyAdded {
+			t.Error("DependencyAdded should be true")
+		}
+	})
+
+	t.Run("patcher works with KeepPatched=false", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpPom := filepath.Join(tmpDir, "pom.xml")
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0644); err != nil {
+			t.Fatalf("Failed to create temp pom.xml: %v", err)
+		}
+
+		patcher := spring.NewPatcher()
+		opts := &extractor.PatchOptions{
+			KeepPatched:        false,
+			SpringdocVersion:   extractor.DefaultSpringdocVersion,
+			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		}
+
+		result, err := patcher.Patch(tmpDir, opts)
+		if err != nil {
+			t.Fatalf("Patch failed: %v", err)
+		}
+
+		// Same behavior - caller is responsible for restore
+		if result.OriginalContent == "" {
+			t.Error("OriginalContent should be saved regardless of KeepPatched")
+		}
+	})
+}
