@@ -1311,3 +1311,259 @@ func TestPatcher_MultiModuleGradle_Restore(t *testing.T) {
 		t.Error("File should be restored to original content")
 	}
 }
+
+// ============================================
+// Multi-Module Maven Tests
+// ============================================
+
+// mavenParentPom is a parent pom.xml for multi-module Maven project
+const mavenParentPom = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>multi-module-demo</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <modules>
+        <module>shared-lib</module>
+        <module>user-service</module>
+    </modules>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+</project>
+`
+
+// mavenSharedLibPom is a shared-lib module pom.xml
+const mavenSharedLibPom = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>multi-module-demo</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>shared-lib</artifactId>
+</project>
+`
+
+// mavenUserServicePom is a user-service module pom.xml with Spring Boot plugin
+const mavenUserServicePom = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>multi-module-demo</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>user-service</artifactId>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+`
+
+// TestDetector_MultiModuleMaven tests detection of multi-module Maven projects
+func TestDetector_MultiModuleMaven(t *testing.T) {
+	// Create a multi-module Maven project structure
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
+	userServiceDir := filepath.Join(tmpDir, "user-service")
+
+	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+		t.Fatalf("Failed to create shared-lib dir: %v", err)
+	}
+	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+		t.Fatalf("Failed to create user-service dir: %v", err)
+	}
+
+	// Create parent pom.xml
+	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0644); err != nil {
+		t.Fatalf("Failed to create parent pom.xml: %v", err)
+	}
+
+	// Create shared-lib pom.xml
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0644); err != nil {
+		t.Fatalf("Failed to create shared-lib pom.xml: %v", err)
+	}
+
+	// Create user-service pom.xml
+	if err := os.WriteFile(filepath.Join(userServiceDir, "pom.xml"), []byte(mavenUserServicePom), 0644); err != nil {
+		t.Fatalf("Failed to create user-service pom.xml: %v", err)
+	}
+
+	// Test detection
+	detector := spring.NewDetector()
+	info, err := detector.Detect(tmpDir)
+	if err != nil {
+		t.Fatalf("Detection failed: %v", err)
+	}
+
+	// Verify multi-module detection
+	if !info.IsMultiModule {
+		t.Error("Expected IsMultiModule to be true")
+	}
+	if len(info.Modules) != 2 {
+		t.Errorf("Expected 2 modules, got %d", len(info.Modules))
+	}
+	if info.MainModule != "user-service" {
+		t.Errorf("Expected MainModule to be 'user-service', got '%s'", info.MainModule)
+	}
+	if info.MainModulePath == "" {
+		t.Error("Expected MainModulePath to be set")
+	}
+}
+
+// TestPatcher_MultiModuleMaven tests patching of multi-module Maven projects
+func TestPatcher_MultiModuleMaven(t *testing.T) {
+	// Create a multi-module Maven project structure
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
+	userServiceDir := filepath.Join(tmpDir, "user-service")
+
+	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+		t.Fatalf("Failed to create shared-lib dir: %v", err)
+	}
+	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+		t.Fatalf("Failed to create user-service dir: %v", err)
+	}
+
+	// Create parent pom.xml
+	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0644); err != nil {
+		t.Fatalf("Failed to create parent pom.xml: %v", err)
+	}
+
+	// Create shared-lib pom.xml
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0644); err != nil {
+		t.Fatalf("Failed to create shared-lib pom.xml: %v", err)
+	}
+
+	// Create user-service pom.xml
+	userServicePomPath := filepath.Join(userServiceDir, "pom.xml")
+	if err := os.WriteFile(userServicePomPath, []byte(mavenUserServicePom), 0644); err != nil {
+		t.Fatalf("Failed to create user-service pom.xml: %v", err)
+	}
+
+	// Patch the project
+	patcher := spring.NewPatcher()
+	opts := &extractor.PatchOptions{
+		SpringdocVersion:   extractor.DefaultSpringdocVersion,
+		MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+	}
+
+	result, err := patcher.Patch(tmpDir, opts)
+	if err != nil {
+		t.Fatalf("Patch failed: %v", err)
+	}
+
+	// Verify patch was applied to user-service module, not parent
+	if result.BuildFilePath != userServicePomPath {
+		t.Errorf("Expected patch on user-service module, got: %s", result.BuildFilePath)
+	}
+	if !result.DependencyAdded {
+		t.Error("Expected DependencyAdded to be true")
+	}
+	if !result.PluginAdded {
+		t.Error("Expected PluginAdded to be true")
+	}
+
+	// Verify user-service/pom.xml was modified
+	content, _ := os.ReadFile(userServicePomPath)
+	if !strings.Contains(string(content), "springdoc-openapi") {
+		t.Error("user-service pom.xml should contain springdoc")
+	}
+
+	// Verify parent pom.xml was NOT modified
+	parentContent, _ := os.ReadFile(filepath.Join(tmpDir, "pom.xml"))
+	// Parent already has dependencies section, check it wasn't springdoc added there
+	if strings.Contains(string(parentContent), "springdoc-openapi-starter-webmvc-ui") {
+		t.Error("Parent pom.xml should NOT be modified with springdoc dependency")
+	}
+}
+
+// TestPatcher_MultiModuleMaven_Restore tests restore functionality for multi-module Maven projects
+func TestPatcher_MultiModuleMaven_Restore(t *testing.T) {
+	// Create a multi-module Maven project structure
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
+	userServiceDir := filepath.Join(tmpDir, "user-service")
+
+	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+		t.Fatalf("Failed to create shared-lib dir: %v", err)
+	}
+	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+		t.Fatalf("Failed to create user-service dir: %v", err)
+	}
+
+	// Create parent pom.xml
+	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0644); err != nil {
+		t.Fatalf("Failed to create parent pom.xml: %v", err)
+	}
+
+	// Create shared-lib pom.xml
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0644); err != nil {
+		t.Fatalf("Failed to create shared-lib pom.xml: %v", err)
+	}
+
+	// Create user-service pom.xml
+	userServicePomPath := filepath.Join(userServiceDir, "pom.xml")
+	originalContent := mavenUserServicePom
+	if err := os.WriteFile(userServicePomPath, []byte(originalContent), 0644); err != nil {
+		t.Fatalf("Failed to create user-service pom.xml: %v", err)
+	}
+
+	// Patch the project
+	patcher := spring.NewPatcher()
+	opts := &extractor.PatchOptions{
+		SpringdocVersion:   extractor.DefaultSpringdocVersion,
+		MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+	}
+
+	result, err := patcher.Patch(tmpDir, opts)
+	if err != nil {
+		t.Fatalf("Patch failed: %v", err)
+	}
+
+	// Verify file was modified
+	content, _ := os.ReadFile(userServicePomPath)
+	if string(content) == originalContent {
+		t.Error("File should have been modified")
+	}
+
+	// Restore original content
+	err = patcher.Restore(result.BuildFilePath, result.OriginalContent)
+	if err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+
+	// Verify file was restored
+	restoredContent, _ := os.ReadFile(userServicePomPath)
+	if string(restoredContent) != originalContent {
+		t.Error("File should be restored to original content")
+	}
+}

@@ -173,3 +173,20 @@ func (p *MavenParser) GetModules(pom *gopom.Project) []string {
 	}
 	return modules
 }
+
+// HasSpringBootPlugin checks if the pom has the Spring Boot Maven plugin.
+func (p *MavenParser) HasSpringBootPlugin(pom *gopom.Project) bool {
+	if pom.Build == nil || pom.Build.Plugins == nil {
+		return false
+	}
+
+	for _, plugin := range *pom.Build.Plugins {
+		if plugin.GroupID != nil && *plugin.GroupID == SpringBootParentGroupID {
+			if plugin.ArtifactID != nil && *plugin.ArtifactID == "spring-boot-maven-plugin" {
+				return true
+			}
+		}
+	}
+
+	return false
+}

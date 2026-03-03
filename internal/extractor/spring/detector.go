@@ -42,7 +42,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 }
 
 // detectMavenProject analyzes a Maven project.
-func (d *Detector) detectMavenProject(_, pomPath string) (*extractor.ProjectInfo, error) {
+func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.ProjectInfo, error) {
 	info := &extractor.ProjectInfo{
 		BuildTool:     extractor.BuildToolMaven,
 		BuildFilePath: pomPath,
@@ -60,8 +60,13 @@ func (d *Detector) detectMavenProject(_, pomPath string) (*extractor.ProjectInfo
 	if len(modules) > 0 {
 		info.IsMultiModule = true
 		info.Modules = modules
-		// For multi-module Maven, the parent POM is the build file
-		// but we may need to find the main module
+
+		// For multi-module projects, find the main module (one with Spring Boot plugin)
+		mainModule, mainModulePath := d.findMainMavenModule(projectPath, modules)
+		if mainModule != "" {
+			info.MainModule = mainModule
+			info.MainModulePath = mainModulePath
+		}
 	}
 
 	// Extract Spring Boot version
@@ -73,6 +78,24 @@ func (d *Detector) detectMavenProject(_, pomPath string) (*extractor.ProjectInfo
 
 	// Check for springdoc plugin
 	info.HasSpringdocPlugin = mavenParser.HasSpringdocPlugin(pom)
+
+	// For multi-module projects, also check subproject pom files
+	if info.IsMultiModule && info.MainModulePath != "" {
+		subPom, err := mavenParser.Parse(info.MainModulePath)
+		if err == nil {
+			// If subproject has Spring Boot, use its info
+			if subVersion := mavenParser.GetSpringBootVersion(subPom); subVersion != "" {
+				info.SpringBootVersion = subVersion
+			}
+			if mavenParser.HasSpringdocDependency(subPom) {
+				info.HasSpringdocDeps = true
+				info.SpringdocVersion = mavenParser.GetSpringdocVersion(subPom)
+			}
+			if mavenParser.HasSpringdocPlugin(subPom) {
+				info.HasSpringdocPlugin = true
+			}
+		}
+	}
 
 	return info, nil
 }
@@ -154,13 +177,13 @@ func (d *Detector) parseGradleModules(settingsPath string) []string {
 		}
 		// Parse include statements
 		// Formats: include 'module1', 'module2' or include 'module1', "module2"
-		if strings.HasPrefix(line, "include") {
+		if after, ok := strings.CutPrefix(line, "include"); ok {
 			// Extract module names
-			line = strings.TrimPrefix(line, "include")
+			line = after
 			line = strings.TrimSpace(line)
 			// Split by comma and clean up
-			parts := strings.Split(line, ",")
-			for _, part := range parts {
+			parts := strings.SplitSeq(line, ",")
+			for part := range parts {
 				part = strings.TrimSpace(part)
 				// Remove quotes
 				part = strings.Trim(part, "'\"")
@@ -195,6 +218,30 @@ func (d *Detector) findMainGradleModule(projectPath string, modules []string) (s
 
 		// Check if this module has Spring Boot plugin
 		if gradleParser.HasSpringBootPlugin(build) {
+			return module, modulePath
+		}
+	}
+
+	return "", ""
+}
+
+// findMainMavenModule finds the main module that contains the Spring Boot application.
+func (d *Detector) findMainMavenModule(projectPath string, modules []string) (string, string) {
+	mavenParser := NewMavenParser()
+
+	for _, module := range modules {
+		modulePath := filepath.Join(projectPath, module, "pom.xml")
+		if _, err := os.Stat(modulePath); err != nil {
+			continue
+		}
+
+		pom, err := mavenParser.Parse(modulePath)
+		if err != nil {
+			continue
+		}
+
+		// Check if this module has Spring Boot plugin
+		if mavenParser.HasSpringBootPlugin(pom) {
 			return module, modulePath
 		}
 	}

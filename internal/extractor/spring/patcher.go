@@ -89,12 +89,18 @@ func (p *Patcher) Restore(buildFilePath, originalContent string) error {
 
 // patchMaven patches a Maven project using gopom.
 func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
+	// For multi-module projects, patch the main module instead of parent POM
+	buildFilePath := info.BuildFilePath
+	if info.IsMultiModule && info.MainModulePath != "" {
+		buildFilePath = info.MainModulePath
+	}
+
 	result := &PatchResult{
-		BuildFilePath: info.BuildFilePath,
+		BuildFilePath: buildFilePath,
 	}
 
 	// Read and save original content
-	content, err := os.ReadFile(info.BuildFilePath)
+	content, err := os.ReadFile(buildFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read pom.xml: %w", err)
 	}
@@ -103,7 +109,7 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 	if opts.DryRun {
 		// In dry-run mode, don't modify anything
 		parser := NewMavenParser()
-		pom, err := parser.Parse(info.BuildFilePath)
+		pom, err := parser.Parse(buildFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +119,7 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 	}
 
 	// Parse with gopom
-	pom, err := gopom.Parse(info.BuildFilePath)
+	pom, err := gopom.Parse(buildFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse pom.xml: %w", err)
 	}
@@ -143,7 +149,7 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 
 		// Add XML header and newline
 		xmlContent := xml.Header + string(output) + "\n"
-		if err := os.WriteFile(info.BuildFilePath, []byte(xmlContent), 0644); err != nil {
+		if err := os.WriteFile(buildFilePath, []byte(xmlContent), 0644); err != nil {
 			return nil, fmt.Errorf("failed to write pom.xml: %w", err)
 		}
 	}
@@ -167,9 +173,9 @@ func hasSpringdocDependency(pom *gopom.Project) bool {
 // addMavenDependency adds springdoc dependency to pom.
 func addMavenDependency(pom *gopom.Project, version string) {
 	dep := gopom.Dependency{
-		GroupID:    strPtr(SpringdocGroupID),
-		ArtifactID: strPtr(SpringdocWebMVCArtifactID),
-		Version:    strPtr(version),
+		GroupID:    new(SpringdocGroupID),
+		ArtifactID: new(SpringdocWebMVCArtifactID),
+		Version:    new(version),
 	}
 
 	if pom.Dependencies == nil {
@@ -195,12 +201,12 @@ func hasSpringdocPlugin(pom *gopom.Project) bool {
 // addMavenPlugin adds springdoc maven plugin to pom.
 func addMavenPlugin(pom *gopom.Project, version string) {
 	plugin := gopom.Plugin{
-		GroupID:    strPtr(SpringdocGroupID),
-		ArtifactID: strPtr(SpringdocMavenPluginArtifact),
-		Version:    strPtr(version),
+		GroupID:    new(SpringdocGroupID),
+		ArtifactID: new(SpringdocMavenPluginArtifact),
+		Version:    new(version),
 		Executions: &[]gopom.PluginExecution{
 			{
-				ID:    strPtr("generate-openapi"),
+				ID:    new("generate-openapi"),
 				Goals: &[]string{"generate"},
 			},
 		},
@@ -217,11 +223,6 @@ func addMavenPlugin(pom *gopom.Project, version string) {
 	} else {
 		*pom.Build.Plugins = append(*pom.Build.Plugins, plugin)
 	}
-}
-
-// strPtr returns a pointer to the string.
-func strPtr(s string) *string {
-	return &s
 }
 
 // patchGradle patches a Gradle project.

@@ -117,8 +117,8 @@ func TestMavenParser_FindDependency(t *testing.T) {
 	webVersion := "4.0.3"
 	deps := []gopom.Dependency{
 		{
-			GroupID:    ptr("org.springframework.boot"),
-			ArtifactID: ptr("spring-boot-starter-web"),
+			GroupID:    new("org.springframework.boot"),
+			ArtifactID: new("spring-boot-starter-web"),
 			Version:    &webVersion,
 		},
 	}
@@ -133,9 +133,4 @@ func TestMavenParser_FindDependency(t *testing.T) {
 	if *dep.Version != "4.0.3" {
 		t.Errorf("Version = %s, want 4.0.3", *dep.Version)
 	}
-}
-
-// ptr is a helper to create string pointers.
-func ptr(s string) *string {
-	return &s
 }
