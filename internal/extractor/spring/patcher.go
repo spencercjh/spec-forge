@@ -158,12 +158,6 @@ func (p *Patcher) writePom(path string, pom *gopom.Project) error {
 		pom.XMLName = &xml.Name{Space: "http://maven.apache.org/POM/4.0.0", Local: "project"}
 	}
 
-	// Read original file to preserve header and formatting
-	origContent, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("failed to read original pom: %w", err)
-	}
-
 	// Marshal with indentation
 	output, err := xml.MarshalIndent(pom, "    ", "    ")
 	if err != nil {
@@ -210,7 +204,6 @@ func (p *Patcher) writePom(path string, pom *gopom.Project) error {
 		return fmt.Errorf("failed to write pom: %w", err)
 	}
 
-	_ = origContent // Preserve for potential future use
 	return nil
 }
 
@@ -243,7 +236,7 @@ func (p *Patcher) addGradleDependency(content, dep string) string {
 	var result []string
 	inserted := false
 
-	for i, line := range lines {
+	for _, line := range lines {
 		result = append(result, line)
 		if !inserted && strings.TrimSpace(line) == "dependencies {" {
 			// Find proper indentation
@@ -258,11 +251,6 @@ func (p *Patcher) addGradleDependency(content, dep string) string {
 			// Add dependency with proper indentation
 			result = append(result, indent+"    implementation '"+dep+"'")
 			inserted = true
-
-			// Skip if there are already dependencies
-			if i+1 < len(lines) && strings.Contains(lines[i+1], "implementation") {
-				// Already has dependencies, our insertion is complete
-			}
 		}
 	}
 

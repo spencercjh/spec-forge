@@ -13,9 +13,9 @@ const (
 
 // Default version constants (convention over configuration).
 const (
-	DefaultSpringdocVersion       = "3.0.2"
-	DefaultSpringdocMavenPlugin   = "1.5"
-	DefaultSpringdocGradlePlugin  = "1.9.0"
+	DefaultSpringdocVersion      = "3.0.2"
+	DefaultSpringdocMavenPlugin  = "1.5"
+	DefaultSpringdocGradlePlugin = "1.9.0"
 )
 
 // ProjectInfo contains detected information about a Spring project.

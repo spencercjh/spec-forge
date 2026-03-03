@@ -181,9 +181,9 @@ func TestPatcher_Patch_GradleWithMissingDeps(t *testing.T) {
 
 	t.Run("dry-run reports changes but does not modify file", func(t *testing.T) {
 		opts := &extractor.PatchOptions{
-			DryRun:               true,
-			SpringdocVersion:     extractor.DefaultSpringdocVersion,
-			GradlePluginVersion:  extractor.DefaultSpringdocGradlePlugin,
+			DryRun:              true,
+			SpringdocVersion:    extractor.DefaultSpringdocVersion,
+			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
 		}
 
 		changes, err := patcher.Patch(tmpDir, opts)
@@ -215,9 +215,9 @@ func TestPatcher_Patch_GradleWithMissingDeps(t *testing.T) {
 		}
 
 		opts := &extractor.PatchOptions{
-			DryRun:               false,
-			SpringdocVersion:     extractor.DefaultSpringdocVersion,
-			GradlePluginVersion:  extractor.DefaultSpringdocGradlePlugin,
+			DryRun:              false,
+			SpringdocVersion:    extractor.DefaultSpringdocVersion,
+			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
 		}
 
 		changes, err := patcher.Patch(tmpDir, opts)
@@ -278,4 +278,171 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 			t.Error("Should not need patch when already configured")
 		}
 	})
+}
+
+// minimalPomWithSpringdoc is a minimal pom.xml already containing springdoc dependencies
+const minimalPomWithSpringdoc = `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+        <relativePath/>
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>test-project</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-maven-plugin</artifactId>
+                <version>1.4</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+`
+
+// TestPatcher_Patch_AlreadyPatchedMaven verifies that patching an already-patched Maven project
+// returns no changes and does not modify the file.
+func TestPatcher_Patch_AlreadyPatchedMaven(t *testing.T) {
+	// Create a temp project with springdoc already configured
+	tmpDir := t.TempDir()
+	tmpPom := filepath.Join(tmpDir, "pom.xml")
+	if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0644); err != nil {
+		t.Fatalf("Failed to create temp pom.xml: %v", err)
+	}
+
+	patcher := spring.NewPatcher()
+	opts := &extractor.PatchOptions{
+		DryRun:             false,
+		SpringdocVersion:   extractor.DefaultSpringdocVersion,
+		MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+	}
+
+	changes, err := patcher.Patch(tmpDir, opts)
+	if err != nil {
+		t.Fatalf("Patch failed: %v", err)
+	}
+
+	// Verify no changes were reported
+	if changes.DependencyAdded {
+		t.Error("Expected DependencyAdded to be false for already-patched project")
+	}
+	if changes.PluginAdded {
+		t.Error("Expected PluginAdded to be false for already-patched project")
+	}
+
+	// Verify file was not modified
+	content, err := os.ReadFile(tmpPom)
+	if err != nil {
+		t.Fatalf("Failed to read pom.xml: %v", err)
+	}
+	// The file should still contain exactly one springdoc dependency
+	springdocCount := strings.Count(string(content), "springdoc-openapi-starter-webmvc-ui")
+	if springdocCount != 1 {
+		t.Errorf("Expected exactly 1 springdoc dependency, found %d", springdocCount)
+	}
+}
+
+// minimalGradleWithSpringdoc is a minimal build.gradle already containing springdoc dependencies
+const minimalGradleWithSpringdoc = `
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springdoc.openapi-gradle-plugin' version "1.8.0"
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+}
+`
+
+// TestPatcher_Patch_AlreadyPatchedGradle verifies that patching an already-patched Gradle project
+// returns no changes and does not modify the file.
+func TestPatcher_Patch_AlreadyPatchedGradle(t *testing.T) {
+	// Create a temp project with springdoc already configured
+	tmpDir := t.TempDir()
+	tmpGradle := filepath.Join(tmpDir, "build.gradle")
+	if err := os.WriteFile(tmpGradle, []byte(minimalGradleWithSpringdoc), 0644); err != nil {
+		t.Fatalf("Failed to create temp build.gradle: %v", err)
+	}
+
+	patcher := spring.NewPatcher()
+	opts := &extractor.PatchOptions{
+		DryRun:              false,
+		SpringdocVersion:    extractor.DefaultSpringdocVersion,
+		GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+	}
+
+	changes, err := patcher.Patch(tmpDir, opts)
+	if err != nil {
+		t.Fatalf("Patch failed: %v", err)
+	}
+
+	// Verify no changes were reported
+	if changes.DependencyAdded {
+		t.Error("Expected DependencyAdded to be false for already-patched project")
+	}
+	if changes.PluginAdded {
+		t.Error("Expected PluginAdded to be false for already-patched project")
+	}
+
+	// Verify file was not modified
+	content, err := os.ReadFile(tmpGradle)
+	if err != nil {
+		t.Fatalf("Failed to read build.gradle: %v", err)
+	}
+	// The file should still contain exactly one springdoc dependency
+	springdocCount := strings.Count(string(content), "springdoc-openapi-starter-webmvc-ui")
+	if springdocCount != 1 {
+		t.Errorf("Expected exactly 1 springdoc dependency, found %d", springdocCount)
+	}
+}
+
+// TestPatcher_Patch_NoBuildFile verifies that patching a project without a build file
+// returns an appropriate error.
+func TestPatcher_Patch_NoBuildFile(t *testing.T) {
+	// Create a temp directory without any build files
+	tmpDir := t.TempDir()
+
+	patcher := spring.NewPatcher()
+	opts := &extractor.PatchOptions{
+		DryRun: false,
+	}
+
+	_, err := patcher.Patch(tmpDir, opts)
+	if err == nil {
+		t.Fatal("Expected error when no build file found")
+	}
+	if !strings.Contains(err.Error(), "no build file found") {
+		t.Errorf("Expected 'no build file found' error, got: %v", err)
+	}
 }

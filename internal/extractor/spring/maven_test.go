@@ -9,8 +9,12 @@ import (
 	"github.com/vifraa/gopom"
 )
 
+const (
+	mavenTestPath = "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
+)
+
 func TestMavenParser_Parse(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
+	pomPath := mavenTestPath
 
 	// Skip if project doesn't exist
 	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
@@ -29,7 +33,7 @@ func TestMavenParser_Parse(t *testing.T) {
 }
 
 func TestMavenParser_GetSpringBootVersion(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
+	pomPath := mavenTestPath
 
 	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")
@@ -46,13 +50,13 @@ func TestMavenParser_GetSpringBootVersion(t *testing.T) {
 		t.Error("Spring Boot version should not be empty")
 	}
 	// The demo project uses Spring Boot 4.0.3
-	if version != "4.0.3" {
-		t.Logf("Warning: Expected Spring Boot 4.0.3, got %s", version)
+	if version != testSpringBootVersion {
+		t.Logf("Warning: Expected Spring Boot %s, got %s", testSpringBootVersion, version)
 	}
 }
 
 func TestMavenParser_HasSpringdocDependency(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
+	pomPath := mavenTestPath
 
 	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")
@@ -70,7 +74,7 @@ func TestMavenParser_HasSpringdocDependency(t *testing.T) {
 }
 
 func TestMavenParser_GetSpringdocVersion(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
+	pomPath := mavenTestPath
 
 	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")
@@ -89,7 +93,7 @@ func TestMavenParser_GetSpringdocVersion(t *testing.T) {
 }
 
 func TestMavenParser_HasSpringdocPlugin(t *testing.T) {
-	pomPath := "../../../integration-tests/maven-springboot-openapi-demo/pom.xml"
+	pomPath := mavenTestPath
 
 	if _, err := os.Stat(pomPath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")

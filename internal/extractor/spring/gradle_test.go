@@ -9,8 +9,13 @@ import (
 	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 )
 
+const (
+	gradleTestPath        = "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
+	testSpringBootVersion = "4.0.3"
+)
+
 func TestGradleParser_Parse(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
+	gradlePath := gradleTestPath
 
 	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")
@@ -28,7 +33,7 @@ func TestGradleParser_Parse(t *testing.T) {
 }
 
 func TestGradleParser_HasSpringdocDependency(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
+	gradlePath := gradleTestPath
 
 	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")
@@ -46,7 +51,7 @@ func TestGradleParser_HasSpringdocDependency(t *testing.T) {
 }
 
 func TestGradleParser_HasSpringdocPlugin(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
+	gradlePath := gradleTestPath
 
 	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")
@@ -64,7 +69,7 @@ func TestGradleParser_HasSpringdocPlugin(t *testing.T) {
 }
 
 func TestGradleParser_GetSpringdocVersion(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
+	gradlePath := gradleTestPath
 
 	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")
@@ -83,7 +88,7 @@ func TestGradleParser_GetSpringdocVersion(t *testing.T) {
 }
 
 func TestGradleParser_GetSpringBootVersion(t *testing.T) {
-	gradlePath := "../../../integration-tests/gradle-springboot-openapi-demo/build.gradle"
+	gradlePath := gradleTestPath
 
 	if _, err := os.Stat(gradlePath); os.IsNotExist(err) {
 		t.Skip("Integration test project not found")
@@ -100,8 +105,8 @@ func TestGradleParser_GetSpringBootVersion(t *testing.T) {
 		t.Error("Spring Boot version should not be empty")
 	}
 	// The demo project uses Spring Boot 4.0.3
-	if version != "4.0.3" {
-		t.Logf("Warning: Expected Spring Boot 4.0.3, got %s", version)
+	if version != testSpringBootVersion {
+		t.Logf("Warning: Expected Spring Boot %s, got %s", testSpringBootVersion, version)
 	}
 }
 
@@ -114,7 +119,7 @@ func TestGradleParser_FindDependency(t *testing.T) {
 			{
 				Group:   "org.springframework.boot",
 				Name:    "spring-boot-starter-web",
-				Version: "4.0.3",
+				Version: testSpringBootVersion,
 				Scope:   "implementation",
 			},
 		},
@@ -124,8 +129,8 @@ func TestGradleParser_FindDependency(t *testing.T) {
 	if dep == nil {
 		t.Fatal("Should find spring-boot-starter-web dependency")
 	}
-	if dep.Version != "4.0.3" {
-		t.Errorf("Version = %s, want 4.0.3", dep.Version)
+	if dep.Version != testSpringBootVersion {
+		t.Errorf("Version = %s, want %s", dep.Version, testSpringBootVersion)
 	}
 }
 
@@ -137,7 +142,7 @@ func TestGradleParser_FindPlugin(t *testing.T) {
 		Plugins: []*model.Plugin{
 			{
 				ID:      "org.springframework.boot",
-				Version: "4.0.3",
+				Version: testSpringBootVersion,
 			},
 		},
 	}
@@ -146,7 +151,7 @@ func TestGradleParser_FindPlugin(t *testing.T) {
 	if plugin == nil {
 		t.Fatal("Should find spring-boot plugin")
 	}
-	if plugin.Version != "4.0.3" {
-		t.Errorf("Version = %s, want 4.0.3", plugin.Version)
+	if plugin.Version != testSpringBootVersion {
+		t.Errorf("Version = %s, want %s", plugin.Version, testSpringBootVersion)
 	}
 }

@@ -24,8 +24,8 @@ linters:
     - gocritic
     - goconst
     - gocyclo
-    - dupl
     - prealloc
+  # dupl is disabled because test files often have similar structure by design
 
 formatters:
   enable:
@@ -46,9 +46,6 @@ linters-settings:
 
   gocyclo:
     min-complexity: 15
-
-  dupl:
-    threshold: 100
 
   misspell:
     locale: US
@@ -96,9 +93,8 @@ linters-settings:
 
 issues:
   exclude-rules:
-    - path: _test\.go
+    - path: '.*_test\.go'
       linters:
-        - dupl
         - gocyclo
         - goconst
 
