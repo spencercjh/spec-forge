@@ -33,7 +33,6 @@ func TestDetector_Detect_MavenProject(t *testing.T) {
 
 	detector := spring.NewDetector()
 	info, err := detector.Detect(projectPath)
-
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}
@@ -62,7 +61,6 @@ func TestDetector_Detect_GradleProject(t *testing.T) {
 
 	detector := spring.NewDetector()
 	info, err := detector.Detect(projectPath)
-
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}

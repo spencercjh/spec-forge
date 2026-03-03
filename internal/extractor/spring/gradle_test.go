@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/scagogogo/gradle-parser/pkg/model"
+
 	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 )
 

@@ -1,4 +1,4 @@
-.PHONY: all build clean test lint fmt vet help
+.PHONY: all build clean test lint fmt install build-linux dev verify help
 
 # Go parameters
 GOCMD=go
@@ -7,7 +7,6 @@ GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
-GOFMT=gofmt
 GOLINT=golangci-lint
 
 # Binary names
@@ -20,7 +19,8 @@ MAIN_PACKAGE=.
 # Build directory
 BUILD_DIR=./build
 
-all: clean deps lint fmt build test
+# All-in-one: clean, deps, format, lint, test, build
+all: clean deps fmt lint test build
 
 build:
 	@echo "Building..."
@@ -50,20 +50,17 @@ test-coverage: test
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
+# Run golangci-lint (includes linters + formatters check)
 lint:
 	@echo "Running linter..."
 	$(GOLINT) run ./...
 	@echo "Lint complete"
 
+# Format code using golangci-lint formatters (gofumpt, goimports, gci)
 fmt:
 	@echo "Formatting code..."
-	$(GOFMT) -s -w .
+	$(GOLINT) fmt ./...
 	@echo "Format complete"
-
-vet:
-	@echo "Running vet..."
-	$(GOCMD) vet ./...
-	@echo "Vet complete"
 
 install:
 	@echo "Installing..."
@@ -79,23 +76,22 @@ dev: build
 	@echo "Running in development mode..."
 	./$(BUILD_DIR)/$(BINARY_NAME) --help
 
-# Verify all checks pass
-verify: deps fmt vet lint test
+# Verify all checks pass (deps, fmt, lint, test)
+verify: deps fmt lint test
 	@echo "All checks passed!"
 
 help:
 	@echo "Available targets:"
-	@echo "  all           - Clean, download dependencies, lint, test, and build"
+	@echo "  all           - Clean, download dependencies, format, lint, test, and build"
 	@echo "  build         - Build the binary"
 	@echo "  clean         - Remove build artifacts"
 	@echo "  deps          - Download and tidy dependencies"
 	@echo "  test          - Run tests with coverage"
 	@echo "  test-coverage - Generate HTML coverage report"
-	@echo "  lint          - Run golangci-lint"
-	@echo "  fmt           - Format code with gofmt"
-	@echo "  vet           - Run go vet"
+	@echo "  lint          - Run golangci-lint (linters + formatters check)"
+	@echo "  fmt           - Format code with golangci-lint formatters"
 	@echo "  install       - Install binary to GOPATH/bin"
 	@echo "  build-linux   - Build for Linux"
 	@echo "  dev           - Build and show help"
-	@echo "  verify        - Run all checks (deps, fmt, vet, lint, test)"
+	@echo "  verify        - Run all checks (deps, fmt, lint, test)"
 	@echo "  help          - Show this help message"

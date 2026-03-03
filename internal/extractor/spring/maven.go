@@ -146,7 +146,8 @@ func (p *MavenParser) GetModules(pom *gopom.Project) []string {
 }
 
 // FindMainModule finds the main module that contains the Spring Boot application.
-func (p *MavenParser) FindMainModule(projectPath string, modules []string) (string, string) {
+// Returns (moduleName, modulePomPath). Returns empty strings if not found.
+func (p *MavenParser) FindMainModule(projectPath string, modules []string) (moduleName, modulePomPath string) {
 	for _, module := range modules {
 		modulePath := filepath.Join(projectPath, module, "pom.xml")
 		if _, err := os.Stat(modulePath); err != nil {
@@ -160,11 +161,13 @@ func (p *MavenParser) FindMainModule(projectPath string, modules []string) (stri
 
 		// Check if this module has Spring Boot plugin
 		if p.HasSpringBootPlugin(pom) {
-			return module, modulePath
+			moduleName = module
+			modulePomPath = modulePath
+			return moduleName, modulePomPath
 		}
 	}
 
-	return "", ""
+	return moduleName, modulePomPath
 }
 
 // AddDependency adds a dependency to the pom.

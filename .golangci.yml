@@ -13,91 +13,168 @@ output:
       print-linter-name: true
 
 linters:
+  default: none
   enable:
-    - errcheck
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - misspell
-    - revive
-    - gocritic
-    - goconst
-    - gocyclo
-    - prealloc
-  # dupl is disabled because test files often have similar structure by design
+    # Default linters (important ones)
+    - errcheck      # Check for unchecked errors
+    - govet         # Go vet checks
+    - ineffassign   # Detect unused assignments
+    - staticcheck   # Static analysis checks
+    - unused        # Find unused code
+
+    # Error handling
+    - errorlint     # Check for error wrapping issues
+    - nilerr        # Find nil error returns
+    - nilnil        # Check for nil nil returns
+
+    # Code quality
+    - gocritic      # Comprehensive Go source code linter
+    - revive        # Fast, configurable linter (golint replacement)
+    - gosec         # Security checks
+    - gocyclo       # Cyclomatic complexity
+    - dupl          # Detect duplicate code
+
+    # Performance
+    - prealloc      # Find slice declarations that could be pre-allocated
+    - bodyclose     # Check if HTTP response body is closed
+    - perfsprint    # Detect fmt.Sprintf calls that could be more efficient
+
+    # Testing
+    - testifylint   # Check testify usage
+    - thelper       # Detect test helpers without t.Helper()
+
+    # Style
+    - goconst       # Find repeated strings that could be constants
+    - misspell      # Find misspelled words
+    - whitespace    # Check for unnecessary newlines
+
+    # Modern Go
+    - modernize     # Suggest modern Go features
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+
+    gocyclo:
+      min-complexity: 20
+
+    misspell:
+      locale: US
+
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+        - name: unreachable-code
+        - name: redefines-builtin-id
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+      disabled-checks:
+        - dupImport
+        - ifElseChain
+        - octalLiteral
+        - whyNoLint
+        - wrapperFunc
+
+    testifylint:
+      enable-all: true
+
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+    rules:
+      # Test files often have similar structure by design
+      - path: '_test\.go'
+        linters:
+          - gocyclo
+          - goconst
+          - dupl
+          - gosec
+          - errcheck
+          - revive
+          - govet
+      # Config file may contain APIKey field
+      - path: 'config\.go'
+        text: "G117:"
+        linters:
+          - gosec
 
 formatters:
   enable:
-    - gofmt
-    - goimports
+    - gofumpt       # Stricter gofmt
+    - goimports     # Manage imports
+    - gci           # Import ordering
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/spencercjh/spec-forge)
 
-  govet:
-    enable-all: true
+    gofumpt:
+      extra-rules: true
 
-  goconst:
-    min-len: 3
-    min-occurrences: 3
+    goimports:
+      local-prefixes: github.com/spencercjh/spec-forge
 
-  gocyclo:
-    min-complexity: 15
-
-  misspell:
-    locale: US
-
-  revive:
-    rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unused-parameter
-      - name: unreachable-code
-      - name: redefines-builtin-id
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 
 issues:
-  exclude-rules:
-    - path: '.*_test\.go'
-      linters:
-        - gocyclo
-        - goconst
-
   max-issues-per-linter: 0
   max-same-issues: 0
   new: false

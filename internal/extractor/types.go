@@ -28,10 +28,10 @@ type ProjectInfo struct {
 	SpringdocVersion   string    // Existing springdoc version if any
 
 	// Multi-module project support
-	IsMultiModule    bool     // Whether this is a multi-module project
-	Modules          []string // List of module names (for multi-module projects)
-	MainModule       string   // The main application module (if detected)
-	MainModulePath   string   // Path to the main module's build file
+	IsMultiModule  bool     // Whether this is a multi-module project
+	Modules        []string // List of module names (for multi-module projects)
+	MainModule     string   // The main application module (if detected)
+	MainModulePath string   // Path to the main module's build file
 }
 
 // PatchOptions configures the patch behavior.

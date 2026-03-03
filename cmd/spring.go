@@ -4,9 +4,10 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/spencercjh/spec-forge/internal/extractor/spring"
-	"github.com/spf13/cobra"
 )
 
 // springCmd represents the spring command group

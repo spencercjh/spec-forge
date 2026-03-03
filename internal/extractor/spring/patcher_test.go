@@ -102,7 +102,7 @@ func TestPatcher_Patch_MavenDryRun(t *testing.T) {
 	// Create a temp copy for testing
 	tmpDir := t.TempDir()
 	tmpPom := filepath.Join(tmpDir, "pom.xml")
-	if err := os.WriteFile(tmpPom, origContent, 0644); err != nil {
+	if err := os.WriteFile(tmpPom, origContent, 0o644); err != nil {
 		t.Fatalf("Failed to create temp pom.xml: %v", err)
 	}
 
@@ -126,7 +126,7 @@ func TestPatcher_Patch_MavenWithMissingDeps(t *testing.T) {
 	// Create a temp project without springdoc
 	tmpDir := t.TempDir()
 	tmpPom := filepath.Join(tmpDir, "pom.xml")
-	if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0644); err != nil {
+	if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0o644); err != nil {
 		t.Fatalf("Failed to create temp pom.xml: %v", err)
 	}
 
@@ -163,7 +163,7 @@ func TestPatcher_Patch_MavenWithMissingDeps(t *testing.T) {
 
 	t.Run("actual patch modifies file", func(t *testing.T) {
 		// Reset the pom file
-		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0o644); err != nil {
 			t.Fatalf("Failed to reset temp pom.xml: %v", err)
 		}
 
@@ -203,7 +203,7 @@ func TestPatcher_Patch_GradleWithMissingDeps(t *testing.T) {
 	// Create a temp project without springdoc
 	tmpDir := t.TempDir()
 	tmpGradle := filepath.Join(tmpDir, "build.gradle")
-	if err := os.WriteFile(tmpGradle, []byte(minimalGradleWithoutSpringdoc), 0644); err != nil {
+	if err := os.WriteFile(tmpGradle, []byte(minimalGradleWithoutSpringdoc), 0o644); err != nil {
 		t.Fatalf("Failed to create temp build.gradle: %v", err)
 	}
 
@@ -240,7 +240,7 @@ func TestPatcher_Patch_GradleWithMissingDeps(t *testing.T) {
 
 	t.Run("actual patch modifies file", func(t *testing.T) {
 		// Reset the gradle file
-		if err := os.WriteFile(tmpGradle, []byte(minimalGradleWithoutSpringdoc), 0644); err != nil {
+		if err := os.WriteFile(tmpGradle, []byte(minimalGradleWithoutSpringdoc), 0o644); err != nil {
 			t.Fatalf("Failed to reset temp build.gradle: %v", err)
 		}
 
@@ -316,7 +316,7 @@ func TestPatcher_Patch_AlreadyPatchedMaven(t *testing.T) {
 	// Create a temp project with springdoc already configured
 	tmpDir := t.TempDir()
 	tmpPom := filepath.Join(tmpDir, "pom.xml")
-	if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0644); err != nil {
+	if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0o644); err != nil {
 		t.Fatalf("Failed to create temp pom.xml: %v", err)
 	}
 
@@ -380,7 +380,7 @@ func TestPatcher_Patch_AlreadyPatchedGradle(t *testing.T) {
 	// Create a temp project with springdoc already configured
 	tmpDir := t.TempDir()
 	tmpGradle := filepath.Join(tmpDir, "build.gradle")
-	if err := os.WriteFile(tmpGradle, []byte(minimalGradleWithSpringdoc), 0644); err != nil {
+	if err := os.WriteFile(tmpGradle, []byte(minimalGradleWithSpringdoc), 0o644); err != nil {
 		t.Fatalf("Failed to create temp build.gradle: %v", err)
 	}
 
@@ -442,7 +442,7 @@ func TestPatcher_OriginalContent(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
 		originalContent := minimalPomWithoutSpringdoc
-		if err := os.WriteFile(tmpPom, []byte(originalContent), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(originalContent), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -471,7 +471,7 @@ func TestPatcher_OriginalContent(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpGradle := filepath.Join(tmpDir, "build.gradle")
 		originalContent := minimalGradleWithoutSpringdoc
-		if err := os.WriteFile(tmpGradle, []byte(originalContent), 0644); err != nil {
+		if err := os.WriteFile(tmpGradle, []byte(originalContent), 0o644); err != nil {
 			t.Fatalf("Failed to create temp build.gradle: %v", err)
 		}
 
@@ -499,7 +499,7 @@ func TestPatcher_OriginalContent(t *testing.T) {
 	t.Run("No changes: empty OriginalContent", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -526,7 +526,7 @@ func TestPatcher_Restore(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
 		originalContent := minimalPomWithoutSpringdoc
-		if err := os.WriteFile(tmpPom, []byte(originalContent), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(originalContent), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -584,7 +584,7 @@ func TestPatcher_KeepPatchedOption(t *testing.T) {
 	t.Run("patcher works with KeepPatched=true", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -612,7 +612,7 @@ func TestPatcher_KeepPatchedOption(t *testing.T) {
 	t.Run("patcher works with KeepPatched=false", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -763,7 +763,7 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 	t.Run("pom with only pluginManagement", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(pomWithOnlyPluginManagement), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(pomWithOnlyPluginManagement), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -795,7 +795,7 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 	t.Run("pom without dependencies section", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(pomWithoutDependencies), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(pomWithoutDependencies), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -824,7 +824,7 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 	t.Run("pom without build section", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(pomWithoutBuild), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(pomWithoutBuild), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -856,7 +856,7 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 	t.Run("pom with dependencyManagement", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(pomWithDependencyManagement), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(pomWithDependencyManagement), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -885,7 +885,7 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 	t.Run("force option on already patched project", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -914,7 +914,7 @@ func TestPatcher_EdgeCases_Gradle(t *testing.T) {
 	t.Run("gradle without plugins block", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpGradle := filepath.Join(tmpDir, "build.gradle")
-		if err := os.WriteFile(tmpGradle, []byte(gradleWithoutPlugins), 0644); err != nil {
+		if err := os.WriteFile(tmpGradle, []byte(gradleWithoutPlugins), 0o644); err != nil {
 			t.Fatalf("Failed to create temp build.gradle: %v", err)
 		}
 
@@ -938,7 +938,7 @@ func TestPatcher_EdgeCases_Gradle(t *testing.T) {
 	t.Run("gradle without dependencies block", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpGradle := filepath.Join(tmpDir, "build.gradle")
-		if err := os.WriteFile(tmpGradle, []byte(gradleWithoutDependencies), 0644); err != nil {
+		if err := os.WriteFile(tmpGradle, []byte(gradleWithoutDependencies), 0o644); err != nil {
 			t.Fatalf("Failed to create temp build.gradle: %v", err)
 		}
 
@@ -971,7 +971,7 @@ func TestPatcher_ForceOption(t *testing.T) {
 		// but the actual POM doesn't have it (edge case)
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithoutSpringdoc), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -995,7 +995,7 @@ func TestPatcher_ForceOption(t *testing.T) {
 	t.Run("force does not add duplicate", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
-		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(minimalPomWithSpringdoc), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -1019,7 +1019,7 @@ func TestPatcher_DryRunMode(t *testing.T) {
 		tmpDir := t.TempDir()
 		tmpPom := filepath.Join(tmpDir, "pom.xml")
 		originalContent := minimalPomWithoutSpringdoc
-		if err := os.WriteFile(tmpPom, []byte(originalContent), 0644); err != nil {
+		if err := os.WriteFile(tmpPom, []byte(originalContent), 0o644); err != nil {
 			t.Fatalf("Failed to create temp pom.xml: %v", err)
 		}
 
@@ -1115,30 +1115,30 @@ func TestDetector_MultiModuleGradle(t *testing.T) {
 	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
 	userServiceDir := filepath.Join(tmpDir, "user-service")
 
-	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedLibDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared-lib dir: %v", err)
 	}
-	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+	if err := os.MkdirAll(userServiceDir, 0o755); err != nil {
 		t.Fatalf("Failed to create user-service dir: %v", err)
 	}
 
 	// Create settings.gradle
-	if err := os.WriteFile(filepath.Join(settingsDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(settingsDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create settings.gradle: %v", err)
 	}
 
 	// Create root build.gradle
-	if err := os.WriteFile(filepath.Join(settingsDir, "build.gradle"), []byte(rootBuildGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(settingsDir, "build.gradle"), []byte(rootBuildGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create root build.gradle: %v", err)
 	}
 
 	// Create shared-lib build.gradle
-	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create shared-lib build.gradle: %v", err)
 	}
 
 	// Create user-service build.gradle
-	if err := os.WriteFile(filepath.Join(userServiceDir, "build.gradle"), []byte(userServiceBuildGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(userServiceDir, "build.gradle"), []byte(userServiceBuildGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create user-service build.gradle: %v", err)
 	}
 
@@ -1173,31 +1173,31 @@ func TestPatcher_MultiModuleGradle(t *testing.T) {
 	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
 	userServiceDir := filepath.Join(tmpDir, "user-service")
 
-	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedLibDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared-lib dir: %v", err)
 	}
-	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+	if err := os.MkdirAll(userServiceDir, 0o755); err != nil {
 		t.Fatalf("Failed to create user-service dir: %v", err)
 	}
 
 	// Create settings.gradle
-	if err := os.WriteFile(filepath.Join(tmpDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create settings.gradle: %v", err)
 	}
 
 	// Create root build.gradle
-	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte(rootBuildGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte(rootBuildGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create root build.gradle: %v", err)
 	}
 
 	// Create shared-lib build.gradle
-	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create shared-lib build.gradle: %v", err)
 	}
 
 	// Create user-service build.gradle
 	userServiceBuildPath := filepath.Join(userServiceDir, "build.gradle")
-	if err := os.WriteFile(userServiceBuildPath, []byte(userServiceBuildGradle), 0644); err != nil {
+	if err := os.WriteFile(userServiceBuildPath, []byte(userServiceBuildGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create user-service build.gradle: %v", err)
 	}
 
@@ -1252,32 +1252,32 @@ func TestPatcher_MultiModuleGradle_Restore(t *testing.T) {
 	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
 	userServiceDir := filepath.Join(tmpDir, "user-service")
 
-	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedLibDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared-lib dir: %v", err)
 	}
-	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+	if err := os.MkdirAll(userServiceDir, 0o755); err != nil {
 		t.Fatalf("Failed to create user-service dir: %v", err)
 	}
 
 	// Create settings.gradle
-	if err := os.WriteFile(filepath.Join(tmpDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "settings.gradle"), []byte(multiModuleSettingsGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create settings.gradle: %v", err)
 	}
 
 	// Create root build.gradle
-	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte(rootBuildGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte(rootBuildGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create root build.gradle: %v", err)
 	}
 
 	// Create shared-lib build.gradle
-	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "build.gradle"), []byte(sharedLibBuildGradle), 0o644); err != nil {
 		t.Fatalf("Failed to create shared-lib build.gradle: %v", err)
 	}
 
 	// Create user-service build.gradle
 	userServiceBuildPath := filepath.Join(userServiceDir, "build.gradle")
 	originalContent := userServiceBuildGradle
-	if err := os.WriteFile(userServiceBuildPath, []byte(originalContent), 0644); err != nil {
+	if err := os.WriteFile(userServiceBuildPath, []byte(originalContent), 0o644); err != nil {
 		t.Fatalf("Failed to create user-service build.gradle: %v", err)
 	}
 
@@ -1391,25 +1391,25 @@ func TestDetector_MultiModuleMaven(t *testing.T) {
 	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
 	userServiceDir := filepath.Join(tmpDir, "user-service")
 
-	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedLibDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared-lib dir: %v", err)
 	}
-	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+	if err := os.MkdirAll(userServiceDir, 0o755); err != nil {
 		t.Fatalf("Failed to create user-service dir: %v", err)
 	}
 
 	// Create parent pom.xml
-	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0o644); err != nil {
 		t.Fatalf("Failed to create parent pom.xml: %v", err)
 	}
 
 	// Create shared-lib pom.xml
-	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0o644); err != nil {
 		t.Fatalf("Failed to create shared-lib pom.xml: %v", err)
 	}
 
 	// Create user-service pom.xml
-	if err := os.WriteFile(filepath.Join(userServiceDir, "pom.xml"), []byte(mavenUserServicePom), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(userServiceDir, "pom.xml"), []byte(mavenUserServicePom), 0o644); err != nil {
 		t.Fatalf("Failed to create user-service pom.xml: %v", err)
 	}
 
@@ -1444,26 +1444,26 @@ func TestPatcher_MultiModuleMaven(t *testing.T) {
 	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
 	userServiceDir := filepath.Join(tmpDir, "user-service")
 
-	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedLibDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared-lib dir: %v", err)
 	}
-	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+	if err := os.MkdirAll(userServiceDir, 0o755); err != nil {
 		t.Fatalf("Failed to create user-service dir: %v", err)
 	}
 
 	// Create parent pom.xml
-	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0o644); err != nil {
 		t.Fatalf("Failed to create parent pom.xml: %v", err)
 	}
 
 	// Create shared-lib pom.xml
-	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0o644); err != nil {
 		t.Fatalf("Failed to create shared-lib pom.xml: %v", err)
 	}
 
 	// Create user-service pom.xml
 	userServicePomPath := filepath.Join(userServiceDir, "pom.xml")
-	if err := os.WriteFile(userServicePomPath, []byte(mavenUserServicePom), 0644); err != nil {
+	if err := os.WriteFile(userServicePomPath, []byte(mavenUserServicePom), 0o644); err != nil {
 		t.Fatalf("Failed to create user-service pom.xml: %v", err)
 	}
 
@@ -1513,27 +1513,27 @@ func TestPatcher_MultiModuleMaven_Restore(t *testing.T) {
 	sharedLibDir := filepath.Join(tmpDir, "shared-lib")
 	userServiceDir := filepath.Join(tmpDir, "user-service")
 
-	if err := os.MkdirAll(sharedLibDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedLibDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared-lib dir: %v", err)
 	}
-	if err := os.MkdirAll(userServiceDir, 0755); err != nil {
+	if err := os.MkdirAll(userServiceDir, 0o755); err != nil {
 		t.Fatalf("Failed to create user-service dir: %v", err)
 	}
 
 	// Create parent pom.xml
-	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "pom.xml"), []byte(mavenParentPom), 0o644); err != nil {
 		t.Fatalf("Failed to create parent pom.xml: %v", err)
 	}
 
 	// Create shared-lib pom.xml
-	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sharedLibDir, "pom.xml"), []byte(mavenSharedLibPom), 0o644); err != nil {
 		t.Fatalf("Failed to create shared-lib pom.xml: %v", err)
 	}
 
 	// Create user-service pom.xml
 	userServicePomPath := filepath.Join(userServiceDir, "pom.xml")
 	originalContent := mavenUserServicePom
-	if err := os.WriteFile(userServicePomPath, []byte(originalContent), 0644); err != nil {
+	if err := os.WriteFile(userServicePomPath, []byte(originalContent), 0o644); err != nil {
 		t.Fatalf("Failed to create user-service pom.xml: %v", err)
 	}
 

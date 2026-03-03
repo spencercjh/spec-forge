@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 	"github.com/vifraa/gopom"
+
+	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 )
 
 const (

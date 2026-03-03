@@ -2,6 +2,7 @@ package spring
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ func (p *GradleParser) Parse(gradlePath string) (*model.Project, error) {
 	}
 
 	if result.Project == nil {
-		return nil, fmt.Errorf("parsed project is nil")
+		return nil, errors.New("parsed project is nil")
 	}
 
 	return result.Project, nil
@@ -41,7 +42,7 @@ func (p *GradleParser) ParseString(content string) (*model.Project, error) {
 	}
 
 	if result.Project == nil {
-		return nil, fmt.Errorf("parsed project is nil")
+		return nil, errors.New("parsed project is nil")
 	}
 
 	return result.Project, nil
@@ -167,7 +168,8 @@ func (p *GradleParser) ParseModules(settingsPath string) []string {
 }
 
 // FindMainModule finds the main module that contains the Spring Boot application.
-func (p *GradleParser) FindMainModule(projectPath string, modules []string) (string, string) {
+// Returns (moduleName, moduleBuildPath). Returns empty strings if not found.
+func (p *GradleParser) FindMainModule(projectPath string, modules []string) (moduleName, moduleBuildPath string) {
 	for _, module := range modules {
 		// Try build.gradle first
 		modulePath := filepath.Join(projectPath, module, "build.gradle")
@@ -186,11 +188,13 @@ func (p *GradleParser) FindMainModule(projectPath string, modules []string) (str
 
 		// Check if this module has Spring Boot plugin
 		if p.HasSpringBootPlugin(build) {
-			return module, modulePath
+			moduleName = module
+			moduleBuildPath = modulePath
+			return moduleName, moduleBuildPath
 		}
 	}
 
-	return "", ""
+	return moduleName, moduleBuildPath
 }
 
 // AddDependencyText adds springdoc dependency using text manipulation.
@@ -228,7 +232,7 @@ func (p *GradleParser) AddDependencyText(content, version string) string {
 
 // AddPluginText adds springdoc plugin using text manipulation.
 func (p *GradleParser) AddPluginText(content, version string) string {
-	plugin := fmt.Sprintf("id '%s' version \"%s\"", SpringdocGradlePluginID, version)
+	plugin := fmt.Sprintf("id %q version %q", SpringdocGradlePluginID, version)
 
 	// Find the plugins block
 	pluginsIdx := strings.Index(content, "plugins {")

@@ -4,16 +4,15 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/spencercjh/spec-forge/internal/extractor/spring"
-	"github.com/spf13/cobra"
 )
 
-var (
-	// generateKeepPatched controls whether to keep the patched pom/build file
-	// Default is false (restore original) for generate command
-	generateKeepPatched bool
-)
+// generateKeepPatched controls whether to keep the patched pom/build file
+// Default is false (restore original) for generate command
+var generateKeepPatched bool
 
 // generateCmd represents the generate command
 var generateCmd = &cobra.Command{

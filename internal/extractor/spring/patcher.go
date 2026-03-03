@@ -86,7 +86,8 @@ func (p *Patcher) Restore(buildFilePath, originalContent string) error {
 	if originalContent == "" {
 		return nil
 	}
-	return os.WriteFile(buildFilePath, []byte(originalContent), 0644)
+	//nolint:gosec // G306: 0644 is appropriate for build files (pom.xml, build.gradle)
+	return os.WriteFile(buildFilePath, []byte(originalContent), 0o644)
 }
 
 // patchMaven patches a Maven project using gopom.
@@ -110,9 +111,9 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 
 	if opts.DryRun {
 		// In dry-run mode, don't modify anything
-		pom, err := p.mavenParser.Parse(buildFilePath)
-		if err != nil {
-			return nil, err
+		pom, dryRunErr := p.mavenParser.Parse(buildFilePath)
+		if dryRunErr != nil {
+			return nil, dryRunErr
 		}
 		result.DependencyAdded = !p.mavenParser.HasSpringdocDependency(pom)
 		result.PluginAdded = !p.mavenParser.HasSpringdocPlugin(pom)
@@ -147,7 +148,8 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal pom.xml: %w", err)
 		}
-		if err := os.WriteFile(buildFilePath, output, 0644); err != nil {
+		//nolint:gosec // 0644 is appropriate for build files (pom.xml)
+		if err := os.WriteFile(buildFilePath, output, 0o644); err != nil {
 			return nil, fmt.Errorf("failed to write pom.xml: %w", err)
 		}
 	}
@@ -220,7 +222,8 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 
 	// Write changes if modified
 	if result.DependencyAdded || result.PluginAdded {
-		if err := os.WriteFile(buildFilePath, []byte(modified), 0644); err != nil {
+		//nolint:gosec // 0644 is appropriate for build files (build.gradle)
+		if err := os.WriteFile(buildFilePath, []byte(modified), 0o644); err != nil {
 			return nil, fmt.Errorf("failed to write build.gradle: %w", err)
 		}
 	}
