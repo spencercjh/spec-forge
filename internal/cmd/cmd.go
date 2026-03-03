@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	cfgFile   string
-	verbose   bool
-	rootCmd   *cobra.Command
+	cfgFile string
+	verbose bool
+	rootCmd *cobra.Command
 )
 
 // initRootCommand initializes the root command
@@ -68,13 +68,32 @@ func initConfig() {
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
 	rootCmd = initRootCommand()
+	registerCommands(rootCmd)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
+// registerCommands adds all subcommands to the root command
+func registerCommands(root *cobra.Command) {
+	root.AddCommand(generateCmd)
+	root.AddCommand(extractCmd)
+	root.AddCommand(enrichCmd)
+	root.AddCommand(publishCmd)
+	root.AddCommand(springCmd)
+
+	// Add spring subcommands
+	springCmd.AddCommand(springDetectCmd)
+	springCmd.AddCommand(springPatchCmd)
+}
+
 // GetRootCommand returns the root command for testing purposes
 func GetRootCommand() *cobra.Command {
 	return rootCmd
+}
+
+// getConfig returns the global configuration
+func getConfig() *config.Config {
+	return config.Get()
 }
