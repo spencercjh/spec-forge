@@ -82,10 +82,6 @@ func registerCommands(root *cobra.Command) {
 	root.AddCommand(enrichCmd)
 	root.AddCommand(publishCmd)
 	root.AddCommand(springCmd)
-
-	// Add spring subcommands
-	springCmd.AddCommand(springDetectCmd)
-	springCmd.AddCommand(springPatchCmd)
 }
 
 // GetRootCommand returns the root command for testing purposes
