@@ -51,6 +51,9 @@ linters:
     # Modern Go
     - modernize     # Suggest modern Go features
 
+    # Logging
+    - forbidigo    # Forbid specific identifiers
+
   settings:
     errcheck:
       check-type-assertions: true
@@ -119,6 +122,17 @@ linters:
       errorf: true
       asserts: true
       comparison: true
+
+    forbidigo:
+      # Forbid fmt.Print* functions - use log/slog instead
+      # Note: fmt.Sprintf is allowed as it's often used for string building, not logging
+      forbid:
+        - pattern: fmt\.Print.*$
+          msg: use log/slog for logging
+        - pattern: fmt\.Fprint(os\.(Stdout|Stderr),.*)$
+          msg: use log/slog for logging
+      # Exclude test files from this check
+      exclude_godoc_examples: true
 
   exclusions:
     generated: lax

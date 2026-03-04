@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 
@@ -29,13 +30,14 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 	RunE: runGenerate,
 }
 
-func runGenerate(_ *cobra.Command, args []string) error {
+func runGenerate(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	path := "."
 	if len(args) > 0 {
 		path = args[0]
 	}
 
-	fmt.Printf("Generating OpenAPI spec from %s...\n", path)
+	slog.InfoContext(ctx, "Generating OpenAPI spec", "path", path)
 
 	// Step 1: Detect project
 	detector := spring.NewDetector()
@@ -44,7 +46,7 @@ func runGenerate(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("detection failed: %w", err)
 	}
 
-	fmt.Printf("Detected %s project (%s)\n", info.BuildTool, info.BuildFilePath)
+	slog.InfoContext(ctx, "Detected project", "tool", info.BuildTool, "build_file", info.BuildFilePath)
 
 	// Step 2: Patch project if needed
 	patcher := spring.NewPatcher()
@@ -60,27 +62,27 @@ func runGenerate(_ *cobra.Command, args []string) error {
 	// Step 3: If we patched the file and should restore later, defer the restore
 	if !generateKeepPatched && result.OriginalContent != "" {
 		defer func() {
-			fmt.Println("\nRestoring original build file...")
+			slog.InfoContext(ctx, "Restoring original build file...")
 			if err := patcher.Restore(result.BuildFilePath, result.OriginalContent); err != nil {
-				fmt.Printf("Warning: failed to restore original file: %v\n", err)
+				slog.WarnContext(ctx, "failed to restore original file", "error", err)
 			} else {
-				fmt.Println("✅ Original build file restored")
+				slog.InfoContext(ctx, "Original build file restored", "status", "✅")
 			}
 		}()
 	}
 
 	// Step 4: Extract OpenAPI spec (TODO: implement actual extraction)
 	// For now, just print what would happen
-	fmt.Println("\nExtraction would run here...")
+	slog.InfoContext(ctx, "Extraction would run here...")
 
 	if result.DependencyAdded {
-		fmt.Println("✅ springdoc dependency added temporarily")
+		slog.InfoContext(ctx, "springdoc dependency added temporarily", "status", "✅")
 	}
 	if result.PluginAdded {
-		fmt.Println("✅ springdoc plugin added temporarily")
+		slog.InfoContext(ctx, "springdoc plugin added temporarily", "status", "✅")
 	}
 
-	fmt.Println("\nGenerate command complete - extraction implementation coming soon")
+	slog.InfoContext(ctx, "Generate command complete - extraction implementation coming soon")
 	return nil
 }
 

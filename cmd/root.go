@@ -2,7 +2,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -31,7 +31,7 @@ Core workflow: Source Code -> Extract -> Enrich -> Publish`,
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		slog.Error("command failed", "error", err)
 		os.Exit(1)
 	}
 }
@@ -43,13 +43,16 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
 	if err := viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose")); err != nil {
-		fmt.Fprintf(os.Stderr, "Error binding verbose flag: %v\n", err)
+		slog.Error("failed to bind verbose flag", "error", err)
 		os.Exit(1)
 	}
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	// Initialize logging first
+	setupLogging(verbose)
+
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -64,7 +67,20 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		if verbose {
-			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+			slog.Debug("using config file", "path", viper.ConfigFileUsed())
 		}
 	}
+}
+
+// setupLogging configures the default slog logger.
+func setupLogging(verbose bool) {
+	level := slog.LevelInfo
+	if verbose {
+		level = slog.LevelDebug
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+	}))
+	slog.SetDefault(logger)
 }

@@ -2,7 +2,7 @@
 package config
 
 import (
-	"fmt"
+	"log/slog"
 
 	"github.com/spf13/viper"
 )
@@ -58,7 +58,7 @@ func Load() *Config {
 
 	// Unmarshal from viper
 	if err := viper.Unmarshal(cfg); err != nil {
-		fmt.Printf("warning: failed to unmarshal config: %v\n", err)
+		slog.Warn("failed to unmarshal config, using defaults", "error", err)
 	}
 
 	// Override with environment variables

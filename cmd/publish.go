@@ -2,7 +2,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 )
@@ -24,15 +24,18 @@ Supports:
 - Apifox
 - Swagger UI`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		specFile := "openapi.yaml"
-		if len(args) > 0 {
-			specFile = args[0]
-		}
-		fmt.Printf("Publishing %s to %s...\n", specFile, publishOutput)
-		fmt.Println("publish called - implementation coming soon")
-		return nil
-	},
+	RunE: runPublish,
+}
+
+func runPublish(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	specFile := "openapi.yaml"
+	if len(args) > 0 {
+		specFile = args[0]
+	}
+	slog.InfoContext(ctx, "Publishing spec", "file", specFile, "output", publishOutput)
+	slog.InfoContext(ctx, "publish called - implementation coming soon")
+	return nil
 }
 
 func init() {

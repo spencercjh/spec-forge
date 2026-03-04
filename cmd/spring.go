@@ -2,7 +2,9 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 
@@ -40,7 +42,8 @@ This command will identify:
 	RunE: runSpringDetect,
 }
 
-func runSpringDetect(_ *cobra.Command, args []string) error {
+func runSpringDetect(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	path := "."
 	if len(args) > 0 {
 		path = args[0]
@@ -53,38 +56,37 @@ func runSpringDetect(_ *cobra.Command, args []string) error {
 	}
 
 	// Print human-readable output
-	printProjectInfo(info)
+	printProjectInfo(ctx, info)
 	return nil
 }
 
-func printProjectInfo(info *extractor.ProjectInfo) {
-	fmt.Println("Spring Project Detection Results")
-	fmt.Println("================================")
-	fmt.Printf("Build Tool:           %s\n", info.BuildTool)
-	fmt.Printf("Build File:           %s\n", info.BuildFilePath)
-	fmt.Printf("Spring Boot:          %s\n", info.SpringBootVersion)
+func printProjectInfo(ctx context.Context, info *extractor.ProjectInfo) {
+	slog.InfoContext(ctx, "Spring Project Detection Results")
+	slog.InfoContext(ctx, "Build Tool", "tool", info.BuildTool)
+	slog.InfoContext(ctx, "Build File", "path", info.BuildFilePath)
+	slog.InfoContext(ctx, "Spring Boot", "version", info.SpringBootVersion)
 
 	if info.IsMultiModule {
-		fmt.Printf("Multi-Module:         ✅ Yes\n")
-		fmt.Printf("Modules:              %v\n", info.Modules)
+		slog.InfoContext(ctx, "Multi-Module", "enabled", "✅ Yes")
+		slog.InfoContext(ctx, "Modules", "list", info.Modules)
 		if info.MainModule != "" {
-			fmt.Printf("Main Module:          %s\n", info.MainModule)
-			fmt.Printf("Main Module Path:     %s\n", info.MainModulePath)
+			slog.InfoContext(ctx, "Main Module", "name", info.MainModule)
+			slog.InfoContext(ctx, "Main Module Path", "path", info.MainModulePath)
 		}
 	} else {
-		fmt.Printf("Multi-Module:         ❌ No\n")
+		slog.InfoContext(ctx, "Multi-Module", "enabled", "❌ No")
 	}
 
 	if info.HasSpringdocDeps {
-		fmt.Printf("springdoc Dependency: ✅ Present (%s)\n", info.SpringdocVersion)
+		slog.InfoContext(ctx, "springdoc Dependency", "status", "✅ Present", "version", info.SpringdocVersion)
 	} else {
-		fmt.Println("springdoc Dependency: ❌ Not found")
+		slog.InfoContext(ctx, "springdoc Dependency", "status", "❌ Not found")
 	}
 
 	if info.HasSpringdocPlugin {
-		fmt.Println("springdoc Plugin:     ✅ Configured")
+		slog.InfoContext(ctx, "springdoc Plugin", "status", "✅ Configured")
 	} else {
-		fmt.Println("springdoc Plugin:     ❌ Not configured")
+		slog.InfoContext(ctx, "springdoc Plugin", "status", "❌ Not configured")
 	}
 }
 
@@ -108,7 +110,8 @@ This command will:
 	RunE: runSpringPatch,
 }
 
-func runSpringPatch(_ *cobra.Command, args []string) error {
+func runSpringPatch(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	path := "."
 	if len(args) > 0 {
 		path = args[0]
@@ -130,29 +133,29 @@ func runSpringPatch(_ *cobra.Command, args []string) error {
 
 	// Print results
 	if opts.DryRun {
-		fmt.Println("Dry run mode - showing changes without modifying files")
+		slog.InfoContext(ctx, "Dry run mode - showing changes without modifying files")
 	}
 
-	fmt.Printf("Build file: %s\n", result.BuildFilePath)
+	slog.InfoContext(ctx, "Build file", "path", result.BuildFilePath)
 
 	if result.DependencyAdded {
-		fmt.Println("✅ springdoc dependency will be added")
+		slog.InfoContext(ctx, "springdoc dependency will be added", "status", "✅")
 	} else {
-		fmt.Println("⏭️  springdoc dependency already present")
+		slog.InfoContext(ctx, "springdoc dependency already present", "status", "⏭️")
 	}
 
 	if result.PluginAdded {
-		fmt.Println("✅ springdoc plugin will be added")
+		slog.InfoContext(ctx, "springdoc plugin will be added", "status", "✅")
 	} else {
-		fmt.Println("⏭️  springdoc plugin already configured")
+		slog.InfoContext(ctx, "springdoc plugin already configured", "status", "⏭️")
 	}
 
 	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
-		fmt.Println("\nPatch applied successfully!")
-		fmt.Println("Note: Build file format may differ from original due to XML serialization.")
-		fmt.Println("Use 'spec-forge generate' to extract specs while preserving original file format.")
+		slog.InfoContext(ctx, "Patch applied successfully!")
+		slog.InfoContext(ctx, "Note: Build file format may differ from original due to XML serialization.")
+		slog.InfoContext(ctx, "Use 'spec-forge generate' to extract specs while preserving original file format.")
 	} else if !result.DependencyAdded && !result.PluginAdded {
-		fmt.Println("\nNo changes needed.")
+		slog.InfoContext(ctx, "No changes needed.")
 	}
 
 	return nil

@@ -2,7 +2,7 @@
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -23,20 +23,23 @@ for APIs and fields.
 
 Supports multiple LLM providers: OpenAI, Anthropic, Ollama, and Zhipu GLM.`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		specFile := "openapi.yaml"
-		if len(args) > 0 {
-			specFile = args[0]
-		}
-		fmt.Printf("Enriching OpenAPI spec from %s...\n", specFile)
-		if !enrichEnabled {
-			fmt.Println("Enrichment disabled")
-			return nil
-		}
-		fmt.Printf("Provider: %s, Model: %s\n", enrichProvider, enrichModel)
-		fmt.Println("enrich called - implementation coming soon")
+	RunE: runEnrich,
+}
+
+func runEnrich(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	specFile := "openapi.yaml"
+	if len(args) > 0 {
+		specFile = args[0]
+	}
+	slog.InfoContext(ctx, "Enriching OpenAPI spec", "file", specFile)
+	if !enrichEnabled {
+		slog.InfoContext(ctx, "Enrichment disabled")
 		return nil
-	},
+	}
+	slog.InfoContext(ctx, "Using provider", "provider", enrichProvider, "model", enrichModel)
+	slog.InfoContext(ctx, "enrich called - implementation coming soon")
+	return nil
 }
 
 func init() {
@@ -47,7 +50,7 @@ func init() {
 	enrichCmd.Flags().BoolVar(&enrichEnabled, "enabled", true, "enable/disable enrichment")
 
 	if err := enrichCmd.MarkFlagRequired("provider"); err != nil {
-		fmt.Fprintf(os.Stderr, "Error marking provider flag required: %v\n", err)
+		slog.Error("failed to mark provider flag required", "error", err)
 		os.Exit(1)
 	}
 }
