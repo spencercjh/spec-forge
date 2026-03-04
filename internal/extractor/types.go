@@ -1,6 +1,8 @@
 // Package extractor provides interfaces and types for extracting OpenAPI specs from projects.
 package extractor
 
+import "time"
+
 // BuildTool represents the build tool type for a project.
 type BuildTool string
 
@@ -42,4 +44,25 @@ type PatchOptions struct {
 	MavenPluginVersion  string // Maven plugin version (default: built-in)
 	GradlePluginVersion string // Gradle plugin version (default: built-in)
 	KeepPatched         bool   // If false (default for generate), restore original file after extraction
+}
+
+// GenerateOptions configures OpenAPI spec generation.
+type GenerateOptions struct {
+	OutputDir  string        // Output directory for generated spec (default: project target/build dir)
+	OutputFile string        // Output file name without extension (default: "openapi")
+	Format     string        // Output format: "json" or "yaml" (default: "json")
+	Timeout    time.Duration // Command execution timeout (default: 5 minutes)
+	SkipTests  bool          // Skip tests during build (default: true)
+}
+
+// GenerateResult contains the result of OpenAPI spec generation.
+type GenerateResult struct {
+	SpecFilePath string // Absolute path to the generated spec file
+	Format       string // Output format: "json" or "yaml"
+}
+
+// ValidateResult contains the result of OpenAPI spec validation.
+type ValidateResult struct {
+	Valid  bool     // Whether the spec is valid
+	Errors []string // Validation errors (if any)
 }

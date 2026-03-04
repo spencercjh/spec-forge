@@ -185,8 +185,11 @@ func (p *MavenParser) AddDependency(pom *gopom.Project, groupID, artifactID, ver
 	}
 }
 
-// AddPlugin adds a plugin to the pom build section.
+// AddPlugin adds a plugin to the pom build section with proper execution configuration.
 func (p *MavenParser) AddPlugin(pom *gopom.Project, groupID, artifactID, version string) {
+	// Configure execution with integration-test phase for automatic app startup
+	id := "integration-test"
+	phase := "integration-test"
 	goals := []string{"generate"}
 	plugin := gopom.Plugin{
 		GroupID:    &groupID,
@@ -194,6 +197,8 @@ func (p *MavenParser) AddPlugin(pom *gopom.Project, groupID, artifactID, version
 		Version:    &version,
 		Executions: &[]gopom.PluginExecution{
 			{
+				ID:    &id,
+				Phase: &phase,
 				Goals: &goals,
 			},
 		},

@@ -135,3 +135,48 @@ func TestMavenParser_FindDependency(t *testing.T) {
 		t.Errorf("Version = %s, want 4.0.3", *dep.Version)
 	}
 }
+
+func TestMavenParser_AddPlugin(t *testing.T) {
+	parser := spring.NewMavenParser()
+
+	// Create a minimal pom without plugins
+	pom := &gopom.Project{}
+
+	parser.AddPlugin(pom, "org.springdoc", "springdoc-openapi-maven-plugin", "1.5")
+
+	if pom.Build == nil || pom.Build.Plugins == nil {
+		t.Fatal("Build or Plugins should be set")
+	}
+
+	plugins := *pom.Build.Plugins
+	if len(plugins) != 1 {
+		t.Fatalf("Expected 1 plugin, got %d", len(plugins))
+	}
+
+	plugin := plugins[0]
+	if *plugin.GroupID != "org.springdoc" {
+		t.Errorf("Expected GroupID org.springdoc, got %s", *plugin.GroupID)
+	}
+	if *plugin.ArtifactID != "springdoc-openapi-maven-plugin" {
+		t.Errorf("Expected ArtifactID springdoc-openapi-maven-plugin, got %s", *plugin.ArtifactID)
+	}
+	if *plugin.Version != "1.5" {
+		t.Errorf("Expected Version 1.5, got %s", *plugin.Version)
+	}
+
+	// Check execution configuration
+	if plugin.Executions == nil || len(*plugin.Executions) != 1 {
+		t.Fatalf("Expected 1 execution, got %d", len(*plugin.Executions))
+	}
+
+	exec := (*plugin.Executions)[0]
+	if exec.ID == nil || *exec.ID != "integration-test" {
+		t.Errorf("Expected execution ID 'integration-test', got %v", exec.ID)
+	}
+	if exec.Phase == nil || *exec.Phase != "integration-test" {
+		t.Errorf("Expected execution phase 'integration-test', got %v", exec.Phase)
+	}
+	if exec.Goals == nil || len(*exec.Goals) != 1 || (*exec.Goals)[0] != "generate" {
+		t.Errorf("Expected execution goals ['generate'], got %v", exec.Goals)
+	}
+}
