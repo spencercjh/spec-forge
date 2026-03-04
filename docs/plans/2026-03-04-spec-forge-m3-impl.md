@@ -28,8 +28,12 @@ internal/
 ├── extractor/
 │   ├── types.go              # GenerateOptions, GenerateResult, ValidateResult
 │   └── spring/
+│       ├── detector.go       # 项目检测器
+│       ├── patcher.go        # 构建文件补丁器
+│       ├── maven.go          # Maven POM 解析和配置
+│       ├── gradle.go         # Gradle 构建文件解析
 │       ├── generator.go      # OpenAPI 生成器
-│       └── generator_test.go
+│       └── *_test.go         # 各模块测试
 │
 └── validator/
     ├── validator.go          # 验证器入口
@@ -135,14 +139,20 @@ Hint: Install Maven from https://maven.apache.org/install.html or use your packa
 
 ## 4. 生成流程
 
+> **⚠️ 重要约束：** 必须参考 springdoc 官方文档 https://springdoc.org/#plugins 确认正确的命令。
+
 ### Maven 生成
+
+根据 springdoc 官方文档，Maven 插件使用 `verify` 阶段触发生成：
 
 ```go
 func (g *Generator) generateMaven(ctx context.Context, workDir string, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
     mavenCmd := g.resolveMavenCommand(workDir)
 
+    // 官方文档: mvn verify
+    // 参考: https://springdoc.org/#plugins
     args := []string{
-        "org.springdoc:springdoc-openapi-maven-plugin:generate",
+        "verify",
         "-DskipTests",
         "-Dspringdoc.outputFormat=" + opts.Format,
     }
@@ -159,12 +169,16 @@ func (g *Generator) generateMaven(ctx context.Context, workDir string, opts *ext
 
 ### Gradle 生成
 
+根据 springdoc 官方文档，Gradle 插件使用 `generateOpenApiDocs` 任务：
+
 ```go
 func (g *Generator) generateGradle(ctx context.Context, workDir string, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
     gradleCmd := g.resolveGradleCommand(workDir)
 
+    // 官方文档: gradle clean generateOpenApiDocs
+    // 参考: https://springdoc.org/#plugins
     args := []string{
-        "generateOpenApi",
+        "generateOpenApiDocs",
         "-x", "test",
     }
 
@@ -263,14 +277,54 @@ require (
 | 测试文件 | 覆盖内容 |
 |----------|----------|
 | `executor_test.go` | 命令执行、超时、错误处理 |
-| `generator_test.go` | Maven/Gradle 生成、Wrapper 解析、文件查找 |
+| `generator_test.go` | Maven/Gradle 生成、Wrapper 解析、文件查找、正确命令验证 |
+| `maven_test.go` | POM 解析、spring-boot 插件配置检测和添加 |
+| `patcher_test.go` | 单模块/多模块补丁、Restore 机制、DryRun 模式 |
 | `validator_test.go` | 有效/无效 spec、格式错误、引用验证 |
 
 ---
 
 ## 9. 关键设计决策
 
-### 9.1 Wrapper 优先
+### 9.1 参考官方文档（强制约束）
+
+> **⚠️ 极其重要：** 实现 springdoc 相关功能时，**必须**参考官方文档 https://springdoc.org/#plugins
+
+**决策：** 所有 springdoc 命令必须与官方文档保持一致
+
+**原因：**
+- springdoc 插件的工作方式与直觉不同
+- 直接调用 `springdoc:generate` 无法正常工作，需要通过 `verify` 阶段触发
+- 官方文档明确指定了正确的命令：
+  - **Maven**: `mvn verify`
+  - **Gradle**: `gradle clean generateOpenApiDocs`
+- 错误的命令会导致 "Connection refused" 或 CLI 阻塞等问题
+
+**教训：**
+- 不要猜测构建工具的行为，始终参考官方文档
+- springdoc 插件需要在运行时访问 `/v3/api-docs` 端点，因此需要启动 Spring Boot 应用
+
+### 9.2 多模块项目 spring-boot 配置
+
+**决策：** 多模块 Maven 项目需要配置 `spring-boot-maven-plugin` 的 start/stop goals
+
+**原因：**
+- springdoc 插件需要 Spring Boot 应用运行才能生成 OpenAPI spec
+- 多模块项目的子模块可能没有配置 start/stop goals
+- Patcher 自动检测并添加配置：
+  ```xml
+  <execution>
+      <id>start-stop-for-openapi</id>
+      <goals>
+          <goal>start</goal>
+          <goal>stop</goal>
+      </goals>
+  </execution>
+  ```
+
+**实现位置：** `internal/extractor/spring/maven.go` 中的 `ConfigureSpringBootPlugin` 函数
+
+### 9.3 Wrapper 优先
 
 **决策：** 优先使用项目自带的 Maven/Gradle Wrapper
 
@@ -279,7 +333,7 @@ require (
 - 不依赖用户本地安装的工具
 - 多模块项目的 wrapper 通常在根目录
 
-### 9.2 错误提示
+### 9.4 错误提示
 
 **决策：** 当命令不存在时提供安装提示
 
@@ -287,7 +341,7 @@ require (
 - 用户可能不知道需要安装什么
 - 提供官方文档链接帮助快速解决
 
-### 9.3 验证可选
+### 9.5 验证可选
 
 **决策：** 提供 `--skip-validate` 选项
 
