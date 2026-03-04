@@ -2,6 +2,7 @@ package spring
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/vifraa/gopom"
@@ -11,10 +12,11 @@ import (
 
 // PatchResult contains the result of a patch operation.
 type PatchResult struct {
-	DependencyAdded bool
-	PluginAdded     bool
-	BuildFilePath   string
-	OriginalContent string // Original file content for potential restoration
+	DependencyAdded      bool
+	PluginAdded          bool
+	BuildFilePath        string
+	OriginalContent      string // Original file content for potential restoration
+	SpringBootConfigured bool   // Whether spring-boot-maven-plugin was configured with start/stop goals
 }
 
 // Patcher modifies Spring projects to add springdoc dependencies.
@@ -49,16 +51,6 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 		return nil, fmt.Errorf("detection failed: %w", err)
 	}
 
-	// Check if patch is needed
-	if !p.NeedsPatch(info, opts.Force) {
-		return &PatchResult{
-			DependencyAdded: false,
-			PluginAdded:     false,
-			BuildFilePath:   info.BuildFilePath,
-			OriginalContent: "",
-		}, nil
-	}
-
 	// Apply defaults
 	if opts.SpringdocVersion == "" {
 		opts.SpringdocVersion = extractor.DefaultSpringdocVersion
@@ -70,10 +62,24 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 		opts.GradlePluginVersion = extractor.DefaultSpringdocGradlePlugin
 	}
 
+	// For Maven projects, we always need to check spring-boot-maven-plugin configuration
+	// even if springdoc is already configured, because start/stop goals might be missing
+	if info.BuildTool == extractor.BuildToolMaven {
+		return p.patchMaven(info, opts)
+	}
+
+	// Check if patch is needed for other build tools
+	if !p.NeedsPatch(info, opts.Force) {
+		return &PatchResult{
+			DependencyAdded: false,
+			PluginAdded:     false,
+			BuildFilePath:   info.BuildFilePath,
+			OriginalContent: "",
+		}, nil
+	}
+
 	// Patch based on build tool
 	switch info.BuildTool {
-	case extractor.BuildToolMaven:
-		return p.patchMaven(info, opts)
 	case extractor.BuildToolGradle:
 		return p.patchGradle(info, opts)
 	default:
@@ -117,6 +123,7 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 		}
 		result.DependencyAdded = !p.mavenParser.HasSpringdocDependency(pom)
 		result.PluginAdded = !p.mavenParser.HasSpringdocPlugin(pom)
+		result.SpringBootConfigured = !p.mavenParser.HasSpringBootStartStopGoals(pom)
 		return result, nil
 	}
 
@@ -142,8 +149,16 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 		}
 	}
 
+	// Always check spring-boot-maven-plugin configuration
+	// This is required for springdoc plugin to work during integration-test phase
+	// We do this even if springdoc plugin already exists, because start/stop might be missing
+	if p.mavenParser.ConfigureSpringBootPlugin(pom) {
+		result.SpringBootConfigured = true
+		slog.Debug("Configured spring-boot-maven-plugin with start/stop goals", "status", "configured")
+	}
+
 	// Write changes if any modifications were made
-	if result.DependencyAdded || result.PluginAdded {
+	if result.DependencyAdded || result.PluginAdded || result.SpringBootConfigured {
 		output, err := p.mavenParser.MarshalPom(pom)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal pom.xml: %w", err)

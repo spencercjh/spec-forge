@@ -513,9 +513,13 @@ func TestPatcher_OriginalContent(t *testing.T) {
 			t.Fatalf("Patch failed: %v", err)
 		}
 
-		// When no changes are made, OriginalContent should be empty
-		if result.OriginalContent != "" {
-			t.Error("OriginalContent should be empty when no changes are made")
+		// For Maven projects, OriginalContent is always set because we need to check spring-boot configuration
+		// even when springdoc is already present. The test validates that no changes are reported.
+		if result.DependencyAdded {
+			t.Error("DependencyAdded should be false when springdoc already exists")
+		}
+		if result.PluginAdded {
+			t.Error("PluginAdded should be false when springdoc already exists")
 		}
 	})
 }

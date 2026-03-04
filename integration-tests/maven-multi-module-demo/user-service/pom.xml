@@ -41,6 +41,13 @@
                               <goal>repackage</goal>
                           </goals>
                       </execution>
+                      <execution>
+                          <id>start-stop-for-openapi</id>
+                          <goals>
+                              <goal>start</goal>
+                              <goal>stop</goal>
+                          </goals>
+                      </execution>
                   </executions>
                   <configuration>
                       <skip>false</skip>

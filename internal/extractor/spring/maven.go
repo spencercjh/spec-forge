@@ -240,6 +240,80 @@ func (p *MavenParser) HasPlugin(pom *gopom.Project) bool {
 	return false
 }
 
+const (
+	springBootGroupID    = "org.springframework.boot"
+	springBootArtifactID = "spring-boot-maven-plugin"
+)
+
+// HasSpringBootStartStopGoals checks if spring-boot-maven-plugin has start/stop goals configured.
+func (p *MavenParser) HasSpringBootStartStopGoals(pom *gopom.Project) bool {
+	if pom.Build == nil || pom.Build.Plugins == nil {
+		return false
+	}
+	for _, plugin := range *pom.Build.Plugins {
+		if plugin.GroupID != nil && *plugin.GroupID == springBootGroupID &&
+			plugin.ArtifactID != nil && *plugin.ArtifactID == springBootArtifactID {
+			// Check if it has executions with start/stop goals
+			if plugin.Executions != nil {
+				for _, exec := range *plugin.Executions {
+					if exec.Goals != nil {
+						hasStart := false
+						hasStop := false
+						for _, goal := range *exec.Goals {
+							if goal == "start" {
+								hasStart = true
+							}
+							if goal == "stop" {
+								hasStop = true
+							}
+						}
+						if hasStart && hasStop {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// ConfigureSpringBootPlugin configures spring-boot-maven-plugin with start/stop goals
+// for integration-test phase if not already configured.
+// Returns true if the plugin was modified.
+func (p *MavenParser) ConfigureSpringBootPlugin(pom *gopom.Project) bool {
+	if pom.Build == nil || pom.Build.Plugins == nil {
+		return false
+	}
+
+	for i := range *pom.Build.Plugins {
+		plugin := &(*pom.Build.Plugins)[i]
+		if plugin.GroupID != nil && *plugin.GroupID == springBootGroupID &&
+			plugin.ArtifactID != nil && *plugin.ArtifactID == springBootArtifactID {
+			// Found spring-boot-maven-plugin, check if it needs configuration
+			if p.HasSpringBootStartStopGoals(pom) {
+				return false // Already configured
+			}
+
+			// Add start/stop execution with unique ID
+			id := "start-stop-for-openapi"
+			goals := []string{"start", "stop"}
+			execution := gopom.PluginExecution{
+				ID:    &id,
+				Goals: &goals,
+			}
+
+			if plugin.Executions == nil {
+				plugin.Executions = &[]gopom.PluginExecution{execution}
+			} else {
+				*plugin.Executions = append(*plugin.Executions, execution)
+			}
+			return true
+		}
+	}
+	return false
+}
+
 // MarshalPom marshals a pom to XML bytes.
 func (p *MavenParser) MarshalPom(pom *gopom.Project) ([]byte, error) {
 	output, err := xml.MarshalIndent(pom, "  ", "    ")

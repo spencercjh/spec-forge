@@ -180,3 +180,77 @@ func TestMavenParser_AddPlugin(t *testing.T) {
 		t.Errorf("Expected execution goals ['generate'], got %v", exec.Goals)
 	}
 }
+
+func TestMavenParser_HasSpringBootStartStopGoals(t *testing.T) {
+	parser := spring.NewMavenParser()
+
+	t.Run("has start/stop goals", func(t *testing.T) {
+		pom, err := parser.Parse(mavenTestPath)
+		if err != nil {
+			t.Fatalf("Failed to parse pom.xml: %v", err)
+		}
+
+		// The test pom.xml has spring-boot-maven-plugin with start/stop goals
+		if !parser.HasSpringBootStartStopGoals(pom) {
+			t.Error("Expected HasSpringBootStartStopGoals to return true")
+		}
+	})
+
+	t.Run("no spring-boot plugin", func(t *testing.T) {
+		pom := &gopom.Project{}
+		if parser.HasSpringBootStartStopGoals(pom) {
+			t.Error("Expected HasSpringBootStartStopGoals to return false for empty project")
+		}
+	})
+}
+
+func TestMavenParser_ConfigureSpringBootPlugin(t *testing.T) {
+	parser := spring.NewMavenParser()
+
+	t.Run("already configured", func(t *testing.T) {
+		pom, err := parser.Parse(mavenTestPath)
+		if err != nil {
+			t.Fatalf("Failed to parse pom.xml: %v", err)
+		}
+
+		// Should not modify since it already has start/stop
+		modified := parser.ConfigureSpringBootPlugin(pom)
+		if modified {
+			t.Error("Expected ConfigureSpringBootPlugin to return false for already configured plugin")
+		}
+	})
+
+	t.Run("add start/stop goals", func(t *testing.T) {
+		// Create a pom with spring-boot plugin but no start/stop goals
+		groupID := "org.springframework.boot"
+		artifactID := "spring-boot-maven-plugin"
+		plugins := []gopom.Plugin{
+			{
+				GroupID:    &groupID,
+				ArtifactID: &artifactID,
+			},
+		}
+		pom := &gopom.Project{
+			Build: &gopom.Build{},
+		}
+		pom.Build.Plugins = &plugins
+
+		modified := parser.ConfigureSpringBootPlugin(pom)
+		if !modified {
+			t.Error("Expected ConfigureSpringBootPlugin to return true")
+		}
+
+		// Verify start/stop goals were added
+		if !parser.HasSpringBootStartStopGoals(pom) {
+			t.Error("Expected HasSpringBootStartStopGoals to return true after configuration")
+		}
+	})
+
+	t.Run("no spring-boot plugin", func(t *testing.T) {
+		pom := &gopom.Project{}
+		modified := parser.ConfigureSpringBootPlugin(pom)
+		if modified {
+			t.Error("Expected ConfigureSpringBootPlugin to return false for project without spring-boot plugin")
+		}
+	})
+}

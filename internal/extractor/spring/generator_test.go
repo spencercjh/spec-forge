@@ -133,6 +133,10 @@ func TestGenerator_Generate_Maven(t *testing.T) {
 			if opts.Command != "mvn" {
 				t.Errorf("expected mvn command, got %s", opts.Command)
 			}
+			// Verify Maven uses "verify" phase per springdoc documentation
+			if len(opts.Args) == 0 || opts.Args[0] != "verify" {
+				t.Errorf("expected 'verify' as first arg, got %v", opts.Args)
+			}
 			return &executor.ExecuteResult{ExitCode: 0}, nil
 		},
 	}
@@ -180,6 +184,10 @@ func TestGenerator_Generate_Gradle(t *testing.T) {
 			// Verify Gradle command structure
 			if opts.Command != "gradle" {
 				t.Errorf("expected gradle command, got %s", opts.Command)
+			}
+			// Verify Gradle uses "generateOpenApiDocs" task per springdoc documentation
+			if len(opts.Args) == 0 || opts.Args[0] != "generateOpenApiDocs" {
+				t.Errorf("expected 'generateOpenApiDocs' as first arg, got %v", opts.Args)
 			}
 			return &executor.ExecuteResult{ExitCode: 0}, nil
 		},

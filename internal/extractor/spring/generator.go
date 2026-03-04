@@ -182,8 +182,9 @@ func (g *Generator) generateMaven(ctx context.Context, workDir string, _ *extrac
 	mavenCmd := g.resolveMavenCommand(workDir)
 
 	// Build Maven command arguments
+	// Per springdoc official documentation, use "verify" phase to trigger springdoc plugin
 	args := []string{
-		"org.springdoc:springdoc-openapi-maven-plugin:generate",
+		"verify",
 	}
 
 	// Skip tests by default
@@ -232,8 +233,9 @@ func (g *Generator) generateGradle(ctx context.Context, workDir string, _ *extra
 	gradleCmd := g.resolveGradleCommand(workDir)
 
 	// Build Gradle command arguments
+	// Per springdoc official documentation, use "generateOpenApiDocs" task
 	args := []string{
-		"generateOpenApi",
+		"generateOpenApiDocs",
 	}
 
 	// Skip tests by default

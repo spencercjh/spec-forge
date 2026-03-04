@@ -90,6 +90,9 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	if result.PluginAdded {
 		slog.InfoContext(ctx, "springdoc plugin added temporarily", "status", "✅")
 	}
+	if result.SpringBootConfigured {
+		slog.InfoContext(ctx, "spring-boot-maven-plugin configured with start/stop goals", "status", "✅")
+	}
 
 	// Step 4: Generate OpenAPI spec
 	generator := spring.NewGenerator()
