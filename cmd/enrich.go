@@ -90,7 +90,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create provider
-	p, err := createProvider(prov, model)
+	p, err := createProvider(prov, model, cfg.Enrich)
 	if err != nil {
 		return err
 	}
@@ -112,14 +112,23 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create enricher config
+	customBaseURL := enrichCustomBaseURL
+	if customBaseURL == "" {
+		customBaseURL = cfg.Enrich.BaseURL
+	}
+	customAPIKeyEnv := enrichCustomAPIKeyEnv
+	if customAPIKeyEnv == "" {
+		customAPIKeyEnv = cfg.Enrich.APIKeyEnv
+	}
+
 	enricherCfg := enricher.Config{
 		Provider:        prov,
 		Model:           model,
 		Language:        lang,
 		Concurrency:     enrichConcurrency,
 		Timeout:         enrichTimeout,
-		CustomBaseURL:   enrichCustomBaseURL,
-		CustomAPIKeyEnv: enrichCustomAPIKeyEnv,
+		CustomBaseURL:   customBaseURL,
+		CustomAPIKeyEnv: customAPIKeyEnv,
 	}
 	enricherCfg = enricherCfg.MergeWithDefaults()
 
@@ -160,11 +169,17 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 }
 
 // createProvider creates a provider based on the provider type
-func createProvider(providerType, model string) (provider.Provider, error) {
+func createProvider(providerType, model string, enrichCfg config.EnrichConfig) (provider.Provider, error) { //nolint:gocritic // copying config is acceptable
+	// Determine baseURL: flag > config > default
+	baseURL := enrichCustomBaseURL
+	if baseURL == "" {
+		baseURL = enrichCfg.BaseURL
+	}
+
 	cfg := provider.Config{
 		Provider: providerType,
 		Model:    model,
-		BaseURL:  enrichCustomBaseURL,
+		BaseURL:  baseURL,
 	}
 
 	// Get API key based on provider type
@@ -180,29 +195,36 @@ func createProvider(providerType, model string) (provider.Provider, error) {
 			return nil, errors.New("ANTHROPIC_API_KEY environment variable not set")
 		}
 	case "custom":
-		cfg.APIKey = getCustomAPIKey()
+		cfg.APIKey = getCustomAPIKey(enrichCfg)
 		if cfg.APIKey == "" {
-			return nil, fmt.Errorf("API key not found. Set %s environment variable", getCustomAPIKeyEnv())
+			return nil, fmt.Errorf("API key not found. Set %s environment variable", getCustomAPIKeyEnv(enrichCfg))
 		}
 	}
 
 	return provider.NewProvider(cfg)
 }
 
-func getCustomAPIKeyEnv() string {
+func getCustomAPIKeyEnv(enrichCfg config.EnrichConfig) string { //nolint:gocritic // copying config is acceptable //nolint:gocritic // copying config is acceptable
 	if enrichCustomAPIKeyEnv != "" {
 		return enrichCustomAPIKeyEnv
+	}
+	if enrichCfg.APIKeyEnv != "" {
+		return enrichCfg.APIKeyEnv
 	}
 	return "LLM_API_KEY"
 }
 
-func getCustomAPIKey() string {
+func getCustomAPIKey(enrichCfg config.EnrichConfig) string { //nolint:gocritic // copying config is acceptable
 	// First check explicit flag
 	if enrichCustomAPIKey != "" {
 		return enrichCustomAPIKey
 	}
+	// Then check config file
+	if enrichCfg.APIKey != "" {
+		return enrichCfg.APIKey
+	}
 	// Then check environment variable
-	return os.Getenv(getCustomAPIKeyEnv())
+	return os.Getenv(getCustomAPIKeyEnv(enrichCfg))
 }
 
 // saveSpec saves the spec to a file
