@@ -3,6 +3,7 @@ package processor
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
@@ -257,5 +258,76 @@ func TestParseSchemaResponse(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// MockProvider for schema batch test
+type MockProvider struct {
+	GenerateFunc func(ctx context.Context, prompt string) (string, error)
+}
+
+func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, error) {
+	if m.GenerateFunc != nil {
+		return m.GenerateFunc(ctx, prompt)
+	}
+	return "", nil
+}
+
+func (m *MockProvider) Name() string {
+	return "mock"
+}
+
+func TestBatchProcessor_ProcessSchemaBatch(t *testing.T) {
+	mockProvider := &MockProvider{
+		GenerateFunc: func(_ context.Context, prompt string) (string, error) {
+			// Return mock schema field descriptions
+			if strings.Contains(prompt, "User") {
+				return `{"id": "User ID", "name": "User name"}`, nil
+			}
+			return "{}", nil
+		},
+	}
+
+	tmplMgr := prompt.NewTemplateManager()
+	bp := NewBatchProcessor(mockProvider, tmplMgr)
+
+	fields := []FieldElement{
+		{FieldName: "id", FieldType: "integer", Required: true},
+		{FieldName: "name", FieldType: "string", Required: false},
+	}
+
+	var setValues []string
+	for i := range fields {
+		f := &fields[i]
+		f.SetValue = func(desc string) {
+			setValues = append(setValues, f.FieldName+":"+desc)
+		}
+	}
+
+	batch := &Batch{
+		Type: prompt.TemplateTypeSchema,
+		Elements: []EnrichmentElement{
+			{
+				Type: prompt.TemplateTypeSchema,
+				Path: "#/components/schemas/User",
+				Context: prompt.TemplateContext{
+					Type:       prompt.TemplateTypeSchema,
+					Language:   "en",
+					SchemaName: "User",
+					Fields:     convertFieldElements(fields),
+				},
+				SchemaFields: fields,
+			},
+		},
+	}
+
+	ctx := context.Background()
+	err := bp.ProcessBatch(ctx, batch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(setValues) != 2 {
+		t.Errorf("expected 2 SetValue calls, got %d", len(setValues))
 	}
 }

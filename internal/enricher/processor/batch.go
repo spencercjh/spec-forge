@@ -46,8 +46,18 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 			return fmt.Errorf("LLM call failed: %w", err)
 		}
 
-		description := parseDescriptionResponse(response)
-		elem.SetValue(description)
+		// Handle schema-specific response parsing
+		if batch.Type == prompt.TemplateTypeSchema && len(elem.SchemaFields) > 0 {
+			fieldDescriptions := parseSchemaResponse(response)
+			for _, field := range elem.SchemaFields {
+				if desc, ok := fieldDescriptions[field.FieldName]; ok {
+					field.SetValue(desc)
+				}
+			}
+		} else {
+			description := parseDescriptionResponse(response)
+			elem.SetValue(description)
+		}
 	}
 
 	return nil

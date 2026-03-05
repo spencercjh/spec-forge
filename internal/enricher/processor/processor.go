@@ -12,6 +12,9 @@ type EnrichmentElement struct {
 	Path     string // Path in the OpenAPI spec
 	Context  prompt.TemplateContext
 	SetValue func(description string) // Callback to set the description
+
+	// Schema-specific: fields to set descriptions for
+	SchemaFields []FieldElement
 }
 
 // Batch represents a group of elements to process together
