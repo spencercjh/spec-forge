@@ -127,8 +127,73 @@ API keys should be provided via environment variables:
 - `ANTHROPIC_API_KEY` for Anthropic
 - `LLM_API_KEY` (default) for custom providers
 
+## Functional Testing with Example Projects
+
+The `integration-tests/` directory contains example Spring Boot projects for testing:
+
+```
+integration-tests/
+├── maven-springboot-openapi-demo/    # Maven-based Spring Boot project
+└── gradle-springboot-openapi-demo/   # Gradle-based Spring Boot project
+```
+
+### Quick Test: Enrichment (M5)
+
+Test schema field and API parameter enrichment with DeepSeek:
+
+```bash
+# Build the binary first
+go build -o ./build/spec-forge .
+
+# Run enrichment with Chinese descriptions
+LLM_API_KEY="your-deepseek-api-key" ./build/spec-forge enrich \
+    ./integration-tests/maven-springboot-openapi-demo/target/openapi.json \
+    --provider custom \
+    --model deepseek-chat \
+    --custom-base-url https://api.deepseek.com/v1 \
+    --language zh \
+    -v
+```
+
+Expected output:
+- Schema fields get Chinese descriptions (e.g., `User.id` → "用户唯一标识符")
+- API parameters get Chinese descriptions (e.g., `page` → "指定要获取的页码，用于分页查询")
+- Batch count shows `batches=2` (API operations + Schema fields)
+
+### Full Pipeline Test
+
+```bash
+# Generate OpenAPI spec from source, then enrich
+./build/spec-forge generate \
+    ./integration-tests/maven-springboot-openapi-demo \
+    --enrich \
+    --language zh \
+    -v
+```
+
+### Configuration File
+
+Use `.spec-forge.yaml` to simplify commands:
+
+```yaml
+enrich:
+  enabled: true
+  provider: custom
+  model: deepseek-chat
+  baseUrl: https://api.deepseek.com/v1
+  apiKeyEnv: LLM_API_KEY
+  language: zh
+  timeout: 60s
+```
+
+Then run with config:
+```bash
+LLM_API_KEY="your-key" ./build/spec-forge enrich ./path/to/openapi.json -v
+```
+
 ## Related Documentation
 
 - Design doc: `docs/plans/2026-03-03-spec-forge-design.md`
 - M3 implementation (Generator/Validator): `docs/plans/2026-03-04-spec-forge-m3-impl.md`
 - M4 design (Enricher): `docs/plans/2026-03-04-spec-forge-m4-design.md`
+- M5 design (Schema/Param Enrichment): `docs/plans/2026-03-05-spec-forge-m5-design.md`
