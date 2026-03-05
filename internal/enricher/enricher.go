@@ -132,6 +132,77 @@ func (e *Enricher) collectElements(spec *openapi3.T, language string) *processor
 	return collector
 }
 
+// collectParametersFromSpec collects parameters from API operations.
+func collectParametersFromSpec(spec *openapi3.T, collector *processor.SpecCollector, language string) {
+	if spec.Paths == nil {
+		return
+	}
+
+	for _, pathStr := range spec.Paths.InMatchingOrder() {
+		pathItem := spec.Paths.Value(pathStr)
+		if pathItem == nil {
+			continue
+		}
+
+		operations := []struct {
+			method string
+			op     *openapi3.Operation
+		}{
+			{"GET", pathItem.Get},
+			{"POST", pathItem.Post},
+			{"PUT", pathItem.Put},
+			{"DELETE", pathItem.Delete},
+			{"PATCH", pathItem.Patch},
+		}
+
+		for _, item := range operations {
+			if item.op == nil {
+				continue
+			}
+
+			// Collect parameters from operation
+			for _, paramRef := range item.op.Parameters {
+				if paramRef.Value == nil || paramRef.Value.Description != "" {
+					continue // Skip if already has description
+				}
+
+				param := paramRef.Value
+				fieldType := ""
+				if param.Schema != nil && param.Schema.Value != nil {
+					fieldType = getSchemaTypeString(param.Schema.Value)
+				}
+
+				// Capture for closure
+				p := param
+				collector.AddParamElement(
+					pathStr,
+					item.method,
+					param.Name,
+					param.In,
+					fieldType,
+					param.Required,
+					language,
+					func(desc string) {
+						p.Description = desc
+					},
+				)
+			}
+		}
+	}
+}
+
+// getSchemaTypeString returns a string representation of a schema type.
+func getSchemaTypeString(schema *openapi3.Schema) string {
+	if schema.Type != nil && len(*schema.Type) > 0 {
+		typeStr := (*schema.Type)[0]
+		if schema.Format != "" {
+			return typeStr + "(" + schema.Format + ")"
+		}
+		return typeStr
+	}
+	return "object"
+}
+
 // parseSummaryDescription splits a description into summary and full description
 func parseSummaryDescription(desc string) (summary, description string) {
 	// If the description contains double newline, split it

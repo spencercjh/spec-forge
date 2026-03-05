@@ -116,7 +116,7 @@ func (c *SpecCollector) AddSchemaElement(schema SchemaElement, language string) 
 }
 
 // AddParamElement adds a parameter element to the collector.
-func (c *SpecCollector) AddParamElement(path, method, paramName, paramIn, fieldType string, required bool, language string) {
+func (c *SpecCollector) AddParamElement(path, method, paramName, paramIn, fieldType string, required bool, language string, setValue func(description string)) {
 	c.params = append(c.params, ParamElement{
 		Path:      path,
 		Method:    method,
@@ -124,6 +124,7 @@ func (c *SpecCollector) AddParamElement(path, method, paramName, paramIn, fieldT
 		ParamIn:   paramIn,
 		FieldType: fieldType,
 		Required:  required,
+		SetValue:  setValue,
 	})
 }
 

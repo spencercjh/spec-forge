@@ -151,9 +151,18 @@ func TestSpecCollector_AddSchemaElement(t *testing.T) {
 func TestSpecCollector_AddParamElement(t *testing.T) {
 	collector := &SpecCollector{}
 
-	collector.AddParamElement("/users/{id}", "GET", "id", "path", "string", true, "en")
+	var received string
+	collector.AddParamElement("/users/{id}", "GET", "id", "path", "string", true, "en", func(desc string) {
+		received = desc
+	})
 
 	if len(collector.params) != 1 {
 		t.Errorf("expected 1 param, got %d", len(collector.params))
+	}
+
+	// Test SetValue callback
+	collector.params[0].SetValue("test description")
+	if received != "test description" {
+		t.Errorf("expected 'test description', got '%s'", received)
 	}
 }

@@ -168,3 +168,43 @@ func TestEnricher_Enrich_WithOptions(t *testing.T) {
 		t.Fatal("Enrich() returned nil")
 	}
 }
+
+func TestEnricher_CollectParameters(t *testing.T) {
+	paths := openapi3.NewPaths()
+	paths.Set("/users/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Parameters: openapi3.Parameters{
+				&openapi3.ParameterRef{
+					Value: &openapi3.Parameter{
+						Name:     "id",
+						In:       "path",
+						Required: true,
+						Schema:   &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"integer"}}},
+					},
+				},
+			},
+		},
+	})
+	spec := &openapi3.T{
+		Paths: paths,
+	}
+
+	cfg := &processor.SpecCollector{}
+	collectParametersFromSpec(spec, cfg, "en")
+
+	params := cfg.GetParams()
+	if len(params) != 1 {
+		t.Fatalf("expected 1 parameter, got %d", len(params))
+	}
+	if params[0].ParamName != "id" {
+		t.Errorf("expected param name 'id', got %s", params[0].ParamName)
+	}
+	if params[0].ParamIn != "path" {
+		t.Errorf("expected param in 'path', got %s", params[0].ParamIn)
+	}
+	// Test SetValue callback
+	params[0].SetValue("User ID")
+	if spec.Paths.Value("/users/{id}").Get.Parameters[0].Value.Description != "User ID" {
+		t.Errorf("expected description to be set via callback")
+	}
+}
