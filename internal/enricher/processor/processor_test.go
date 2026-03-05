@@ -96,3 +96,37 @@ func TestSpecCollector_GroupByType(t *testing.T) {
 		t.Errorf("API batch elements = %d, want %d", len(apiBatch.Elements), 2)
 	}
 }
+
+func TestSchemaElement(t *testing.T) {
+	schema := SchemaElement{
+		SchemaName: "User",
+		Fields: []FieldElement{
+			{FieldName: "id", FieldType: "integer", Required: true},
+			{FieldName: "name", FieldType: "string", Required: false},
+		},
+	}
+
+	if schema.SchemaName != "User" {
+		t.Errorf("expected SchemaName 'User', got %s", schema.SchemaName)
+	}
+	if len(schema.Fields) != 2 {
+		t.Errorf("expected 2 fields, got %d", len(schema.Fields))
+	}
+}
+
+func TestFieldElement(t *testing.T) {
+	var setCalled bool
+	field := FieldElement{
+		FieldName: "userId",
+		FieldType: "string",
+		Required:  true,
+		SetValue:  func(_ string) {
+			setCalled = true
+		},
+	}
+
+	field.SetValue("test description")
+	if !setCalled {
+		t.Error("expected SetValue callback to be called")
+	}
+}

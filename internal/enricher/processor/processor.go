@@ -63,3 +63,18 @@ func (c *SpecCollector) GroupByType() []*Batch {
 
 	return batches
 }
+
+// SchemaElement represents a schema to be enriched.
+type SchemaElement struct {
+	SchemaName string
+	Fields     []FieldElement
+	Context    prompt.TemplateContext
+}
+
+// FieldElement represents a field to be enriched.
+type FieldElement struct {
+	FieldName string
+	FieldType string
+	Required  bool
+	SetValue  func(description string)
+}
