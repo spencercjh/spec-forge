@@ -1,0 +1,94 @@
+package enricher
+
+import (
+	"fmt"
+	"time"
+)
+
+// Config Enricher configuration
+type Config struct {
+	// Provider type: "openai", "anthropic", "ollama", "custom"
+	Provider string
+
+	// Common configuration
+	Model       string
+	Language    string
+	Concurrency int
+	MaxRetries  int
+	Timeout     time.Duration
+
+	// Custom provider configuration (used when Provider == "custom")
+	CustomBaseURL   string
+	CustomAPIKeyEnv string
+	CustomHeaders   map[string]string
+
+	// Advanced configuration
+	PromptTemplateDir string
+}
+
+// DefaultConfig provides sensible defaults
+var DefaultConfig = Config{
+	Language:    "en",
+	Concurrency: 3,
+	MaxRetries:  2,
+	Timeout:     30 * time.Second,
+}
+
+// Validate validates the configuration
+// Note: This validates after merging with defaults, so zero values for optional fields are allowed
+func (c *Config) Validate() error {
+	if c.Provider == "" {
+		return fmt.Errorf("provider is required")
+	}
+	if c.Model == "" {
+		return fmt.Errorf("model is required")
+	}
+	if c.Provider == "custom" && c.CustomBaseURL == "" {
+		return fmt.Errorf("customBaseURL is required for custom provider")
+	}
+	// Concurrency and Timeout zero values are handled by MergeWithDefaults
+	// Only reject explicitly invalid values (negative)
+	if c.Concurrency < 0 {
+		return fmt.Errorf("concurrency cannot be negative")
+	}
+	if c.Timeout < 0 {
+		return fmt.Errorf("timeout cannot be negative")
+	}
+	return nil
+}
+
+// MergeWithDefaults merges the config with defaults for zero values
+func (c Config) MergeWithDefaults() Config {
+	if c.Language == "" {
+		c.Language = DefaultConfig.Language
+	}
+	if c.Concurrency == 0 {
+		c.Concurrency = DefaultConfig.Concurrency
+	}
+	if c.MaxRetries == 0 {
+		c.MaxRetries = DefaultConfig.MaxRetries
+	}
+	if c.Timeout == 0 {
+		c.Timeout = DefaultConfig.Timeout
+	}
+	return c
+}
+
+// GetAPIKeyEnv returns the environment variable name for the API key
+func (c *Config) GetAPIKeyEnv() string {
+	switch c.Provider {
+	case "openai":
+		return "OPENAI_API_KEY"
+	case "anthropic":
+		return "ANTHROPIC_API_KEY"
+	case "custom":
+		if c.CustomAPIKeyEnv != "" {
+			return c.CustomAPIKeyEnv
+		}
+		return "LLM_API_KEY"
+	case "ollama":
+		return "" // Ollama doesn't require an API key
+	default:
+		return "LLM_API_KEY"
+	}
+}
