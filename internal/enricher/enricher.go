@@ -127,7 +127,12 @@ func (e *Enricher) collectElements(spec *openapi3.T, language string) *processor
 		}
 	}
 
-	// TODO: Collect schemas, parameters, responses
+	// Collect API parameters
+	collectParametersFromSpec(spec, collector, language)
+
+	// Collect schema fields
+	processedSchemas := make(map[string]bool)
+	collectSchemasFromSpec(spec, collector, processedSchemas, language)
 
 	return collector
 }

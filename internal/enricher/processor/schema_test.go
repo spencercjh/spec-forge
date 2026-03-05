@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 )
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	pkgcontext "github.com/spencercjh/spec-forge/internal/context"
 )
 

@@ -120,7 +120,7 @@ func TestFieldElement(t *testing.T) {
 		FieldName: "userId",
 		FieldType: "string",
 		Required:  true,
-		SetValue:  func(_ string) {
+		SetValue: func(_ string) {
 			setCalled = true
 		},
 	}
