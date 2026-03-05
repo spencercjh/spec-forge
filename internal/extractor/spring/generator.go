@@ -115,7 +115,7 @@ func (g *Generator) resolveMavenCommand(workDir string) string {
 			// Found wrapper in parent, return absolute path
 			absPath, absErr := filepath.Abs(mvnwInParent)
 			if absErr != nil {
-				return "mvn" // Fallback to system Maven on error
+				return mavenCmd // Fallback to system Maven on error
 			}
 			return absPath
 		}
@@ -155,7 +155,7 @@ func (g *Generator) resolveGradleCommand(workDir string) string {
 		if _, err := os.Stat(gradlewInParent); err == nil {
 			absPath, absErr := filepath.Abs(gradlewInParent)
 			if absErr != nil {
-				return "gradle" // Fallback to system Gradle on error
+				return gradleCmd // Fallback to system Gradle on error
 			}
 			return absPath
 		}

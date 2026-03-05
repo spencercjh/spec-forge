@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/tmc/langchaingo/llms"
@@ -27,10 +28,10 @@ type CustomProviderConfig struct {
 // NewCustomProvider creates a provider for custom OpenAI-compatible services
 func NewCustomProvider(cfg CustomProviderConfig) (*CustomProvider, error) {
 	if cfg.BaseURL == "" {
-		return nil, fmt.Errorf("baseURL is required for custom provider")
+		return nil, errors.New("baseURL is required for custom provider")
 	}
 	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("apiKey is required for custom provider")
+		return nil, errors.New("apiKey is required for custom provider")
 	}
 
 	name := cfg.Name

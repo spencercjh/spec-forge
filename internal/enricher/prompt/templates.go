@@ -70,7 +70,7 @@ func (t *Template) Render(ctx TemplateContext) (system, user string, err error) 
 	return system, user, nil
 }
 
-func renderString(tmpl string, data interface{}) (string, error) {
+func renderString(tmpl string, data any) (string, error) {
 	t, err := template.New("prompt").Parse(tmpl)
 	if err != nil {
 		return "", err

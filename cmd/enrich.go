@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -67,7 +68,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		prov = cfg.Enrich.Provider
 	}
 	if prov == "" {
-		return fmt.Errorf("provider is required. Use --provider flag or configure in .spec-forge.yaml")
+		return errors.New("provider is required. Use --provider flag or configure in .spec-forge.yaml")
 	}
 
 	// Determine model
@@ -76,7 +77,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		model = cfg.Enrich.Model
 	}
 	if model == "" {
-		return fmt.Errorf("model is required. Use --model flag or configure in .spec-forge.yaml")
+		return errors.New("model is required. Use --model flag or configure in .spec-forge.yaml")
 	}
 
 	// Determine language
@@ -163,14 +164,14 @@ func createProvider(providerType, model string) (provider.Provider, error) {
 	case "openai":
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
-			return nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+			return nil, errors.New("OPENAI_API_KEY environment variable not set")
 		}
 		return provider.NewOpenAIProvider(apiKey, model)
 
 	case "anthropic":
 		apiKey := os.Getenv("ANTHROPIC_API_KEY")
 		if apiKey == "" {
-			return nil, fmt.Errorf("ANTHROPIC_API_KEY environment variable not set")
+			return nil, errors.New("ANTHROPIC_API_KEY environment variable not set")
 		}
 		return provider.NewAnthropicProvider(apiKey, model)
 

@@ -173,7 +173,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	// Step 7: Copy to output directory if specified
 	finalSpecPath := genResult.SpecFilePath
 	if outputDir != "" {
-		if err := copySpecToOutput(genResult.SpecFilePath, outputDir, genResult.Format); err != nil {
+		if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
 			return errWrap("failed to copy spec to output directory", err)
 		}
 		finalSpecPath = filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
@@ -236,7 +236,7 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 	// Parse timeout
 	timeout := 30 * time.Second
 	if cfg.Enrich.Timeout != "" {
-		if parsed, err := time.ParseDuration(cfg.Enrich.Timeout); err == nil {
+		if parsed, parseErr := time.ParseDuration(cfg.Enrich.Timeout); parseErr == nil {
 			timeout = parsed
 		}
 	}
@@ -286,14 +286,14 @@ func createProviderFromConfig(cfg config.EnrichConfig) (provider.Provider, error
 	case "openai":
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
-			return nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+			return nil, errors.New("OPENAI_API_KEY environment variable not set")
 		}
 		return provider.NewOpenAIProvider(apiKey, cfg.Model)
 
 	case "anthropic":
 		apiKey := os.Getenv("ANTHROPIC_API_KEY")
 		if apiKey == "" {
-			return nil, fmt.Errorf("ANTHROPIC_API_KEY environment variable not set")
+			return nil, errors.New("ANTHROPIC_API_KEY environment variable not set")
 		}
 		return provider.NewAnthropicProvider(apiKey, cfg.Model)
 
@@ -307,7 +307,7 @@ func createProviderFromConfig(cfg config.EnrichConfig) (provider.Provider, error
 	case "custom":
 		apiKey := getAPIKeyFromConfig(cfg)
 		if apiKey == "" {
-			return nil, fmt.Errorf("API key not found for custom provider")
+			return nil, errors.New("API key not found for custom provider")
 		}
 		return provider.NewCustomProvider(provider.CustomProviderConfig{
 			BaseURL: cfg.BaseURL,
@@ -340,7 +340,7 @@ func errWrap(msg string, err error) error {
 }
 
 // copySpecToOutput copies the generated spec to the specified output directory
-func copySpecToOutput(srcPath, outputDir, format string) error {
+func copySpecToOutput(srcPath, outputDir string) error {
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)

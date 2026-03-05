@@ -39,7 +39,7 @@ func NewOllamaProvider(baseURL, model string) (*OllamaProvider, error) {
 func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, error) {
 	response, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
 	if err != nil {
-		return "", fmt.Errorf("Ollama generation failed: %w", err)
+		return "", fmt.Errorf("ollama generation failed: %w", err)
 	}
 	return response, nil
 }

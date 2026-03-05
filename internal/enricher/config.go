@@ -1,7 +1,7 @@
 package enricher
 
 import (
-	"fmt"
+	"errors"
 	"time"
 )
 
@@ -38,21 +38,21 @@ var DefaultConfig = Config{
 // Note: This validates after merging with defaults, so zero values for optional fields are allowed
 func (c *Config) Validate() error {
 	if c.Provider == "" {
-		return fmt.Errorf("provider is required")
+		return errors.New("provider is required")
 	}
 	if c.Model == "" {
-		return fmt.Errorf("model is required")
+		return errors.New("model is required")
 	}
 	if c.Provider == "custom" && c.CustomBaseURL == "" {
-		return fmt.Errorf("customBaseURL is required for custom provider")
+		return errors.New("customBaseURL is required for custom provider")
 	}
 	// Concurrency and Timeout zero values are handled by MergeWithDefaults
 	// Only reject explicitly invalid values (negative)
 	if c.Concurrency < 0 {
-		return fmt.Errorf("concurrency cannot be negative")
+		return errors.New("concurrency cannot be negative")
 	}
 	if c.Timeout < 0 {
-		return fmt.Errorf("timeout cannot be negative")
+		return errors.New("timeout cannot be negative")
 	}
 	return nil
 }

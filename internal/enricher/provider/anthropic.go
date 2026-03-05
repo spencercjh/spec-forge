@@ -34,7 +34,7 @@ func NewAnthropicProvider(apiKey, model string) (*AnthropicProvider, error) {
 func (p *AnthropicProvider) Generate(ctx context.Context, prompt string) (string, error) {
 	response, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
 	if err != nil {
-		return "", fmt.Errorf("Anthropic generation failed: %w", err)
+		return "", fmt.Errorf("anthropic generation failed: %w", err)
 	}
 	return response, nil
 }

@@ -53,7 +53,7 @@ func (c *SpecCollector) GroupByType() []*Batch {
 		groups[elem.Type] = append(groups[elem.Type], elem)
 	}
 
-	var batches []*Batch
+	batches := make([]*Batch, 0, len(groups))
 	for ttype, elements := range groups {
 		batches = append(batches, &Batch{
 			Type:     ttype,
