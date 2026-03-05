@@ -1,0 +1,134 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build, Test, and Lint Commands
+
+```bash
+# Build the binary
+make build
+
+# Run all tests
+make test
+
+# Run a single test
+go test -v -run TestFunctionName ./internal/extractor/spring/...
+
+# Run linter (golangci-lint v2)
+make lint
+
+# Format code (uses golangci-lint formatters: gofumpt, goimports, gci)
+make fmt
+
+# Run all verification (deps, fmt, lint, test)
+make verify
+```
+
+## Architecture Overview
+
+Spec Forge is a CLI tool that generates enriched OpenAPI specifications from Spring Boot projects.
+
+**Core workflow:**
+```
+Source Code → Detect → Patch → Generate → Validate → Enrich → Restore
+```
+
+### Package Structure
+
+```
+cmd/                      # Cobra CLI commands
+├── root.go               # Entry point, config initialization
+├── generate.go           # `spec-forge generate` - full pipeline
+├── enrich.go             # `spec-forge enrich` - standalone enrichment
+├── spring.go             # `spec-forge spring` - patch/detect subcommands
+
+internal/
+├── config/               # Viper configuration loading
+├── executor/             # Shell command execution with timeout
+├── extractor/            # OpenAPI spec extraction
+│   ├── types.go          # GenerateOptions, GenerateResult, etc.
+│   └── spring/           # Spring Boot specific implementation
+│       ├── detector.go   # Project type detection (Maven/Gradle)
+│       ├── patcher.go    # springdoc dependency injection
+│       ├── generator.go  # Maven/Gradle command execution
+│       ├── maven.go      # POM parsing, spring-boot plugin config
+│       └── gradle.go     # build.gradle parsing
+├── validator/            # kin-openapi validation
+└── enricher/             # LLM-based description enrichment
+    ├── enricher.go       # Main enricher interface
+    ├── config.go         # Enricher configuration
+    ├── prompt/           # Prompt templates
+    ├── processor/        # Batching and concurrent processing
+    └── provider/         # LLM providers (factory pattern)
+        └── factory.go    # Use NewProvider(cfg Config) to create providers
+```
+
+### Data Flow
+
+```
+Spring Project → springdoc plugin → openapi.json → Enricher (LLM) → openapi.yaml
+```
+
+## Critical Constraints
+
+### springdoc Commands (MUST follow official docs)
+
+> **Reference:** https://springdoc.org/#plugins
+
+The springdoc plugin requires the Spring Boot application to run. Correct commands:
+
+| Build Tool | Command |
+|------------|---------|
+| **Maven** | `mvn verify` (NOT `springdoc:generate`) |
+| **Gradle** | `gradle generateOpenApiDocs` |
+
+**Why:** springdoc needs to access `/v3/api-docs` endpoint at runtime.
+
+### Multi-module Maven Projects
+
+Maven multi-module projects require `spring-boot-maven-plugin` with start/stop goals configured. The patcher automatically detects and adds this configuration in `internal/extractor/spring/maven.go` → `ConfigureSpringBootPlugin`.
+
+### Provider Factory Pattern
+
+When creating LLM providers, always use the factory method:
+
+```go
+import "github.com/spencercjh/spec-forge/internal/enricher/provider"
+
+cfg := provider.Config{
+    Provider: "openai",  // or "anthropic", "ollama", "custom"
+    Model:    "gpt-4o",
+    APIKey:   apiKey,
+    BaseURL:  baseURL,   // for ollama/custom
+}
+p, err := provider.NewProvider(cfg)
+```
+
+Individual provider constructors (e.g., `newOpenAIProvider`) are internal (unexported). Use `provider.NewProvider()` as the entry point.
+
+### Wrapper Priority
+
+When executing Maven/Gradle commands, prioritize wrappers:
+
+1. `./mvnw` or `./gradlew` in project root
+2. Wrapper in parent directory (multi-module projects)
+3. System `mvn` or `gradle`
+
+### Configuration Priority
+
+```
+flag > env > config file > default
+```
+
+Config file: `.spec-forge.yaml` (see `.spec-forge.example.yaml`)
+
+API keys should be provided via environment variables:
+- `OPENAI_API_KEY` for OpenAI
+- `ANTHROPIC_API_KEY` for Anthropic
+- `LLM_API_KEY` (default) for custom providers
+
+## Related Documentation
+
+- Design doc: `docs/plans/2026-03-03-spec-forge-design.md`
+- M3 implementation (Generator/Validator): `docs/plans/2026-03-04-spec-forge-m3-impl.md`
+- M4 design (Enricher): `docs/plans/2026-03-04-spec-forge-m4-design.md`

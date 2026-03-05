@@ -109,6 +109,7 @@ func (c *SpecCollector) AddSchemaElement(schema SchemaElement, language string) 
 			SchemaName: schema.SchemaName,
 			Fields:     convertFieldElements(schema.Fields),
 		},
+		SchemaFields: schema.Fields, // Field-level SetValue callbacks
 		SetValue: func(_ string) {
 			// Schema SetValue is handled by individual field SetValue callbacks
 		},
@@ -125,6 +126,23 @@ func (c *SpecCollector) AddParamElement(path, method, paramName, paramIn, fieldT
 		FieldType: fieldType,
 		Required:  required,
 		SetValue:  setValue,
+	})
+
+	// Also add as an enrichment element for processing
+	c.elements = append(c.elements, EnrichmentElement{
+		Type: prompt.TemplateTypeParam,
+		Path: method + " " + path + " [" + paramIn + "] " + paramName,
+		Context: prompt.TemplateContext{
+			Type:      prompt.TemplateTypeParam,
+			Language:  language,
+			Method:    method,
+			Path:      path,
+			ParamName: paramName,
+			ParamIn:   paramIn,
+			FieldType: fieldType,
+			Required:  required,
+		},
+		SetValue: setValue,
 	})
 }
 
