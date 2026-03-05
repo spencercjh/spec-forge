@@ -1,5 +1,5 @@
 // internal/context/extractor_test.go
-package context_test
+package pkgcontext_test
 
 import (
 	stdcontext "context"
@@ -10,9 +10,9 @@ import (
 	pkgcontext "github.com/spencercjh/spec-forge/internal/context"
 )
 
-func TestContextExtractor_Interface(t *testing.T) {
+func TestExtractor_Interface(t *testing.T) {
 	// Verify interface compliance
-	var _ pkgcontext.ContextExtractor = (*pkgcontext.NoOpExtractor)(nil)
+	var _ pkgcontext.Extractor = (*pkgcontext.NoOpExtractor)(nil)
 }
 
 func TestNoOpExtractor_Name(t *testing.T) {

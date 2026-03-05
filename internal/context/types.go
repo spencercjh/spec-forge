@@ -1,5 +1,5 @@
 // Package context provides context extraction for OpenAPI spec enrichment.
-package context
+package pkgcontext
 
 // EnrichmentContext contains context information for LLM enrichment.
 type EnrichmentContext struct {
@@ -17,7 +17,7 @@ type SchemaContext struct {
 	Name   string
 	Fields []FieldMeta
 
-	// Extended information (filled by ContextExtractor)
+	// Extended information (filled by Extractor)
 	Description string            // Class/struct documentation
 	Package     string            // Package name
 	Annotations map[string]string // Language-specific annotations

@@ -1,5 +1,4 @@
-// internal/context/extractor.go
-package context
+package pkgcontext
 
 import (
 	stdcontext "context"
@@ -7,8 +6,8 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-// ContextExtractor extracts context information from source code.
-type ContextExtractor interface {
+// Extractor extracts context information from source code.
+type Extractor interface {
 	// Extract extracts context from a project.
 	// The spec parameter is the generated OpenAPI spec, used as a skeleton.
 	Extract(ctx stdcontext.Context, projectPath string, spec *openapi3.T) (*EnrichmentContext, error)

@@ -263,12 +263,12 @@ func TestParseSchemaResponse(t *testing.T) {
 
 // MockProvider for schema batch test
 type MockProvider struct {
-	GenerateFunc func(ctx context.Context, prompt string) (string, error)
+	GenerateFunc func(ctx context.Context, p string) (string, error)
 }
 
-func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, error) {
+func (m *MockProvider) Generate(ctx context.Context, p string) (string, error) {
 	if m.GenerateFunc != nil {
-		return m.GenerateFunc(ctx, prompt)
+		return m.GenerateFunc(ctx, p)
 	}
 	return "", nil
 }

@@ -1,9 +1,9 @@
-// internal/context/noop_extractor.go
-package context
+package pkgcontext
 
 import (
 	stdcontext "context"
 	"log/slog"
+	"slices"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -85,10 +85,5 @@ func getSchemaTypeName(schema *openapi3.Schema) string {
 
 // containsString checks if a string is in a slice.
 func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, s)
 }
