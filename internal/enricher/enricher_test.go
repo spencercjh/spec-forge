@@ -208,3 +208,48 @@ func TestEnricher_CollectParameters(t *testing.T) {
 		t.Errorf("expected description to be set via callback")
 	}
 }
+
+func TestEnricher_CollectSchemaFields(t *testing.T) {
+	spec := &openapi3.T{
+		Components: &openapi3.Components{
+			Schemas: openapi3.Schemas{
+				"User": &openapi3.SchemaRef{
+					Value: &openapi3.Schema{
+						Type: &openapi3.Types{"object"},
+						Properties: openapi3.Schemas{
+							"id":   &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"integer"}}},
+							"name": &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	collector := &processor.SpecCollector{}
+	processed := make(map[string]bool)
+
+	collectSchemasFromSpec(spec, collector, processed, "en")
+
+	schemas := collector.GetSchemas()
+	if len(schemas) != 1 {
+		t.Errorf("expected 1 schema, got %d", len(schemas))
+	}
+
+	// Find User schema
+	var userSchema *processor.SchemaElement
+	for i := range schemas {
+		if schemas[i].SchemaName == "User" {
+			userSchema = &schemas[i]
+			break
+		}
+	}
+
+	if userSchema == nil {
+		t.Fatal("User schema not found")
+	}
+
+	if len(userSchema.Fields) != 2 {
+		t.Errorf("expected 2 fields in User schema, got %d", len(userSchema.Fields))
+	}
+}

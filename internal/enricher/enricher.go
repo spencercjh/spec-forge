@@ -214,3 +214,16 @@ func parseSummaryDescription(desc string) (summary, description string) {
 	// Otherwise, use the whole thing as summary
 	return desc, ""
 }
+
+// collectSchemasFromSpec collects schema fields from the OpenAPI spec
+func collectSchemasFromSpec(spec *openapi3.T, collector *processor.SpecCollector, processed map[string]bool, language string) {
+	if spec.Components == nil || spec.Components.Schemas == nil {
+		return
+	}
+
+	for schemaName, schemaRef := range spec.Components.Schemas {
+		if !processed[schemaName] {
+			processor.CollectSchemaFields(schemaName, schemaRef, collector, processed, language, 0)
+		}
+	}
+}
