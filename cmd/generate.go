@@ -2,13 +2,22 @@
 package cmd
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
 
 	"github.com/spencercjh/spec-forge/internal/config"
+	"github.com/spencercjh/spec-forge/internal/enricher"
+	"github.com/spencercjh/spec-forge/internal/enricher/processor"
+	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 	"github.com/spencercjh/spec-forge/internal/validator"
@@ -23,6 +32,15 @@ var generateSkipValidate bool
 
 // generateTimeout is the timeout for generation commands
 var generateTimeout time.Duration
+
+// generateSkipEnrich controls whether to skip AI enrichment
+var generateSkipEnrich bool
+
+// generateLanguage is the language for AI-generated descriptions
+var generateLanguage string
+
+// generateOutput is the output directory for generated spec
+var generateOutput string
 
 // generateCmd represents the generate command
 var generateCmd = &cobra.Command{
@@ -96,7 +114,15 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// Step 4: Generate OpenAPI spec
 	generator := spring.NewGenerator()
+
+	// Determine output directory
+	outputDir := generateOutput
+	if outputDir == "" {
+		outputDir = config.Get().Output.Dir
+	}
+
 	genOpts := &extractor.GenerateOptions{
+		OutputDir: outputDir,
 		Format:    config.Get().Output.Format,
 		Timeout:   generateTimeout,
 		SkipTests: true,
@@ -133,9 +159,30 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		slog.InfoContext(ctx, "Validation skipped", "status", "⏭️")
 	}
 
-	// Step 6: Output final result
+	// Step 6: Enrich with AI (optional)
+	cfg := config.Get()
+	if !generateSkipEnrich && cfg.Enrich.Enabled && cfg.Enrich.Provider != "" && cfg.Enrich.Model != "" {
+		if err := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg); err != nil {
+			// Log warning but don't fail - enrichment is optional
+			slog.WarnContext(ctx, "Enrichment failed (non-fatal)", "error", err)
+		}
+	} else {
+		slog.InfoContext(ctx, "Enrichment skipped", "status", "⏭️")
+	}
+
+	// Step 7: Copy to output directory if specified
+	finalSpecPath := genResult.SpecFilePath
+	if outputDir != "" {
+		if err := copySpecToOutput(genResult.SpecFilePath, outputDir, genResult.Format); err != nil {
+			return errWrap("failed to copy spec to output directory", err)
+		}
+		finalSpecPath = filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
+		slog.InfoContext(ctx, "Spec copied to output directory", "path", finalSpecPath)
+	}
+
+	// Step 8: Output final result
 	slog.InfoContext(ctx, "Generation complete",
-		"spec_file", genResult.SpecFilePath,
+		"spec_file", finalSpecPath,
 	)
 
 	return nil
@@ -150,9 +197,177 @@ func init() {
 		"skip validation of the generated OpenAPI spec")
 	generateCmd.Flags().DurationVar(&generateTimeout, "timeout", 5*time.Minute,
 		"timeout for Maven/Gradle commands")
+	generateCmd.Flags().BoolVar(&generateSkipEnrich, "skip-enrich", false,
+		"skip AI enrichment of the generated OpenAPI spec")
+	generateCmd.Flags().StringVar(&generateLanguage, "language", "en",
+		"language for AI-generated descriptions (e.g., en, zh)")
+	generateCmd.Flags().StringVarP(&generateOutput, "output", "o", "",
+		"output directory for generated spec (default: project's target/build dir)")
+}
+
+// enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
+func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.Config) error {
+	slog.InfoContext(ctx, "Enriching OpenAPI spec with AI descriptions...")
+
+	// Determine language
+	lang := generateLanguage
+	if lang == "" {
+		lang = cfg.Enrich.Language
+	}
+	if lang == "" {
+		lang = "en"
+	}
+
+	// Create provider
+	p, err := createProviderFromConfig(cfg.Enrich)
+	if err != nil {
+		return fmt.Errorf("failed to create provider: %w", err)
+	}
+
+	// Load spec
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+
+	spec, err := loader.LoadFromFile(specFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to load spec: %w", err)
+	}
+
+	// Parse timeout
+	timeout := 30 * time.Second
+	if cfg.Enrich.Timeout != "" {
+		if parsed, err := time.ParseDuration(cfg.Enrich.Timeout); err == nil {
+			timeout = parsed
+		}
+	}
+
+	// Create enricher config
+	enricherCfg := enricher.Config{
+		Provider:      cfg.Enrich.Provider,
+		Model:         cfg.Enrich.Model,
+		Language:      lang,
+		Timeout:       timeout,
+		CustomBaseURL: cfg.Enrich.BaseURL,
+	}
+	enricherCfg = enricherCfg.MergeWithDefaults()
+
+	// Create enricher
+	e, err := enricher.NewEnricher(enricherCfg, p)
+	if err != nil {
+		return fmt.Errorf("failed to create enricher: %w", err)
+	}
+
+	// Enrich
+	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{Language: lang})
+	if err != nil {
+		// Check if partial enrichment
+		if partialErr, ok := err.(*processor.PartialEnrichmentError); ok {
+			slog.WarnContext(ctx, "Partial enrichment completed",
+				"failed_batches", partialErr.FailedBatches,
+				"total_batches", partialErr.TotalBatches,
+			)
+		} else {
+			return fmt.Errorf("enrichment failed: %w", err)
+		}
+	}
+
+	// Save result
+	if err := saveSpec(result, specFilePath); err != nil {
+		return fmt.Errorf("failed to save enriched spec: %w", err)
+	}
+
+	slog.InfoContext(ctx, "OpenAPI spec enriched", "status", "✅")
+	return nil
+}
+
+// createProviderFromConfig creates a provider from config settings
+func createProviderFromConfig(cfg config.EnrichConfig) (provider.Provider, error) {
+	switch cfg.Provider {
+	case "openai":
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		if apiKey == "" {
+			return nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+		}
+		return provider.NewOpenAIProvider(apiKey, cfg.Model)
+
+	case "anthropic":
+		apiKey := os.Getenv("ANTHROPIC_API_KEY")
+		if apiKey == "" {
+			return nil, fmt.Errorf("ANTHROPIC_API_KEY environment variable not set")
+		}
+		return provider.NewAnthropicProvider(apiKey, cfg.Model)
+
+	case "ollama":
+		baseURL := cfg.BaseURL
+		if baseURL == "" {
+			baseURL = "http://localhost:11434"
+		}
+		return provider.NewOllamaProvider(baseURL, cfg.Model)
+
+	case "custom":
+		apiKey := getAPIKeyFromConfig(cfg)
+		if apiKey == "" {
+			return nil, fmt.Errorf("API key not found for custom provider")
+		}
+		return provider.NewCustomProvider(provider.CustomProviderConfig{
+			BaseURL: cfg.BaseURL,
+			APIKey:  apiKey,
+			Model:   cfg.Model,
+		})
+
+	default:
+		return nil, fmt.Errorf("unknown provider: %s", cfg.Provider)
+	}
+}
+
+// getAPIKeyFromConfig gets API key from config or environment
+func getAPIKeyFromConfig(cfg config.EnrichConfig) string {
+	// First check explicit config
+	if cfg.APIKey != "" {
+		return cfg.APIKey
+	}
+	// Then check environment variable
+	envName := cfg.APIKeyEnv
+	if envName == "" {
+		envName = "LLM_API_KEY"
+	}
+	return os.Getenv(envName)
 }
 
 // errWrap wraps an error with a message.
 func errWrap(msg string, err error) error {
 	return errors.New(msg + ": " + err.Error())
+}
+
+// copySpecToOutput copies the generated spec to the specified output directory
+func copySpecToOutput(srcPath, outputDir, format string) error {
+	// Create output directory if it doesn't exist
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Open source file
+	srcFile, err := os.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer srcFile.Close()
+
+	// Determine destination filename
+	filename := filepath.Base(srcPath)
+	dstPath := filepath.Join(outputDir, filename)
+
+	// Create destination file
+	dstFile, err := os.Create(dstPath)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer dstFile.Close()
+
+	// Copy content
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	return nil
 }

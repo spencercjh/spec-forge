@@ -1,38 +1,44 @@
 package provider
 
-// NewOpenAIProvider creates a provider configured for OpenAI
-func NewOpenAIProvider(apiKey, model string) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(OpenAICompatibleConfig{
-		BaseURL: "https://api.openai.com/v1",
-		APIKey:  apiKey,
-		Model:   model,
-	}.WithName("openai"))
+// ProviderConfig contains common configuration for creating providers
+type ProviderConfig struct {
+	Provider string
+	Model    string
+	APIKey   string
+	BaseURL  string
+	Name     string
 }
 
-// NewAnthropicProvider creates a provider configured for Anthropic
-func NewAnthropicProvider(apiKey, model string) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(OpenAICompatibleConfig{
-		BaseURL: "https://api.anthropic.com/v1",
-		APIKey:  apiKey,
-		Model:   model,
-	}.WithName("anthropic"))
+// NewProvider creates a provider based on the provider type
+func NewProvider(cfg ProviderConfig) (Provider, error) {
+	switch cfg.Provider {
+	case "openai":
+		return NewOpenAIProvider(cfg.APIKey, cfg.Model)
+	case "anthropic":
+		return NewAnthropicProvider(cfg.APIKey, cfg.Model)
+	case "ollama":
+		baseURL := cfg.BaseURL
+		if baseURL == "" {
+			baseURL = "http://localhost:11434"
+		}
+		return NewOllamaProvider(baseURL, cfg.Model)
+	case "custom":
+		return NewCustomProvider(CustomProviderConfig{
+			BaseURL: cfg.BaseURL,
+			APIKey:  cfg.APIKey,
+			Model:   cfg.Model,
+			Name:    cfg.Name,
+		})
+	default:
+		return nil, &UnsupportedProviderError{Provider: cfg.Provider}
+	}
 }
 
-// NewOllamaProvider creates a provider configured for Ollama
-func NewOllamaProvider(baseURL, model string) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(OpenAICompatibleConfig{
-		BaseURL: baseURL,
-		APIKey:  "ollama", // Ollama doesn't need a real key
-		Model:   model,
-	}.WithName("ollama"))
+// UnsupportedProviderError is returned when an unknown provider is requested
+type UnsupportedProviderError struct {
+	Provider string
 }
 
-// NewCustomProvider creates a provider for custom OpenAI-compatible services
-func NewCustomProvider(baseURL, apiKey, model string, headers map[string]string) *OpenAICompatibleProvider {
-	return NewOpenAICompatibleProvider(OpenAICompatibleConfig{
-		BaseURL:      baseURL,
-		APIKey:       apiKey,
-		Model:        model,
-		ExtraHeaders: headers,
-	}.WithName("custom"))
+func (e *UnsupportedProviderError) Error() string {
+	return "unsupported provider: " + e.Provider
 }

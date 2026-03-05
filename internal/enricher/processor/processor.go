@@ -9,7 +9,7 @@ import (
 // EnrichmentElement represents an element to be enriched
 type EnrichmentElement struct {
 	Type     prompt.TemplateType
-	Path     string           // Path in the OpenAPI spec
+	Path     string // Path in the OpenAPI spec
 	Context  prompt.TemplateContext
 	SetValue func(description string) // Callback to set the description
 }

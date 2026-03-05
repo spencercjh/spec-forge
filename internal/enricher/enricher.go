@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"

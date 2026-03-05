@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"regexp"
+	"strings"
 
 	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
@@ -53,6 +55,9 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 
 // parseDescriptionResponse extracts description from LLM response
 func parseDescriptionResponse(response string) string {
+	// Strip markdown code blocks if present
+	response = stripMarkdownCodeBlock(response)
+
 	var result map[string]string
 	if err := json.Unmarshal([]byte(response), &result); err != nil {
 		return response // Return as-is if not JSON
@@ -71,4 +76,15 @@ func parseDescriptionResponse(response string) string {
 	}
 
 	return response
+}
+
+// stripMarkdownCodeBlock removes markdown code block wrappers
+func stripMarkdownCodeBlock(s string) string {
+	// Match ```json ... ``` or ``` ... ```
+	re := regexp.MustCompile("(?s)^```(?:json)?\\s*\n?(.*?)\\s*```$")
+	matches := re.FindStringSubmatch(strings.TrimSpace(s))
+	if len(matches) > 1 {
+		return strings.TrimSpace(matches[1])
+	}
+	return s
 }

@@ -37,7 +37,6 @@ func TestMockProvider_Generate(t *testing.T) {
 
 	ctx := context.Background()
 	result, err := mock.Generate(ctx, "hello")
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -47,4 +46,172 @@ func TestMockProvider_Generate(t *testing.T) {
 	if mock.Name() != "test" {
 		t.Errorf("Name() = %q, want %q", mock.Name(), "test")
 	}
+}
+
+func TestNewOpenAIProvider(t *testing.T) {
+	provider, err := NewOpenAIProvider("test-api-key", "gpt-4o")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if provider.Name() != "openai" {
+		t.Errorf("Name() = %q, want %q", provider.Name(), "openai")
+	}
+}
+
+func TestNewAnthropicProvider(t *testing.T) {
+	provider, err := NewAnthropicProvider("test-api-key", "claude-3-opus")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if provider.Name() != "anthropic" {
+		t.Errorf("Name() = %q, want %q", provider.Name(), "anthropic")
+	}
+}
+
+func TestNewOllamaProvider(t *testing.T) {
+	provider, err := NewOllamaProvider("http://localhost:11434", "llama3")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if provider.Name() != "ollama" {
+		t.Errorf("Name() = %q, want %q", provider.Name(), "ollama")
+	}
+}
+
+func TestNewOllamaProvider_EmptyBaseURL(t *testing.T) {
+	provider, err := NewOllamaProvider("", "llama3")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if provider.Name() != "ollama" {
+		t.Errorf("Name() = %q, want %q", provider.Name(), "ollama")
+	}
+}
+
+func TestNewCustomProvider(t *testing.T) {
+	provider, err := NewCustomProvider(CustomProviderConfig{
+		BaseURL: "https://api.example.com/v1",
+		APIKey:  "test-key",
+		Model:   "custom-model",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if provider.Name() != "custom" {
+		t.Errorf("Name() = %q, want %q", provider.Name(), "custom")
+	}
+}
+
+func TestNewCustomProvider_WithCustomName(t *testing.T) {
+	provider, err := NewCustomProvider(CustomProviderConfig{
+		BaseURL: "https://api.example.com/v1",
+		APIKey:  "test-key",
+		Model:   "custom-model",
+		Name:    "my-provider",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if provider.Name() != "my-provider" {
+		t.Errorf("Name() = %q, want %q", provider.Name(), "my-provider")
+	}
+}
+
+func TestNewCustomProvider_MissingBaseURL(t *testing.T) {
+	_, err := NewCustomProvider(CustomProviderConfig{
+		APIKey: "test-key",
+		Model:  "custom-model",
+	})
+	if err == nil {
+		t.Fatal("expected error for missing baseURL")
+	}
+}
+
+func TestNewCustomProvider_MissingAPIKey(t *testing.T) {
+	_, err := NewCustomProvider(CustomProviderConfig{
+		BaseURL: "https://api.example.com/v1",
+		Model:   "custom-model",
+	})
+	if err == nil {
+		t.Fatal("expected error for missing apiKey")
+	}
+}
+
+func TestNewProvider(t *testing.T) {
+	tests := []struct {
+		name       string
+		cfg        ProviderConfig
+		wantName   string
+		wantErr    bool
+		errContain string
+	}{
+		{
+			name:     "openai",
+			cfg:      ProviderConfig{Provider: "openai", Model: "gpt-4o", APIKey: "test"},
+			wantName: "openai",
+		},
+		{
+			name:     "anthropic",
+			cfg:      ProviderConfig{Provider: "anthropic", Model: "claude-3-opus", APIKey: "test"},
+			wantName: "anthropic",
+		},
+		{
+			name:     "ollama with baseURL",
+			cfg:      ProviderConfig{Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434"},
+			wantName: "ollama",
+		},
+		{
+			name:     "ollama without baseURL",
+			cfg:      ProviderConfig{Provider: "ollama", Model: "llama3"},
+			wantName: "ollama",
+		},
+		{
+			name:     "custom",
+			cfg:      ProviderConfig{Provider: "custom", Model: "test", BaseURL: "https://api.example.com/v1", APIKey: "test"},
+			wantName: "custom",
+		},
+		{
+			name:       "unsupported",
+			cfg:        ProviderConfig{Provider: "unsupported", Model: "test"},
+			wantErr:    true,
+			errContain: "unsupported provider",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider, err := NewProvider(tt.cfg)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				if tt.errContain != "" && !containsString(err.Error(), tt.errContain) {
+					t.Errorf("error = %q, want to contain %q", err.Error(), tt.errContain)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if provider.Name() != tt.wantName {
+				t.Errorf("Name() = %q, want %q", provider.Name(), tt.wantName)
+			}
+		})
+	}
+}
+
+func TestUnsupportedProviderError(t *testing.T) {
+	err := &UnsupportedProviderError{Provider: "unknown"}
+	if err.Error() != "unsupported provider: unknown" {
+		t.Errorf("Error() = %q, want %q", err.Error(), "unsupported provider: unknown")
+	}
+}
+
+func containsString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
