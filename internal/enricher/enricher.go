@@ -6,6 +6,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
+	pkgcontext "github.com/spencercjh/spec-forge/internal/context"
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
@@ -13,8 +14,9 @@ import (
 
 // Enricher enriches OpenAPI specs with AI-generated descriptions
 type Enricher struct {
-	config   Config
-	provider provider.Provider
+	config    Config
+	provider  provider.Provider
+	extractor pkgcontext.Extractor
 }
 
 // EnrichOptions provides runtime options for enrichment
@@ -28,9 +30,18 @@ func NewEnricher(cfg Config, p provider.Provider) (*Enricher, error) { //nolint:
 		return nil, NewEnrichmentError(ErrorTypeConfig, "invalid configuration", err)
 	}
 	return &Enricher{
-		config:   cfg.MergeWithDefaults(),
-		provider: p,
+		config:    cfg.MergeWithDefaults(),
+		provider:  p,
+		extractor: &pkgcontext.NoOpExtractor{}, // Default to NoOpExtractor
 	}, nil
+}
+
+// WithExtractor sets a custom context extractor
+func (e *Enricher) WithExtractor(extractor pkgcontext.Extractor) *Enricher {
+	if extractor != nil {
+		e.extractor = extractor
+	}
+	return e
 }
 
 // Enrich enriches an OpenAPI spec with AI-generated descriptions
