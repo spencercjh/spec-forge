@@ -53,18 +53,18 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 
 	// Apply defaults
 	if opts.SpringdocVersion == "" {
-		opts.SpringdocVersion = extractor.DefaultSpringdocVersion
+		opts.SpringdocVersion = DefaultSpringdocVersion
 	}
 	if opts.MavenPluginVersion == "" {
-		opts.MavenPluginVersion = extractor.DefaultSpringdocMavenPlugin
+		opts.MavenPluginVersion = DefaultSpringdocMavenPlugin
 	}
 	if opts.GradlePluginVersion == "" {
-		opts.GradlePluginVersion = extractor.DefaultSpringdocGradlePlugin
+		opts.GradlePluginVersion = DefaultSpringdocGradlePlugin
 	}
 
 	// For Maven projects, we always need to check spring-boot-maven-plugin configuration
 	// even if springdoc is already configured, because start/stop goals might be missing
-	if info.BuildTool == extractor.BuildToolMaven {
+	if info.BuildTool == BuildToolMaven {
 		return p.patchMaven(info, opts)
 	}
 
@@ -80,7 +80,7 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 
 	// Patch based on build tool
 	switch info.BuildTool {
-	case extractor.BuildToolGradle:
+	case BuildToolGradle:
 		return p.patchGradle(info, opts)
 	default:
 		return nil, fmt.Errorf("unsupported build tool: %s", info.BuildTool)

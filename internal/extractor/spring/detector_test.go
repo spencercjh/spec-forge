@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 )
 
@@ -37,8 +36,8 @@ func TestDetector_Detect_MavenProject(t *testing.T) {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.BuildTool != extractor.BuildToolMaven {
-		t.Errorf("BuildTool = %s, want %s", info.BuildTool, extractor.BuildToolMaven)
+	if info.BuildTool != spring.BuildToolMaven {
+		t.Errorf("BuildTool = %s, want %s", info.BuildTool, spring.BuildToolMaven)
 	}
 
 	if info.BuildFilePath == "" {
@@ -65,8 +64,8 @@ func TestDetector_Detect_GradleProject(t *testing.T) {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.BuildTool != extractor.BuildToolGradle {
-		t.Errorf("BuildTool = %s, want %s", info.BuildTool, extractor.BuildToolGradle)
+	if info.BuildTool != spring.BuildToolGradle {
+		t.Errorf("BuildTool = %s, want %s", info.BuildTool, spring.BuildToolGradle)
 	}
 
 	if info.BuildFilePath == "" {

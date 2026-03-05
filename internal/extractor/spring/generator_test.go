@@ -143,7 +143,7 @@ func TestGenerator_Generate_Maven(t *testing.T) {
 
 	gen := NewGeneratorWithExecutor(mockExec)
 	info := &extractor.ProjectInfo{
-		BuildTool:     extractor.BuildToolMaven,
+		BuildTool:     BuildToolMaven,
 		BuildFilePath: filepath.Join(tmpDir, "pom.xml"),
 	}
 
@@ -195,7 +195,7 @@ func TestGenerator_Generate_Gradle(t *testing.T) {
 
 	gen := NewGeneratorWithExecutor(mockExec)
 	info := &extractor.ProjectInfo{
-		BuildTool:     extractor.BuildToolGradle,
+		BuildTool:     BuildToolGradle,
 		BuildFilePath: filepath.Join(tmpDir, "build.gradle"),
 	}
 
@@ -234,7 +234,7 @@ func TestGenerator_Generate_DefaultOptions(t *testing.T) {
 
 	gen := NewGeneratorWithExecutor(mockExec)
 	info := &extractor.ProjectInfo{
-		BuildTool:     extractor.BuildToolMaven,
+		BuildTool:     BuildToolMaven,
 		BuildFilePath: filepath.Join(tmpDir, "pom.xml"),
 	}
 
@@ -278,7 +278,7 @@ func TestGenerator_Generate_MavenFailure(t *testing.T) {
 
 	gen := NewGeneratorWithExecutor(mockExec)
 	info := &extractor.ProjectInfo{
-		BuildTool:     extractor.BuildToolMaven,
+		BuildTool:     BuildToolMaven,
 		BuildFilePath: "pom.xml",
 	}
 
@@ -303,7 +303,7 @@ func TestGenerator_findGeneratedSpec(t *testing.T) {
 	}
 
 	gen := NewGenerator()
-	info := &extractor.ProjectInfo{BuildTool: extractor.BuildToolMaven}
+	info := &extractor.ProjectInfo{BuildTool: BuildToolMaven}
 	opts := &extractor.GenerateOptions{Format: "json", OutputFile: "openapi"}
 
 	path, err := gen.findGeneratedSpec(tmpDir, info, "target", opts)
@@ -336,7 +336,7 @@ func TestGenerator_findGeneratedSpec_Yaml(t *testing.T) {
 	}
 
 	gen := NewGenerator()
-	info := &extractor.ProjectInfo{BuildTool: extractor.BuildToolMaven}
+	info := &extractor.ProjectInfo{BuildTool: BuildToolMaven}
 	opts := &extractor.GenerateOptions{Format: "yaml", OutputFile: "openapi"}
 
 	path, err := gen.findGeneratedSpec(tmpDir, info, "target", opts)
@@ -363,7 +363,7 @@ func TestGenerator_findGeneratedSpec_NotFound(t *testing.T) {
 	}
 
 	gen := NewGenerator()
-	info := &extractor.ProjectInfo{BuildTool: extractor.BuildToolMaven}
+	info := &extractor.ProjectInfo{BuildTool: BuildToolMaven}
 	opts := &extractor.GenerateOptions{Format: "json", OutputFile: "openapi"}
 
 	_, err := gen.findGeneratedSpec(tmpDir, info, "target", opts)

@@ -109,8 +109,8 @@ func TestPatcher_Patch_MavenDryRun(t *testing.T) {
 	patcher := spring.NewPatcher()
 	opts := &extractor.PatchOptions{
 		DryRun:             true,
-		SpringdocVersion:   extractor.DefaultSpringdocVersion,
-		MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		SpringdocVersion:   spring.DefaultSpringdocVersion,
+		MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 	}
 
 	changes, err := patcher.Patch(tmpDir, opts)
@@ -135,8 +135,8 @@ func TestPatcher_Patch_MavenWithMissingDeps(t *testing.T) {
 	t.Run("dry-run reports changes but does not modify file", func(t *testing.T) {
 		opts := &extractor.PatchOptions{
 			DryRun:             true,
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		changes, err := patcher.Patch(tmpDir, opts)
@@ -169,8 +169,8 @@ func TestPatcher_Patch_MavenWithMissingDeps(t *testing.T) {
 
 		opts := &extractor.PatchOptions{
 			DryRun:             false,
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		changes, err := patcher.Patch(tmpDir, opts)
@@ -212,8 +212,8 @@ func TestPatcher_Patch_GradleWithMissingDeps(t *testing.T) {
 	t.Run("dry-run reports changes but does not modify file", func(t *testing.T) {
 		opts := &extractor.PatchOptions{
 			DryRun:              true,
-			SpringdocVersion:    extractor.DefaultSpringdocVersion,
-			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+			SpringdocVersion:    spring.DefaultSpringdocVersion,
+			GradlePluginVersion: spring.DefaultSpringdocGradlePlugin,
 		}
 
 		changes, err := patcher.Patch(tmpDir, opts)
@@ -246,8 +246,8 @@ func TestPatcher_Patch_GradleWithMissingDeps(t *testing.T) {
 
 		opts := &extractor.PatchOptions{
 			DryRun:              false,
-			SpringdocVersion:    extractor.DefaultSpringdocVersion,
-			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+			SpringdocVersion:    spring.DefaultSpringdocVersion,
+			GradlePluginVersion: spring.DefaultSpringdocGradlePlugin,
 		}
 
 		changes, err := patcher.Patch(tmpDir, opts)
@@ -323,8 +323,8 @@ func TestPatcher_Patch_AlreadyPatchedMaven(t *testing.T) {
 	patcher := spring.NewPatcher()
 	opts := &extractor.PatchOptions{
 		DryRun:             false,
-		SpringdocVersion:   extractor.DefaultSpringdocVersion,
-		MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		SpringdocVersion:   spring.DefaultSpringdocVersion,
+		MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 	}
 
 	changes, err := patcher.Patch(tmpDir, opts)
@@ -387,8 +387,8 @@ func TestPatcher_Patch_AlreadyPatchedGradle(t *testing.T) {
 	patcher := spring.NewPatcher()
 	opts := &extractor.PatchOptions{
 		DryRun:              false,
-		SpringdocVersion:    extractor.DefaultSpringdocVersion,
-		GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+		SpringdocVersion:    spring.DefaultSpringdocVersion,
+		GradlePluginVersion: spring.DefaultSpringdocGradlePlugin,
 	}
 
 	changes, err := patcher.Patch(tmpDir, opts)
@@ -449,8 +449,8 @@ func TestPatcher_OriginalContent(t *testing.T) {
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
 			DryRun:             false,
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -478,8 +478,8 @@ func TestPatcher_OriginalContent(t *testing.T) {
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
 			DryRun:              false,
-			SpringdocVersion:    extractor.DefaultSpringdocVersion,
-			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+			SpringdocVersion:    spring.DefaultSpringdocVersion,
+			GradlePluginVersion: spring.DefaultSpringdocGradlePlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -536,8 +536,8 @@ func TestPatcher_Restore(t *testing.T) {
 
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		// Patch the file
@@ -595,8 +595,8 @@ func TestPatcher_KeepPatchedOption(t *testing.T) {
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
 			KeepPatched:        true,
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -623,8 +623,8 @@ func TestPatcher_KeepPatchedOption(t *testing.T) {
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
 			KeepPatched:        false,
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -773,8 +773,8 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -805,8 +805,8 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -834,8 +834,8 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -866,8 +866,8 @@ func TestPatcher_EdgeCases_Maven(t *testing.T) {
 
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -924,8 +924,8 @@ func TestPatcher_EdgeCases_Gradle(t *testing.T) {
 
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
-			SpringdocVersion:    extractor.DefaultSpringdocVersion,
-			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+			SpringdocVersion:    spring.DefaultSpringdocVersion,
+			GradlePluginVersion: spring.DefaultSpringdocGradlePlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -948,8 +948,8 @@ func TestPatcher_EdgeCases_Gradle(t *testing.T) {
 
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
-			SpringdocVersion:    extractor.DefaultSpringdocVersion,
-			GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+			SpringdocVersion:    spring.DefaultSpringdocVersion,
+			GradlePluginVersion: spring.DefaultSpringdocGradlePlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -984,8 +984,8 @@ func TestPatcher_ForceOption(t *testing.T) {
 		// With Force=true, should patch regardless of what detector says
 		opts := &extractor.PatchOptions{
 			Force:              true,
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 		result, err := patcher.Patch(tmpDir, opts)
 		if err != nil {
@@ -1030,8 +1030,8 @@ func TestPatcher_DryRunMode(t *testing.T) {
 		patcher := spring.NewPatcher()
 		opts := &extractor.PatchOptions{
 			DryRun:             true,
-			SpringdocVersion:   extractor.DefaultSpringdocVersion,
-			MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+			SpringdocVersion:   spring.DefaultSpringdocVersion,
+			MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 		}
 
 		result, err := patcher.Patch(tmpDir, opts)
@@ -1208,8 +1208,8 @@ func TestPatcher_MultiModuleGradle(t *testing.T) {
 	// Patch the project
 	patcher := spring.NewPatcher()
 	opts := &extractor.PatchOptions{
-		SpringdocVersion:    extractor.DefaultSpringdocVersion,
-		GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+		SpringdocVersion:    spring.DefaultSpringdocVersion,
+		GradlePluginVersion: spring.DefaultSpringdocGradlePlugin,
 	}
 
 	result, err := patcher.Patch(tmpDir, opts)
@@ -1288,8 +1288,8 @@ func TestPatcher_MultiModuleGradle_Restore(t *testing.T) {
 	// Patch the project
 	patcher := spring.NewPatcher()
 	opts := &extractor.PatchOptions{
-		SpringdocVersion:    extractor.DefaultSpringdocVersion,
-		GradlePluginVersion: extractor.DefaultSpringdocGradlePlugin,
+		SpringdocVersion:    spring.DefaultSpringdocVersion,
+		GradlePluginVersion: spring.DefaultSpringdocGradlePlugin,
 	}
 
 	result, err := patcher.Patch(tmpDir, opts)
@@ -1474,8 +1474,8 @@ func TestPatcher_MultiModuleMaven(t *testing.T) {
 	// Patch the project
 	patcher := spring.NewPatcher()
 	opts := &extractor.PatchOptions{
-		SpringdocVersion:   extractor.DefaultSpringdocVersion,
-		MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		SpringdocVersion:   spring.DefaultSpringdocVersion,
+		MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 	}
 
 	result, err := patcher.Patch(tmpDir, opts)
@@ -1544,8 +1544,8 @@ func TestPatcher_MultiModuleMaven_Restore(t *testing.T) {
 	// Patch the project
 	patcher := spring.NewPatcher()
 	opts := &extractor.PatchOptions{
-		SpringdocVersion:   extractor.DefaultSpringdocVersion,
-		MavenPluginVersion: extractor.DefaultSpringdocMavenPlugin,
+		SpringdocVersion:   spring.DefaultSpringdocVersion,
+		MavenPluginVersion: spring.DefaultSpringdocMavenPlugin,
 	}
 
 	result, err := patcher.Patch(tmpDir, opts)

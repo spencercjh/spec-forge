@@ -6,20 +6,6 @@ import "time"
 // BuildTool represents the build tool type for a project.
 type BuildTool string
 
-const (
-	// BuildToolMaven represents Maven build tool.
-	BuildToolMaven BuildTool = "maven"
-	// BuildToolGradle represents Gradle build tool.
-	BuildToolGradle BuildTool = "gradle"
-)
-
-// Default version constants (convention over configuration).
-const (
-	DefaultSpringdocVersion      = "3.0.2"
-	DefaultSpringdocMavenPlugin  = "1.5"
-	DefaultSpringdocGradlePlugin = "1.9.0"
-)
-
 // ProjectInfo contains detected information about a Spring project.
 type ProjectInfo struct {
 	BuildTool          BuildTool // Maven or Gradle

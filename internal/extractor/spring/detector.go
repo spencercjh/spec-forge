@@ -54,7 +54,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 // detectMavenProject analyzes a Maven project.
 func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.ProjectInfo, error) {
 	info := &extractor.ProjectInfo{
-		BuildTool:     extractor.BuildToolMaven,
+		BuildTool:     BuildToolMaven,
 		BuildFilePath: pomPath,
 	}
 
@@ -110,7 +110,7 @@ func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.P
 // detectGradleProject analyzes a Gradle project.
 func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extractor.ProjectInfo, error) {
 	info := &extractor.ProjectInfo{
-		BuildTool:     extractor.BuildToolGradle,
+		BuildTool:     BuildToolGradle,
 		BuildFilePath: gradlePath,
 	}
 

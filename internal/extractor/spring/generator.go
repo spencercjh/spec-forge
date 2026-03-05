@@ -82,9 +82,9 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 
 	// Generate based on build tool
 	switch info.BuildTool {
-	case extractor.BuildToolMaven:
+	case BuildToolMaven:
 		return g.generateMaven(ctx, absWorkDir, info, opts)
-	case extractor.BuildToolGradle:
+	case BuildToolGradle:
 		return g.generateGradle(ctx, absWorkDir, info, opts)
 	default:
 		return nil, fmt.Errorf("unsupported build tool: %s", info.BuildTool)
