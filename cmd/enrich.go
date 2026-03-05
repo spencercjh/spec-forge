@@ -2,7 +2,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,12 +10,12 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/spencercjh/spec-forge/internal/config"
 	"github.com/spencercjh/spec-forge/internal/enricher"
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
+	"github.com/spencercjh/spec-forge/internal/publisher"
 )
 
 var (
@@ -158,12 +157,17 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		outputFile = specFile // Overwrite input by default
 	}
 
-	// Save result
-	if err := saveSpec(result, outputFile); err != nil {
+	// Publish result using Publisher
+	pub := publisher.NewLocalPublisher()
+	pubResult, err := pub.Publish(ctx, result, &publisher.PublishOptions{
+		OutputPath: outputFile,
+		Overwrite:  true,
+	})
+	if err != nil {
 		return fmt.Errorf("failed to save spec: %w", err)
 	}
 
-	slog.InfoContext(ctx, "Enrichment complete", "output", outputFile)
+	slog.InfoContext(ctx, "Enrichment complete", "output", pubResult.Path)
 	return nil
 }
 
@@ -203,7 +207,7 @@ func createProvider(providerType, model string, enrichCfg config.EnrichConfig) (
 	return provider.NewProvider(cfg)
 }
 
-func getCustomAPIKeyEnv(enrichCfg config.EnrichConfig) string { //nolint:gocritic // copying config is acceptable //nolint:gocritic // copying config is acceptable
+func getCustomAPIKeyEnv(enrichCfg config.EnrichConfig) string { //nolint:gocritic // copying config is acceptable
 	if enrichCustomAPIKeyEnv != "" {
 		return enrichCustomAPIKeyEnv
 	}
@@ -224,35 +228,6 @@ func getCustomAPIKey(enrichCfg config.EnrichConfig) string { //nolint:gocritic /
 	}
 	// Then check environment variable
 	return os.Getenv(getCustomAPIKeyEnv(enrichCfg))
-}
-
-// saveSpec saves the spec to a file
-func saveSpec(spec *openapi3.T, path string) error {
-	// Validate before saving
-	ctx := context.Background()
-	if err := spec.Validate(ctx); err != nil {
-		slog.Warn("Spec validation warning", "error", err)
-	}
-
-	// Determine format from extension
-	var data []byte
-	var err error
-	switch {
-	case len(path) > 5 && path[len(path)-5:] == ".json":
-		data, err = spec.MarshalJSON()
-	default:
-		var yamlData any
-		yamlData, err = spec.MarshalYAML()
-		if err == nil {
-			data, err = yaml.Marshal(yamlData)
-		}
-	}
-
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(path, data, 0o600)
 }
 
 func init() {

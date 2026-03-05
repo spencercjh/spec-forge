@@ -20,6 +20,7 @@ import (
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/spencercjh/spec-forge/internal/extractor/spring"
+	"github.com/spencercjh/spec-forge/internal/publisher"
 	"github.com/spencercjh/spec-forge/internal/validator"
 )
 
@@ -268,12 +269,17 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 		}
 	}
 
-	// Save result
-	if err := saveSpec(result, specFilePath); err != nil {
+	// Publish result using Publisher
+	pub := publisher.NewLocalPublisher()
+	pubResult, err := pub.Publish(ctx, result, &publisher.PublishOptions{
+		OutputPath: specFilePath,
+		Overwrite:  true,
+	})
+	if err != nil {
 		return fmt.Errorf("failed to save enriched spec: %w", err)
 	}
 
-	slog.InfoContext(ctx, "OpenAPI spec enriched", "status", "✅")
+	slog.InfoContext(ctx, "OpenAPI spec enriched", "output", pubResult.Path)
 	return nil
 }
 
