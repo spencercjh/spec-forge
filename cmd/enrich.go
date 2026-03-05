@@ -133,7 +133,8 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{Language: lang})
 	if err != nil {
 		// Check if partial enrichment
-		if partialErr, ok := err.(*processor.PartialEnrichmentError); ok {
+		var partialErr *processor.PartialEnrichmentError
+		if errors.As(err, &partialErr) {
 			slog.WarnContext(ctx, "Partial enrichment completed",
 				"failed_batches", partialErr.FailedBatches,
 				"total_batches", partialErr.TotalBatches,
@@ -240,7 +241,7 @@ func saveSpec(spec *openapi3.T, path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 func init() {

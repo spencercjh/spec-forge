@@ -58,7 +58,7 @@ func (c *Config) Validate() error {
 }
 
 // MergeWithDefaults merges the config with defaults for zero values
-func (c Config) MergeWithDefaults() Config {
+func (c Config) MergeWithDefaults() Config { //nolint:gocritic // receiver by design
 	if c.Language == "" {
 		c.Language = DefaultConfig.Language
 	}

@@ -17,7 +17,7 @@ type mockProvider struct {
 	called       int
 }
 
-func (m *mockProvider) Generate(ctx context.Context, prompt string) (string, error) {
+func (m *mockProvider) Generate(ctx context.Context, p string) (string, error) {
 	m.called++
 	if m.responseFunc != nil {
 		return m.responseFunc()

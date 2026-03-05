@@ -54,7 +54,7 @@ type Template struct {
 }
 
 // Render renders the template with the given context
-func (t *Template) Render(ctx TemplateContext) (system, user string, err error) {
+func (t *Template) Render(ctx TemplateContext) (system, user string, err error) { //nolint:gocritic // copying context is acceptable here
 	if t.System != "" {
 		system, err = renderString(t.System, ctx)
 		if err != nil {

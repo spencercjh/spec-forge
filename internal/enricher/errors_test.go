@@ -64,7 +64,7 @@ func TestNewEnrichmentError(t *testing.T) {
 	if err.Message != "test message" {
 		t.Errorf("Message = %q, want %q", err.Message, "test message")
 	}
-	if err.Cause != cause {
+	if !errors.Is(err, cause) {
 		t.Error("Cause should match")
 	}
 }

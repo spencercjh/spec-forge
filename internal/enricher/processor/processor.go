@@ -41,7 +41,7 @@ type SpecCollector struct {
 }
 
 // AddElement adds an element to the collector
-func (c *SpecCollector) AddElement(element EnrichmentElement) {
+func (c *SpecCollector) AddElement(element EnrichmentElement) { //nolint:gocritic // copying element is acceptable
 	c.elements = append(c.elements, element)
 }
 
@@ -49,7 +49,7 @@ func (c *SpecCollector) AddElement(element EnrichmentElement) {
 func (c *SpecCollector) GroupByType() []*Batch {
 	groups := make(map[TemplateType][]EnrichmentElement)
 
-	for _, elem := range c.elements {
+	for _, elem := range c.elements { //nolint:gocritic // copying elements is acceptable here
 		groups[elem.Type] = append(groups[elem.Type], elem)
 	}
 

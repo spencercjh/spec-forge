@@ -57,7 +57,7 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 	RunE: runGenerate,
 }
 
-func runGenerate(cmd *cobra.Command, args []string) error {
+func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // CLI command runner requires many branches
 	ctx := cmd.Context()
 	path := "."
 	if len(args) > 0 {
@@ -261,7 +261,8 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{Language: lang})
 	if err != nil {
 		// Check if partial enrichment
-		if partialErr, ok := err.(*processor.PartialEnrichmentError); ok {
+		var partialErr *processor.PartialEnrichmentError
+		if errors.As(err, &partialErr) {
 			slog.WarnContext(ctx, "Partial enrichment completed",
 				"failed_batches", partialErr.FailedBatches,
 				"total_batches", partialErr.TotalBatches,
@@ -281,7 +282,7 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 }
 
 // createProviderFromConfig creates a provider from config settings
-func createProviderFromConfig(cfg config.EnrichConfig) (provider.Provider, error) {
+func createProviderFromConfig(cfg config.EnrichConfig) (provider.Provider, error) { //nolint:gocritic // copying config is acceptable
 	switch cfg.Provider {
 	case "openai":
 		apiKey := os.Getenv("OPENAI_API_KEY")
@@ -321,7 +322,7 @@ func createProviderFromConfig(cfg config.EnrichConfig) (provider.Provider, error
 }
 
 // getAPIKeyFromConfig gets API key from config or environment
-func getAPIKeyFromConfig(cfg config.EnrichConfig) string {
+func getAPIKeyFromConfig(cfg config.EnrichConfig) string { //nolint:gocritic // copying config is acceptable
 	// First check explicit config
 	if cfg.APIKey != "" {
 		return cfg.APIKey

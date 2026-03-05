@@ -23,7 +23,7 @@ type EnrichOptions struct {
 }
 
 // NewEnricher creates a new Enricher
-func NewEnricher(cfg Config, p provider.Provider) (*Enricher, error) {
+func NewEnricher(cfg Config, p provider.Provider) (*Enricher, error) { //nolint:gocritic // copying config is acceptable
 	if err := cfg.Validate(); err != nil {
 		return nil, NewEnrichmentError(ErrorTypeConfig, "invalid configuration", err)
 	}

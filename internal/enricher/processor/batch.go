@@ -33,7 +33,7 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	for _, elem := range batch.Elements {
+	for _, elem := range batch.Elements { //nolint:gocritic // copying elements is acceptable here
 		systemPrompt, userPrompt, err := tmpl.Render(elem.Context)
 		if err != nil {
 			slog.Warn("failed to render template", "error", err, "path", elem.Path)

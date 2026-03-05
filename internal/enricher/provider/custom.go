@@ -20,7 +20,7 @@ type CustomProvider struct {
 // CustomProviderConfig configuration for custom OpenAI-compatible services
 type CustomProviderConfig struct {
 	BaseURL string
-	APIKey  string
+	APIKey  string //nolint:gosec // Configuration field, not the actual secret
 	Model   string
 	Name    string // optional custom name
 }
