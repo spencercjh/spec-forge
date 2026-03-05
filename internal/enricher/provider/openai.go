@@ -14,8 +14,8 @@ type OpenAIProvider struct {
 	model string
 }
 
-// NewOpenAIProvider creates a provider configured for OpenAI
-func NewOpenAIProvider(apiKey, model string) (*OpenAIProvider, error) {
+// newOpenAIProvider creates a provider configured for OpenAI
+func newOpenAIProvider(apiKey, model string) (*OpenAIProvider, error) {
 	llm, err := openai.New(
 		openai.WithToken(apiKey),
 		openai.WithModel(model),

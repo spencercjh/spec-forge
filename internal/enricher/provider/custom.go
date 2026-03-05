@@ -25,8 +25,8 @@ type CustomProviderConfig struct {
 	Name    string // optional custom name
 }
 
-// NewCustomProvider creates a provider for custom OpenAI-compatible services
-func NewCustomProvider(cfg CustomProviderConfig) (*CustomProvider, error) {
+// newCustomProvider creates a provider for custom OpenAI-compatible services
+func newCustomProvider(cfg CustomProviderConfig) (*CustomProvider, error) {
 	if cfg.BaseURL == "" {
 		return nil, errors.New("baseURL is required for custom provider")
 	}

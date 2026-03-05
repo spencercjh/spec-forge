@@ -49,7 +49,7 @@ func TestMockProvider_Generate(t *testing.T) {
 }
 
 func TestNewOpenAIProvider(t *testing.T) {
-	provider, err := NewOpenAIProvider("test-api-key", "gpt-4o")
+	provider, err := newOpenAIProvider("test-api-key", "gpt-4o")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestNewOpenAIProvider(t *testing.T) {
 }
 
 func TestNewAnthropicProvider(t *testing.T) {
-	provider, err := NewAnthropicProvider("test-api-key", "claude-3-opus")
+	provider, err := newAnthropicProvider("test-api-key", "claude-3-opus")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestNewAnthropicProvider(t *testing.T) {
 }
 
 func TestNewOllamaProvider(t *testing.T) {
-	provider, err := NewOllamaProvider("http://localhost:11434", "llama3")
+	provider, err := newOllamaProvider("http://localhost:11434", "llama3")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestNewOllamaProvider(t *testing.T) {
 }
 
 func TestNewOllamaProvider_EmptyBaseURL(t *testing.T) {
-	provider, err := NewOllamaProvider("", "llama3")
+	provider, err := newOllamaProvider("", "llama3")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestNewOllamaProvider_EmptyBaseURL(t *testing.T) {
 }
 
 func TestNewCustomProvider(t *testing.T) {
-	provider, err := NewCustomProvider(CustomProviderConfig{
+	provider, err := newCustomProvider(CustomProviderConfig{
 		BaseURL: "https://api.example.com/v1",
 		APIKey:  "test-key",
 		Model:   "custom-model",
@@ -103,7 +103,7 @@ func TestNewCustomProvider(t *testing.T) {
 }
 
 func TestNewCustomProvider_WithCustomName(t *testing.T) {
-	provider, err := NewCustomProvider(CustomProviderConfig{
+	provider, err := newCustomProvider(CustomProviderConfig{
 		BaseURL: "https://api.example.com/v1",
 		APIKey:  "test-key",
 		Model:   "custom-model",
@@ -118,7 +118,7 @@ func TestNewCustomProvider_WithCustomName(t *testing.T) {
 }
 
 func TestNewCustomProvider_MissingBaseURL(t *testing.T) {
-	_, err := NewCustomProvider(CustomProviderConfig{
+	_, err := newCustomProvider(CustomProviderConfig{
 		APIKey: "test-key",
 		Model:  "custom-model",
 	})
@@ -128,7 +128,7 @@ func TestNewCustomProvider_MissingBaseURL(t *testing.T) {
 }
 
 func TestNewCustomProvider_MissingAPIKey(t *testing.T) {
-	_, err := NewCustomProvider(CustomProviderConfig{
+	_, err := newCustomProvider(CustomProviderConfig{
 		BaseURL: "https://api.example.com/v1",
 		Model:   "custom-model",
 	})
@@ -140,39 +140,39 @@ func TestNewCustomProvider_MissingAPIKey(t *testing.T) {
 func TestNewProvider(t *testing.T) {
 	tests := []struct {
 		name       string
-		cfg        ProviderConfig
+		cfg        Config
 		wantName   string
 		wantErr    bool
 		errContain string
 	}{
 		{
 			name:     "openai",
-			cfg:      ProviderConfig{Provider: "openai", Model: "gpt-4o", APIKey: "test"},
+			cfg:      Config{Provider: "openai", Model: "gpt-4o", APIKey: "test"},
 			wantName: "openai",
 		},
 		{
 			name:     "anthropic",
-			cfg:      ProviderConfig{Provider: "anthropic", Model: "claude-3-opus", APIKey: "test"},
+			cfg:      Config{Provider: "anthropic", Model: "claude-3-opus", APIKey: "test"},
 			wantName: "anthropic",
 		},
 		{
 			name:     "ollama with baseURL",
-			cfg:      ProviderConfig{Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434"},
+			cfg:      Config{Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434"},
 			wantName: "ollama",
 		},
 		{
 			name:     "ollama without baseURL",
-			cfg:      ProviderConfig{Provider: "ollama", Model: "llama3"},
+			cfg:      Config{Provider: "ollama", Model: "llama3"},
 			wantName: "ollama",
 		},
 		{
 			name:     "custom",
-			cfg:      ProviderConfig{Provider: "custom", Model: "test", BaseURL: "https://api.example.com/v1", APIKey: "test"},
+			cfg:      Config{Provider: "custom", Model: "test", BaseURL: "https://api.example.com/v1", APIKey: "test"},
 			wantName: "custom",
 		},
 		{
 			name:       "unsupported",
-			cfg:        ProviderConfig{Provider: "unsupported", Model: "test"},
+			cfg:        Config{Provider: "unsupported", Model: "test"},
 			wantErr:    true,
 			errContain: "unsupported provider",
 		},

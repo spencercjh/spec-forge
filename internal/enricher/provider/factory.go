@@ -1,8 +1,18 @@
 package provider
 
-// ProviderConfig contains configuration for creating a provider
-// revive:disable-next-line:exported // keeping ProviderConfig for clarity as provider.Config would be ambiguous
-type ProviderConfig struct {
+import "context"
+
+// Provider defines the interface for LLM providers
+type Provider interface {
+	// Generate generates a response for the given prompt
+	Generate(ctx context.Context, prompt string) (string, error)
+	// Name returns the provider name
+	Name() string
+}
+
+// Config contains configuration for creating a provider
+// revive:disable-next-line:exported // keeping Config for clarity as provider.Config would be ambiguous
+type Config struct {
 	Provider string
 	Model    string
 	APIKey   string //nolint:gosec // Configuration field, not the actual secret
@@ -26,20 +36,20 @@ func NewUnsupportedProviderError(provider string) *UnsupportedProviderError {
 }
 
 // NewProvider creates a provider based on the provider type
-func NewProvider(cfg ProviderConfig) (Provider, error) { //nolint:gocritic // copying config is acceptable
+func NewProvider(cfg Config) (Provider, error) { //nolint:gocritic // copying config is acceptable
 	switch cfg.Provider {
 	case "openai":
-		return NewOpenAIProvider(cfg.APIKey, cfg.Model)
+		return newOpenAIProvider(cfg.APIKey, cfg.Model)
 	case "anthropic":
-		return NewAnthropicProvider(cfg.APIKey, cfg.Model)
+		return newAnthropicProvider(cfg.APIKey, cfg.Model)
 	case "ollama":
 		baseURL := cfg.BaseURL
 		if baseURL == "" {
 			baseURL = "http://localhost:11434"
 		}
-		return NewOllamaProvider(baseURL, cfg.Model)
+		return newOllamaProvider(baseURL, cfg.Model)
 	case "custom":
-		return NewCustomProvider(CustomProviderConfig{
+		return newCustomProvider(CustomProviderConfig{
 			BaseURL: cfg.BaseURL,
 			APIKey:  cfg.APIKey,
 			Model:   cfg.Model,
@@ -47,27 +57,5 @@ func NewProvider(cfg ProviderConfig) (Provider, error) { //nolint:gocritic // co
 		})
 	default:
 		return nil, NewUnsupportedProviderError(cfg.Provider)
-	}
-}
-
-// NewProviderDirect creates a provider based on the provider type with direct parameter mapping
-// This avoids type alias issues between provider.Config and enricher.Config
-func NewProviderDirect(provider, model, _, baseURL, apiKey string, _ map[string]string, name string) (Provider, error) {
-	switch provider {
-	case "openai":
-		return NewOpenAIProvider(apiKey, model)
-	case "anthropic":
-		return NewAnthropicProvider(apiKey, model)
-	case "ollama":
-		return NewOllamaProvider(baseURL, model)
-	case "custom":
-		return NewCustomProvider(CustomProviderConfig{
-			BaseURL: baseURL,
-			APIKey:  apiKey,
-			Model:   model,
-			Name:    name,
-		})
-	default:
-		return nil, NewUnsupportedProviderError(provider)
 	}
 }

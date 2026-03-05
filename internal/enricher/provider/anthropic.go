@@ -14,8 +14,8 @@ type AnthropicProvider struct {
 	model string
 }
 
-// NewAnthropicProvider creates a provider configured for Anthropic
-func NewAnthropicProvider(apiKey, model string) (*AnthropicProvider, error) {
+// newAnthropicProvider creates a provider configured for Anthropic
+func newAnthropicProvider(apiKey, model string) (*AnthropicProvider, error) {
 	llm, err := anthropic.New(
 		anthropic.WithToken(apiKey),
 		anthropic.WithModel(model),

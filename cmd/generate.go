@@ -283,42 +283,32 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 
 // createProviderFromConfig creates a provider from config settings
 func createProviderFromConfig(cfg config.EnrichConfig) (provider.Provider, error) { //nolint:gocritic // copying config is acceptable
+	// Get API key based on provider type
+	var apiKey string
 	switch cfg.Provider {
 	case "openai":
-		apiKey := os.Getenv("OPENAI_API_KEY")
+		apiKey = os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
 			return nil, errors.New("OPENAI_API_KEY environment variable not set")
 		}
-		return provider.NewOpenAIProvider(apiKey, cfg.Model)
-
 	case "anthropic":
-		apiKey := os.Getenv("ANTHROPIC_API_KEY")
+		apiKey = os.Getenv("ANTHROPIC_API_KEY")
 		if apiKey == "" {
 			return nil, errors.New("ANTHROPIC_API_KEY environment variable not set")
 		}
-		return provider.NewAnthropicProvider(apiKey, cfg.Model)
-
-	case "ollama":
-		baseURL := cfg.BaseURL
-		if baseURL == "" {
-			baseURL = "http://localhost:11434"
-		}
-		return provider.NewOllamaProvider(baseURL, cfg.Model)
-
 	case "custom":
-		apiKey := getAPIKeyFromConfig(cfg)
+		apiKey = getAPIKeyFromConfig(cfg)
 		if apiKey == "" {
 			return nil, errors.New("API key not found for custom provider")
 		}
-		return provider.NewCustomProvider(provider.CustomProviderConfig{
-			BaseURL: cfg.BaseURL,
-			APIKey:  apiKey,
-			Model:   cfg.Model,
-		})
-
-	default:
-		return nil, fmt.Errorf("unknown provider: %s", cfg.Provider)
 	}
+
+	return provider.NewProvider(provider.Config{
+		Provider: cfg.Provider,
+		Model:    cfg.Model,
+		APIKey:   apiKey,
+		BaseURL:  cfg.BaseURL,
+	})
 }
 
 // getAPIKeyFromConfig gets API key from config or environment

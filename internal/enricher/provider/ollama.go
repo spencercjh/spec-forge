@@ -15,8 +15,8 @@ type OllamaProvider struct {
 	baseURL string
 }
 
-// NewOllamaProvider creates a provider configured for Ollama
-func NewOllamaProvider(baseURL, model string) (*OllamaProvider, error) {
+// newOllamaProvider creates a provider configured for Ollama
+func newOllamaProvider(baseURL, model string) (*OllamaProvider, error) {
 	opts := []ollama.Option{ollama.WithModel(model)}
 
 	if baseURL != "" {

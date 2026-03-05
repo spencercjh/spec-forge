@@ -161,42 +161,32 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 
 // createProvider creates a provider based on the provider type
 func createProvider(providerType, model string) (provider.Provider, error) {
+	cfg := provider.Config{
+		Provider: providerType,
+		Model:    model,
+		BaseURL:  enrichCustomBaseURL,
+	}
+
+	// Get API key based on provider type
 	switch providerType {
 	case "openai":
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		if apiKey == "" {
+		cfg.APIKey = os.Getenv("OPENAI_API_KEY")
+		if cfg.APIKey == "" {
 			return nil, errors.New("OPENAI_API_KEY environment variable not set")
 		}
-		return provider.NewOpenAIProvider(apiKey, model)
-
 	case "anthropic":
-		apiKey := os.Getenv("ANTHROPIC_API_KEY")
-		if apiKey == "" {
+		cfg.APIKey = os.Getenv("ANTHROPIC_API_KEY")
+		if cfg.APIKey == "" {
 			return nil, errors.New("ANTHROPIC_API_KEY environment variable not set")
 		}
-		return provider.NewAnthropicProvider(apiKey, model)
-
-	case "ollama":
-		baseURL := enrichCustomBaseURL
-		if baseURL == "" {
-			baseURL = "http://localhost:11434"
-		}
-		return provider.NewOllamaProvider(baseURL, model)
-
 	case "custom":
-		apiKey := getCustomAPIKey()
-		if apiKey == "" {
+		cfg.APIKey = getCustomAPIKey()
+		if cfg.APIKey == "" {
 			return nil, fmt.Errorf("API key not found. Set %s environment variable", getCustomAPIKeyEnv())
 		}
-		return provider.NewCustomProvider(provider.CustomProviderConfig{
-			BaseURL: enrichCustomBaseURL,
-			APIKey:  apiKey,
-			Model:   model,
-		})
-
-	default:
-		return nil, fmt.Errorf("unknown provider: %s", providerType)
 	}
+
+	return provider.NewProvider(cfg)
 }
 
 func getCustomAPIKeyEnv() string {
