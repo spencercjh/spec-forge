@@ -11,6 +11,9 @@ make build
 # Run all tests
 make test
 
+# Run end-to-end tests (requires Maven/Gradle)
+make test-e2e
+
 # Run a single test
 go test -v -run TestFunctionName ./internal/extractor/spring/...
 
@@ -133,8 +136,22 @@ The `integration-tests/` directory contains example Spring Boot projects for tes
 
 ```
 integration-tests/
-├── maven-springboot-openapi-demo/    # Maven-based Spring Boot project
-└── gradle-springboot-openapi-demo/   # Gradle-based Spring Boot project
+├── e2e_test.go                        # End-to-end tests
+├── README.md                          # Test documentation
+├── maven-springboot-openapi-demo/     # Maven-based Spring Boot project
+├── gradle-springboot-openapi-demo/    # Gradle-based Spring Boot project
+├── maven-multi-module-demo/           # Multi-module Maven project
+└── gradle-multi-module-demo/          # Multi-module Gradle project
+```
+
+### Running E2E Tests
+
+```bash
+# Run all e2e tests (requires Maven and/or Gradle)
+make test-e2e
+
+# Or directly with go test
+go test -v -tags=e2e ./integration-tests/...
 ```
 
 ### Quick Test: Enrichment (M5)

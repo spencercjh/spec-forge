@@ -1,4 +1,4 @@
-.PHONY: all build clean test lint fmt install build-linux dev verify help
+.PHONY: all build clean test test-e2e lint fmt install build-linux dev verify help
 
 # Go parameters
 GOCMD=go
@@ -45,6 +45,12 @@ test:
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	@echo "Tests complete"
 
+# Run end-to-end tests (requires Maven/Gradle)
+test-e2e:
+	@echo "Running e2e tests..."
+	$(GOTEST) -v -tags=e2e ./integration-tests/...
+	@echo "E2E tests complete"
+
 test-coverage: test
 	@echo "Generating coverage report..."
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
@@ -87,6 +93,7 @@ help:
 	@echo "  clean         - Remove build artifacts"
 	@echo "  deps          - Download and tidy dependencies"
 	@echo "  test          - Run tests with coverage"
+	@echo "  test-e2e      - Run end-to-end tests (requires Maven/Gradle)"
 	@echo "  test-coverage - Generate HTML coverage report"
 	@echo "  lint          - Run golangci-lint (linters + formatters check)"
 	@echo "  fmt           - Format code with golangci-lint formatters"
