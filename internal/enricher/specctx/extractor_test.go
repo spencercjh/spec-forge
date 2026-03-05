@@ -1,4 +1,4 @@
-package speccontext_test
+package specctx_test
 
 import (
 	stdcontext "context"
@@ -6,23 +6,23 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	speccontext "github.com/spencercjh/spec-forge/internal/enricher/context"
+	specctx "github.com/spencercjh/spec-forge/internal/enricher/specctx"
 )
 
 func TestExtractor_Interface(t *testing.T) {
 	// Verify interface compliance
-	var _ speccontext.Extractor = (*speccontext.NoOpExtractor)(nil)
+	var _ specctx.Extractor = (*specctx.NoOpExtractor)(nil)
 }
 
 func TestNoOpExtractor_Name(t *testing.T) {
-	extractor := &speccontext.NoOpExtractor{}
+	extractor := &specctx.NoOpExtractor{}
 	if extractor.Name() != "noop" {
 		t.Errorf("expected Name 'noop', got %s", extractor.Name())
 	}
 }
 
 func TestNoOpExtractor_Extract(t *testing.T) {
-	extractor := &speccontext.NoOpExtractor{}
+	extractor := &specctx.NoOpExtractor{}
 	ctx := stdcontext.Background()
 	spec := &openapi3.T{
 		Components: &openapi3.Components{

@@ -1,4 +1,4 @@
-package speccontext
+package specctx
 
 import (
 	stdcontext "context"
@@ -17,10 +17,10 @@ func (e *NoOpExtractor) Name() string {
 	return "noop"
 }
 
-// Extract extracts context from the OpenAPI spec without source code analysis.
+// Extract extracts specctx from the OpenAPI spec without source code analysis.
 func (e *NoOpExtractor) Extract(_ stdcontext.Context, _ string, spec *openapi3.T) (*EnrichmentContext, error) {
 	if spec == nil {
-		slog.Debug("NoOpExtractor: spec is nil, returning empty context")
+		slog.Debug("NoOpExtractor: spec is nil, returning empty specctx")
 		return &EnrichmentContext{Schemas: make(map[string]*SchemaContext)}, nil
 	}
 
@@ -43,7 +43,7 @@ func (e *NoOpExtractor) Extract(_ stdcontext.Context, _ string, spec *openapi3.T
 		}
 	}
 
-	slog.Debug("NoOpExtractor: extracted context from spec", "schemas", len(result.Schemas))
+	slog.Debug("NoOpExtractor: extracted specctx from spec", "schemas", len(result.Schemas))
 	return result, nil
 }
 

@@ -1,7 +1,7 @@
-// Package context provides context extraction for OpenAPI spec enrichment.
-package speccontext
+// Package specctx provides specctx extraction for OpenAPI spec enrichment.
+package specctx
 
-// EnrichmentContext contains context information for LLM enrichment.
+// EnrichmentContext contains specctx information for LLM enrichment.
 type EnrichmentContext struct {
 	// Project-level information
 	ProjectName string
@@ -11,7 +11,7 @@ type EnrichmentContext struct {
 	Schemas map[string]*SchemaContext // key: schema name
 }
 
-// SchemaContext contains context for a single Schema.
+// SchemaContext contains specctx for a single Schema.
 type SchemaContext struct {
 	// From OpenAPI Spec
 	Name   string

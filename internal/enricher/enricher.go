@@ -6,17 +6,17 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	speccontext "github.com/spencercjh/spec-forge/internal/enricher/context"
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
+	"github.com/spencercjh/spec-forge/internal/enricher/specctx"
 )
 
 // Enricher enriches OpenAPI specs with AI-generated descriptions
 type Enricher struct {
 	config    Config
 	provider  provider.Provider
-	extractor speccontext.Extractor
+	extractor specctx.Extractor
 }
 
 // EnrichOptions provides runtime options for enrichment
@@ -32,12 +32,12 @@ func NewEnricher(cfg Config, p provider.Provider) (*Enricher, error) { //nolint:
 	return &Enricher{
 		config:    cfg.MergeWithDefaults(),
 		provider:  p,
-		extractor: &speccontext.NoOpExtractor{}, // Default to NoOpExtractor
+		extractor: &specctx.NoOpExtractor{}, // Default to NoOpExtractor
 	}, nil
 }
 
-// WithExtractor sets a custom context extractor
-func (e *Enricher) WithExtractor(extractor speccontext.Extractor) *Enricher {
+// WithExtractor sets a custom specctx extractor
+func (e *Enricher) WithExtractor(extractor specctx.Extractor) *Enricher {
 	if extractor != nil {
 		e.extractor = extractor
 	}
@@ -55,8 +55,17 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 		language = opts.Language
 	}
 
+	// Extract context from project (if extractor is configured)
+	// This is a no-op for NoOpExtractor, but future extractors can provide
+	// richer context like Javadoc, Go struct tags, etc.
+	enrichCtx, err := e.extractor.Extract(ctx, e.config.ProjectPath, spec)
+	if err != nil {
+		slog.Warn("failed to extract enrichment context, using empty context", "error", err)
+		enrichCtx = &specctx.EnrichmentContext{Schemas: make(map[string]*specctx.SchemaContext)}
+	}
+
 	// Collect elements to enrich
-	collector := e.collectElements(spec, language)
+	collector := e.collectElements(spec, enrichCtx, language)
 
 	// Group elements into batches
 	batches := collector.GroupByType()
@@ -80,8 +89,9 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	return spec, nil
 }
 
-// collectElements collects elements from the spec that need enrichment
-func (e *Enricher) collectElements(spec *openapi3.T, language string) *processor.SpecCollector {
+// collectElements collects elements from the spec that need enrichment.
+// The enrichCtx parameter provides additional context extracted from source code (currently unused, reserved for future enhancement).
+func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContext, language string) *processor.SpecCollector {
 	collector := &processor.SpecCollector{}
 
 	// Collect API operations

@@ -17,6 +17,9 @@ type Config struct {
 	MaxRetries  int
 	Timeout     time.Duration
 
+	// Project path for context extraction (used by specctx extractors)
+	ProjectPath string
+
 	// Custom provider configuration (used when Provider == "custom")
 	CustomBaseURL   string
 	CustomAPIKeyEnv string

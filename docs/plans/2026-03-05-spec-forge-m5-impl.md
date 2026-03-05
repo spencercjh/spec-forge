@@ -1,12 +1,6 @@
-# M5: Schema Field and API Parameter Enrichment Implementation Plan
+# M5: Schema Field and API Parameter Enrichment Implementation plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
-**Goal:** Extend the Enricher to add AI-generated descriptions for Schema fields and API parameters.
-
-**Architecture:** Create a new `internal/context` package for extensible context extraction. Extend `internal/enricher/processor` to collect schemas and parameters. Modify `enricher.go` to recursively collect all elements. Use hybrid batch strategy (≤10 fields per batch).
-
-**Tech Stack:** Go 1.26, kin-openapi, langchaingo
+> **For Claude:** REQUIRED SUB-skill: use superpowers:executing-plans to implement this plan task-by-task.
 
 ---
 

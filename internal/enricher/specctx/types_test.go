@@ -1,16 +1,16 @@
-package speccontext_test
+package specctx_test
 
 import (
 	"testing"
 
-	speccontext "github.com/spencercjh/spec-forge/internal/enricher/context"
+	specctx "github.com/spencercjh/spec-forge/internal/enricher/specctx"
 )
 
 func TestEnrichmentContext(t *testing.T) {
-	ctx := &speccontext.EnrichmentContext{
+	ctx := &specctx.EnrichmentContext{
 		ProjectName: "test-project",
 		Framework:   "spring-boot",
-		Schemas:     make(map[string]*speccontext.SchemaContext),
+		Schemas:     make(map[string]*specctx.SchemaContext),
 	}
 
 	if ctx.ProjectName != "test-project" {
@@ -22,11 +22,11 @@ func TestEnrichmentContext(t *testing.T) {
 }
 
 func TestSchemaContext(t *testing.T) {
-	schemaCtx := &speccontext.SchemaContext{
+	schemaCtx := &specctx.SchemaContext{
 		Name:        "User",
 		Description: "A user entity",
 		Package:     "com.example.model",
-		Fields: []speccontext.FieldMeta{
+		Fields: []specctx.FieldMeta{
 			{Name: "id", Type: "integer", Required: true},
 			{Name: "name", Type: "string", Required: false},
 		},
@@ -38,7 +38,7 @@ func TestSchemaContext(t *testing.T) {
 }
 
 func TestFieldMeta(t *testing.T) {
-	field := speccontext.FieldMeta{
+	field := specctx.FieldMeta{
 		Name:        "userId",
 		Type:        "string",
 		Required:    true,

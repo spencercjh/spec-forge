@@ -15,36 +15,36 @@ const (
 	TemplateTypeResponse TemplateType = "response"
 )
 
-// FieldContext provides context for a schema field
+// FieldContext provides specctx for a schema field
 type FieldContext struct {
 	Name     string
 	Type     string
 	Required bool
 }
 
-// TemplateContext provides context for template rendering
+// TemplateContext provides specctx for template rendering
 type TemplateContext struct {
 	Type     TemplateType
 	Language string
 
-	// API context
+	// API specctx
 	Path   string
 	Method string
 
-	// Schema context
+	// Schema specctx
 	SchemaName string
 	Fields     []FieldContext
 
-	// Field context
+	// Field specctx
 	FieldName string
 	FieldType string
 	Required  bool
 
-	// Parameter context
+	// Parameter specctx
 	ParamName string
 	ParamIn   string // path, query, header, cookie
 
-	// Response context
+	// Response specctx
 	ResponseCode string
 }
 
@@ -54,8 +54,8 @@ type Template struct {
 	User   string
 }
 
-// Render renders the template with the given context
-func (t *Template) Render(ctx TemplateContext) (system, user string, err error) { //nolint:gocritic // copying context is acceptable here
+// Render renders the template with the given specctx
+func (t *Template) Render(ctx TemplateContext) (system, user string, err error) { //nolint:gocritic // copying specctx is acceptable here
 	if t.System != "" {
 		system, err = renderString(t.System, ctx)
 		if err != nil {
