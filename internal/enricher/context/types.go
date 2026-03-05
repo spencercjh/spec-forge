@@ -1,5 +1,5 @@
 // Package context provides context extraction for OpenAPI spec enrichment.
-package pkgcontext
+package speccontext
 
 // EnrichmentContext contains context information for LLM enrichment.
 type EnrichmentContext struct {

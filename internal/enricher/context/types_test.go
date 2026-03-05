@@ -1,17 +1,16 @@
-// internal/context/types_test.go
-package pkgcontext_test
+package speccontext_test
 
 import (
 	"testing"
 
-	pkgcontext "github.com/spencercjh/spec-forge/internal/context"
+	speccontext "github.com/spencercjh/spec-forge/internal/enricher/context"
 )
 
 func TestEnrichmentContext(t *testing.T) {
-	ctx := &pkgcontext.EnrichmentContext{
+	ctx := &speccontext.EnrichmentContext{
 		ProjectName: "test-project",
 		Framework:   "spring-boot",
-		Schemas:     make(map[string]*pkgcontext.SchemaContext),
+		Schemas:     make(map[string]*speccontext.SchemaContext),
 	}
 
 	if ctx.ProjectName != "test-project" {
@@ -23,11 +22,11 @@ func TestEnrichmentContext(t *testing.T) {
 }
 
 func TestSchemaContext(t *testing.T) {
-	schemaCtx := &pkgcontext.SchemaContext{
+	schemaCtx := &speccontext.SchemaContext{
 		Name:        "User",
 		Description: "A user entity",
 		Package:     "com.example.model",
-		Fields: []pkgcontext.FieldMeta{
+		Fields: []speccontext.FieldMeta{
 			{Name: "id", Type: "integer", Required: true},
 			{Name: "name", Type: "string", Required: false},
 		},
@@ -39,7 +38,7 @@ func TestSchemaContext(t *testing.T) {
 }
 
 func TestFieldMeta(t *testing.T) {
-	field := pkgcontext.FieldMeta{
+	field := speccontext.FieldMeta{
 		Name:        "userId",
 		Type:        "string",
 		Required:    true,

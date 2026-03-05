@@ -1,5 +1,4 @@
-// internal/context/extractor_test.go
-package pkgcontext_test
+package speccontext_test
 
 import (
 	stdcontext "context"
@@ -7,24 +6,24 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	pkgcontext "github.com/spencercjh/spec-forge/internal/context"
+	speccontext "github.com/spencercjh/spec-forge/internal/enricher/context"
 )
 
 func TestExtractor_Interface(t *testing.T) {
 	// Verify interface compliance
-	var _ pkgcontext.Extractor = (*pkgcontext.NoOpExtractor)(nil)
+	var _ speccontext.Extractor = (*speccontext.NoOpExtractor)(nil)
 }
 
 func TestNoOpExtractor_Name(t *testing.T) {
-	extractor := &pkgcontext.NoOpExtractor{}
+	extractor := &speccontext.NoOpExtractor{}
 	if extractor.Name() != "noop" {
 		t.Errorf("expected Name 'noop', got %s", extractor.Name())
 	}
 }
 
 func TestNoOpExtractor_Extract(t *testing.T) {
-	extractor := &pkgcontext.NoOpExtractor{}
-
+	extractor := &speccontext.NoOpExtractor{}
+	ctx := stdcontext.Background()
 	spec := &openapi3.T{
 		Components: &openapi3.Components{
 			Schemas: openapi3.Schemas{
@@ -32,8 +31,11 @@ func TestNoOpExtractor_Extract(t *testing.T) {
 					Value: &openapi3.Schema{
 						Type: &openapi3.Types{"object"},
 						Properties: openapi3.Schemas{
-							"id":   &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"integer"}}},
-							"name": &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+							"id": &openapi3.SchemaRef{
+								Value: &openapi3.Schema{
+									Type: &openapi3.Types{"integer"},
+								},
+							},
 						},
 					},
 				},
@@ -41,7 +43,6 @@ func TestNoOpExtractor_Extract(t *testing.T) {
 		},
 	}
 
-	ctx := stdcontext.Background()
 	result, err := extractor.Extract(ctx, "/dummy/path", spec)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -61,7 +62,7 @@ func TestNoOpExtractor_Extract(t *testing.T) {
 		t.Fatal("expected User schema in result")
 	}
 
-	if len(userSchema.Fields) != 2 {
-		t.Errorf("expected 2 fields in User schema, got %d", len(userSchema.Fields))
+	if len(userSchema.Fields) != 1 {
+		t.Errorf("expected 1 field in User schema, got %d", len(userSchema.Fields))
 	}
 }

@@ -6,7 +6,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	pkgcontext "github.com/spencercjh/spec-forge/internal/context"
+	speccontext "github.com/spencercjh/spec-forge/internal/enricher/context"
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
@@ -16,7 +16,7 @@ import (
 type Enricher struct {
 	config    Config
 	provider  provider.Provider
-	extractor pkgcontext.Extractor
+	extractor speccontext.Extractor
 }
 
 // EnrichOptions provides runtime options for enrichment
@@ -32,12 +32,12 @@ func NewEnricher(cfg Config, p provider.Provider) (*Enricher, error) { //nolint:
 	return &Enricher{
 		config:    cfg.MergeWithDefaults(),
 		provider:  p,
-		extractor: &pkgcontext.NoOpExtractor{}, // Default to NoOpExtractor
+		extractor: &speccontext.NoOpExtractor{}, // Default to NoOpExtractor
 	}, nil
 }
 
 // WithExtractor sets a custom context extractor
-func (e *Enricher) WithExtractor(extractor pkgcontext.Extractor) *Enricher {
+func (e *Enricher) WithExtractor(extractor speccontext.Extractor) *Enricher {
 	if extractor != nil {
 		e.extractor = extractor
 	}

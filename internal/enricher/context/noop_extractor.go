@@ -1,4 +1,4 @@
-package pkgcontext
+package speccontext
 
 import (
 	stdcontext "context"
