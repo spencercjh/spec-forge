@@ -42,6 +42,7 @@ type TemplateContext struct {
 
 	// Parameter context
 	ParamName string
+	ParamIn   string // path, query, header, cookie
 
 	// Response context
 	ResponseCode string

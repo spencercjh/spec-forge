@@ -130,3 +130,30 @@ func TestFieldElement(t *testing.T) {
 		t.Error("expected SetValue callback to be called")
 	}
 }
+
+func TestSpecCollector_AddSchemaElement(t *testing.T) {
+	collector := &SpecCollector{}
+
+	schema := SchemaElement{
+		SchemaName: "User",
+		Fields: []FieldElement{
+			{FieldName: "id", FieldType: "integer", Required: true},
+		},
+	}
+
+	collector.AddSchemaElement(schema, "en")
+
+	if len(collector.schemas) != 1 {
+		t.Errorf("expected 1 schema, got %d", len(collector.schemas))
+	}
+}
+
+func TestSpecCollector_AddParamElement(t *testing.T) {
+	collector := &SpecCollector{}
+
+	collector.AddParamElement("/users/{id}", "GET", "id", "path", "string", true, "en")
+
+	if len(collector.params) != 1 {
+		t.Errorf("expected 1 param, got %d", len(collector.params))
+	}
+}
