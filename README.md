@@ -12,6 +12,25 @@ A CLI tool that generates enriched OpenAPI specifications from source code using
 - 🤖 **AI Enrichment** - Uses LLM to generate meaningful descriptions for APIs and schemas
 - 🌐 **Multi-provider** - Supports OpenAI, Anthropic, Ollama, and custom providers
 
+## How It Works
+
+```mermaid
+flowchart LR
+    A[Source Code] --> B[Detect]
+    B --> C[Patch]
+    C --> D[Generate]
+    D --> E[Validate]
+    E --> F[Enrich]
+    F --> G[Publish]
+```
+
+1. **Detect** - Identifies project type, build tool, and required dependencies
+2. **Patch** - Adds dependencies if missing, configures plugins
+3. **Generate** - Runs build tool to generate OpenAPI spec
+4. **Validate** - Validates the generated OpenAPI specification
+5. **Enrich** - Uses LLM to add descriptions to APIs, parameters, and schemas
+6. **Publish** - Writes the final spec to local file or publishes to documentation platforms
+
 ## Installation
 
 ```bash
@@ -32,14 +51,6 @@ LLM_API_KEY="your-api-key" spec-forge generate ./path/to/spring-boot-project \
 LLM_API_KEY="your-api-key" spec-forge enrich ./openapi.json \
     --provider openai --model gpt-4o --language zh
 ```
-
-## Supported Frameworks
-
-| Framework | Language | Status |
-|-----------|----------|--------|
-| Spring Boot | Java | ✅ Supported |
-| Gin | Go | 🚧 Coming soon |
-| Echo | Go | 🚧 Coming soon |
 
 ## Configuration
 
@@ -62,7 +73,7 @@ output:
 
 **Configuration priority:** `flag > env > config file > default`
 
-## LLM Providers
+## Supported LLM Providers
 
 | Provider    | API Key Env         |
 |-------------|---------------------|
@@ -79,24 +90,24 @@ LLM_API_KEY="sk-xxx" spec-forge enrich ./openapi.json \
     --model deepseek-chat
 ```
 
-## How It Works
+## Supported Frameworks
 
-```mermaid
-flowchart LR
-    A[Source Code] --> B[Detect]
-    B --> C[Patch]
-    C --> D[Generate]
-    D --> E[Validate]
-    E --> F[Enrich]
-    F --> G[Output]
-```
+| Framework   | Language       | Status         |
+|-------------|----------------|----------------|
+| Spring Boot | Java           | ✅ Supported    |
+| go-zero     | Go             | 🚧 Coming soon |
+| Hertz       | Go             | 🚧 Coming soon |
+| Kitex       | Go             | 🚧 Coming soon |
+| gRPC        | Multi-language | 🚧 Coming soon |
 
-1. **Detect** - Identifies project type, build tool, and required dependencies
-2. **Patch** - Adds dependencies if missing, configures plugins
-3. **Generate** - Runs build tool to generate OpenAPI spec
-4. **Validate** - Validates the generated OpenAPI specification
-5. **Enrich** - Uses LLM to add descriptions to APIs, parameters, and schemas
-6. **Output** - Writes the final spec to disk (YAML or JSON)
+## Supported Publishers
+
+| Publisher  | Status         |
+|------------|----------------|
+| Local File | ✅ Supported    |
+| README.com | 🚧 Coming soon |
+| Apifox     | 🚧 Coming soon |
+| Postman    | 🚧 Coming soon |
 
 ## License
 
