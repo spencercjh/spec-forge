@@ -95,8 +95,7 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 	}
 
 	// Handle command not found
-	var execErr *exec.Error
-	if errors.As(err, &execErr) {
+	if execErr, ok := errors.AsType[*exec.Error](err); ok {
 		if errors.Is(execErr.Err, exec.ErrNotFound) {
 			return result, &CommandNotFoundError{
 				Command: opts.Command,

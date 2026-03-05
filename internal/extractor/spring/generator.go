@@ -15,8 +15,7 @@ import (
 
 // wrapCommandError wraps executor errors with helpful hints.
 func wrapCommandError(err error) error {
-	var cmdNotFound *executor.CommandNotFoundError
-	if errors.As(err, &cmdNotFound) && cmdNotFound.Hint != "" {
+	if cmdNotFound, ok := errors.AsType[*executor.CommandNotFoundError](err); ok && cmdNotFound.Hint != "" {
 		return fmt.Errorf("%w\nHint: %s", err, cmdNotFound.Hint)
 	}
 	return err

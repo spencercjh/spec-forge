@@ -6,7 +6,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	specctx "github.com/spencercjh/spec-forge/internal/enricher/specctx"
+	"github.com/spencercjh/spec-forge/internal/enricher/specctx"
 )
 
 func TestExtractor_Interface(t *testing.T) {

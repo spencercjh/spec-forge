@@ -57,8 +57,7 @@ func formatValidationError(err error) string {
 	}
 
 	// Check for openapi3.SchemaError
-	var schemaErr *openapi3.SchemaError
-	if errors.As(err, &schemaErr) {
+	if schemaErr, ok := errors.AsType[*openapi3.SchemaError](err); ok {
 		return fmt.Sprintf("validation error at %s: %s", schemaErr.JSONPointer(), schemaErr.Reason)
 	}
 

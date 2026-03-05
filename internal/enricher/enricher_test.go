@@ -133,8 +133,7 @@ func TestEnricher_Enrich_ProviderError(t *testing.T) {
 	}
 
 	// Should return PartialEnrichmentError
-	var partialErr *processor.PartialEnrichmentError
-	if !errors.As(err, &partialErr) {
+	if _, ok := errors.AsType[*processor.PartialEnrichmentError](err); !ok {
 		t.Errorf("Expected PartialEnrichmentError, got %T", err)
 	}
 }

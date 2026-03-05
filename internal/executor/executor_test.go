@@ -47,8 +47,7 @@ func TestExecutor_Execute_CommandNotFound(t *testing.T) {
 		t.Fatal("expected error for nonexistent command")
 	}
 
-	var notFoundErr *CommandNotFoundError
-	if !errors.As(err, &notFoundErr) {
+	if _, ok := errors.AsType[*CommandNotFoundError](err); !ok {
 		t.Errorf("expected CommandNotFoundError, got %T", err)
 	}
 
@@ -105,8 +104,7 @@ func TestExecutor_Execute_FailedCommand(t *testing.T) {
 		t.Fatal("expected error for failed command")
 	}
 
-	var failedErr *CommandFailedError
-	if !errors.As(err, &failedErr) {
+	if _, ok := errors.AsType[*CommandFailedError](err); !ok {
 		t.Errorf("expected CommandFailedError, got %T", err)
 	}
 

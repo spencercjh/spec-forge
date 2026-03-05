@@ -44,8 +44,7 @@ func NewEnrichmentError(errorType, message string, cause error) *EnrichmentError
 
 // IsConfigError checks if the error is a configuration error
 func IsConfigError(err error) bool {
-	var enrichErr *EnrichmentError
-	if errors.As(err, &enrichErr) {
+	if enrichErr, ok := errors.AsType[*EnrichmentError](err); ok {
 		return enrichErr.Type == ErrorTypeConfig
 	}
 	return false

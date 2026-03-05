@@ -23,24 +23,21 @@ import (
 	"github.com/spencercjh/spec-forge/internal/validator"
 )
 
-// generateKeepPatched controls whether to keep the patched pom/build file
-// Default is false (restore original) for generate command
-var generateKeepPatched bool
-
-// generateSkipValidate controls whether to skip validation
-var generateSkipValidate bool
-
-// generateTimeout is the timeout for generation commands
-var generateTimeout time.Duration
-
-// generateSkipEnrich controls whether to skip AI enrichment
-var generateSkipEnrich bool
-
-// generateLanguage is the language for AI-generated descriptions
-var generateLanguage string
-
-// generateOutput is the output directory for generated spec
-var generateOutput string
+var (
+	// generateKeepPatched controls whether to keep the patched pom/build file
+	// Default is false (restore original) for generate command
+	generateKeepPatched bool
+	// generateSkipValidate controls whether to skip validation
+	generateSkipValidate bool
+	// generateTimeout is the timeout for generation commands
+	generateTimeout time.Duration
+	// generateSkipEnrich controls whether to skip AI enrichment
+	generateSkipEnrich bool
+	// generateLanguage is the language for AI-generated descriptions
+	generateLanguage string
+	// generateOutput is the output directory for generated spec
+	generateOutput string
+)
 
 // generateCmd represents the generate command
 var generateCmd = &cobra.Command{
@@ -261,8 +258,7 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{Language: lang})
 	if err != nil {
 		// Check if partial enrichment
-		var partialErr *processor.PartialEnrichmentError
-		if errors.As(err, &partialErr) {
+		if partialErr, ok := errors.AsType[*processor.PartialEnrichmentError](err); ok {
 			slog.WarnContext(ctx, "Partial enrichment completed",
 				"failed_batches", partialErr.FailedBatches,
 				"total_batches", partialErr.TotalBatches,
