@@ -212,3 +212,50 @@ func TestParseResponse_JSON(t *testing.T) {
 		})
 	}
 }
+
+func TestParseSchemaResponse(t *testing.T) {
+	tests := []struct {
+		name         string
+		response     string
+		fieldCount   int
+		expectFields map[string]string
+	}{
+		{
+			name: "simple JSON",
+			response: `{
+				"id": "The unique identifier of the user",
+				"name": "The display name of the user",
+				"email": "The user's email address"
+			}`,
+			fieldCount: 3,
+			expectFields: map[string]string{
+				"id":    "The unique identifier of the user",
+				"name":  "The display name of the user",
+				"email": "The user's email address",
+			},
+		},
+		{
+			name:       "JSON in markdown code block",
+			response:   "```json\n{\"userId\": \"The user ID\", \"status\": \"The account status\"}\n```",
+			fieldCount: 2,
+			expectFields: map[string]string{
+				"userId": "The user ID",
+				"status": "The account status",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseSchemaResponse(tt.response)
+			if len(result) != tt.fieldCount {
+				t.Errorf("expected %d fields, got %d", tt.fieldCount, len(result))
+			}
+			for name, expectedDesc := range tt.expectFields {
+				if result[name] != expectedDesc {
+					t.Errorf("field %s: expected %q, got %q", name, expectedDesc, result[name])
+				}
+			}
+		})
+	}
+}

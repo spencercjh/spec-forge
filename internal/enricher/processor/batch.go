@@ -88,3 +88,17 @@ func stripMarkdownCodeBlock(s string) string {
 	}
 	return s
 }
+
+// parseSchemaResponse parses a schema field description response.
+// Returns a map of field names to descriptions.
+func parseSchemaResponse(response string) map[string]string {
+	response = stripMarkdownCodeBlock(response)
+
+	var result map[string]string
+	if err := json.Unmarshal([]byte(response), &result); err != nil {
+		slog.Warn("failed to parse schema response as JSON", "error", err, "response", response)
+		return nil
+	}
+
+	return result
+}
