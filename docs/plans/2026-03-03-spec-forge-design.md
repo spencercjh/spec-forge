@@ -268,7 +268,7 @@ spec-forge/
 | **M2** | Spring 检测和 Patch（Detector、Patcher） |
 | **M3** | Extractor（Generator、Validator） |
 | **M4** | Enricher（langchaingo 集成） |
-| **M5** | Publisher（本地文件输出） |
+| **M5** | Enricher Context 提取（specctx） |
 | **M6** | 集成测试和文档 |
 
 ---
@@ -323,6 +323,53 @@ type Publisher interface {
     Publish(ctx context.Context, spec *openapi3.T, opts PublishOptions) error
 }
 ```
+
+---
+
+### Enricher Context (specctx)
+
+`internal/enricher/specctx` 包负责从项目中提取上下文信息，用于 LLM 增强提示词 (prompt)：
+
+**职责：**
+- 从 OpenAPI Spec 提取 Schema 和 Field 元信息
+- 为未来的源码分析预留扩展点（如 Javadoc、Go struct tags）
+
+**依赖关系：**
+- **依赖 `internal/extractor`**: 使用 `Detector` 获取框架信息
+- 这样 `specctx` 可以根据框架类型提供框架特定的上下文提取
+
+**核心类型：**
+```go
+// EnrichmentContext 包含用于 LLM 增强的上下文信息
+type EnrichmentContext struct {
+    ProjectName string
+    Framework   string // "spring-boot", "gin", etc.
+    Schemas     map[string]*SchemaContext
+}
+
+// SchemaContext 包含单个 Schema 的上下文
+type SchemaContext struct {
+    Name        string
+    Fields      []FieldMeta
+    Description string              // 类/结构体的文档注释
+    Package     string              // 所属包名
+    Annotations map[string]string   // 语言特定的注解/标签
+}
+
+// FieldMeta 字段元信息
+type FieldMeta struct {
+    Name        string
+    Type        string
+    Required    bool
+    Description string              // 字段注释
+    Tags        map[string]string   // 如 json:"user_id", validate:"required"
+}
+```
+
+**扩展点：**
+- `NoOpExtractor`: 默认实现，只从 OpenAPI Spec 提取基础信息
+- 未来可添加 `SpringExtractor`: 从 Java 源码提取 Javadoc
+- 未来可添加 `GoExtractor`: 从 Go 源码提取 struct tag 和注释
 
 ---
 
