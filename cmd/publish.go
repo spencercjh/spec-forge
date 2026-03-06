@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
@@ -69,8 +71,14 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build publish options
+	// Avoid input/output path conflict for local publisher
+	outputPath := publishOutput
+	if pub.Name() == "local" && !cmd.Flags().Changed("output") {
+		outputPath = resolveOutputPath(specFile, publishOutput)
+	}
+
 	opts := &publisher.PublishOptions{
-		OutputPath: publishOutput,
+		OutputPath: outputPath,
 		Format:     publishFormat,
 		Overwrite:  publishOverwrite,
 	}
@@ -106,6 +114,27 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// resolveOutputPath avoids input/output path conflicts for local publisher.
+// If the default output path would overwrite the input file, it generates a unique path.
+func resolveOutputPath(inputPath, defaultOutput string) string {
+	// Clean paths for comparison
+	inputPath = filepath.Clean(inputPath)
+	defaultOutput = filepath.Clean(defaultOutput)
+
+	// If default output is different from input, use it
+	if defaultOutput != inputPath {
+		return defaultOutput
+	}
+
+	// Generate a unique path to avoid overwriting input
+	// Example: openapi.yaml -> openapi.published.yaml
+	dir := filepath.Dir(defaultOutput)
+	ext := filepath.Ext(defaultOutput)
+	base := strings.TrimSuffix(filepath.Base(defaultOutput), ext)
+
+	return filepath.Join(dir, base+".published"+ext)
 }
 
 func init() {
