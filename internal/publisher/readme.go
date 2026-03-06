@@ -60,7 +60,9 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func(path string) {
+		_ = os.RemoveAll(path)
+	}(tmpDir)
 
 	// Determine format
 	format := opts.Format
@@ -189,8 +191,7 @@ func (p *ReadMePublisher) buildLocation(opts *ReadMeOptions) string {
 // wrapExecuteError wraps executor errors with appropriate context.
 func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteResult) error {
 	// Handle command not found
-	var cmdNotFound *executor.CommandNotFoundError
-	if errors.As(err, &cmdNotFound) {
+	if cmdNotFound, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
 		if strings.TrimSpace(cmdNotFound.Hint) != "" {
 			return fmt.Errorf("rdme CLI not found: %w\n%s", err, strings.TrimSpace(cmdNotFound.Hint))
 		}
@@ -198,8 +199,7 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 	}
 
 	// Handle command failure - include output for debugging
-	var cmdFailed *executor.CommandFailedError
-	if errors.As(err, &cmdFailed) {
+	if cmdFailed, ok := errors.AsType[*executor.CommandFailedError](err); ok {
 		output := cmdFailed.Stdout
 		if cmdFailed.Stderr != "" {
 			output += "\n" + cmdFailed.Stderr
