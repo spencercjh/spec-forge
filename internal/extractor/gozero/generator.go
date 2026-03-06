@@ -95,6 +95,15 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, opts *extr
 
 // generateSwagger generates Swagger 2.0 spec using goctl command.
 func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *ProjectInfo, opts *extractor.GenerateOptions) (string, error) {
+	// Patch .api files to work around goctl parser bugs (#5425)
+	apiPatcher := NewAPIFilePatcher()
+	defer apiPatcher.Cleanup()
+
+	patchedFiles, err := apiPatcher.PatchAPIFiles(info.APIFiles)
+	if err != nil {
+		return "", fmt.Errorf("failed to patch API files: %w", err)
+	}
+
 	// Build goctl command arguments
 	// goctl api plugin -plugin goctl-swagger="swagger -filename openapi.json" -api <api_file> -dir <output_dir>
 	// For simplicity, we use: goctl api swagger -filename openapi.json -api <api_file>
@@ -109,7 +118,7 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *P
 	args = append(args, "-filename", swaggerFilename)
 
 	// Find the main API file (usually in the api/ directory or the first one found)
-	apiFile := g.findMainAPIFile(workDir, info)
+	apiFile := g.findMainAPIFile(workDir, info, patchedFiles)
 	if apiFile == "" {
 		return "", fmt.Errorf("no .api files found in project")
 	}
@@ -141,21 +150,33 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *P
 }
 
 // findMainAPIFile finds the main API file to use for swagger generation.
-func (g *Generator) findMainAPIFile(workDir string, info *ProjectInfo) string {
+// Returns the patched file path if available, otherwise returns the original.
+func (g *Generator) findMainAPIFile(workDir string, info *ProjectInfo, patchedFiles map[string]string) string {
 	if len(info.APIFiles) == 0 {
 		return ""
 	}
+
+	var selectedFile string
 
 	// Prefer API files in the api/ directory
 	for _, apiFile := range info.APIFiles {
 		relPath, _ := filepath.Rel(workDir, apiFile)
 		if strings.HasPrefix(relPath, "api") || strings.HasPrefix(relPath, "api/") {
-			return apiFile
+			selectedFile = apiFile
+			break
 		}
 	}
 
 	// Fallback to the first API file found
-	return info.APIFiles[0]
+	if selectedFile == "" {
+		selectedFile = info.APIFiles[0]
+	}
+
+	// Return patched path if available
+	if patchedPath, ok := patchedFiles[selectedFile]; ok {
+		return patchedPath
+	}
+	return selectedFile
 }
 
 // convertSwaggerToOpenAPI converts Swagger 2.0 spec to OpenAPI 3.0 spec.
