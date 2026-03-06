@@ -280,7 +280,7 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 	patcher := spring.NewPatcher()
 
 	t.Run("needs patch when missing deps", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
+		info := &extractor.SpringInfo{
 			HasSpringdocDeps:   false,
 			HasSpringdocPlugin: false,
 		}
@@ -290,7 +290,7 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 	})
 
 	t.Run("needs patch when force is true", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
+		info := &extractor.SpringInfo{
 			HasSpringdocDeps:   true,
 			HasSpringdocPlugin: true,
 		}
@@ -300,7 +300,7 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 	})
 
 	t.Run("no patch needed when already configured", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
+		info := &extractor.SpringInfo{
 			HasSpringdocDeps:   true,
 			HasSpringdocPlugin: true,
 		}
@@ -1154,16 +1154,19 @@ func TestDetector_MultiModuleGradle(t *testing.T) {
 	}
 
 	// Verify multi-module detection
-	if !info.IsMultiModule {
+	if info.Spring == nil {
+		t.Fatal("Spring should not be nil")
+	}
+	if !info.Spring.IsMultiModule {
 		t.Error("Expected IsMultiModule to be true")
 	}
-	if len(info.Modules) != 2 {
-		t.Errorf("Expected 2 modules, got %d", len(info.Modules))
+	if len(info.Spring.Modules) != 2 {
+		t.Errorf("Expected 2 modules, got %d", len(info.Spring.Modules))
 	}
-	if info.MainModule != "user-service" {
-		t.Errorf("Expected MainModule to be 'user-service', got '%s'", info.MainModule)
+	if info.Spring.MainModule != "user-service" {
+		t.Errorf("Expected MainModule to be 'user-service', got '%s'", info.Spring.MainModule)
 	}
-	if info.MainModulePath == "" {
+	if info.Spring.MainModulePath == "" {
 		t.Error("Expected MainModulePath to be set")
 	}
 }
@@ -1425,16 +1428,19 @@ func TestDetector_MultiModuleMaven(t *testing.T) {
 	}
 
 	// Verify multi-module detection
-	if !info.IsMultiModule {
+	if info.Spring == nil {
+		t.Fatal("Spring should not be nil")
+	}
+	if !info.Spring.IsMultiModule {
 		t.Error("Expected IsMultiModule to be true")
 	}
-	if len(info.Modules) != 2 {
-		t.Errorf("Expected 2 modules, got %d", len(info.Modules))
+	if len(info.Spring.Modules) != 2 {
+		t.Errorf("Expected 2 modules, got %d", len(info.Spring.Modules))
 	}
-	if info.MainModule != "user-service" {
-		t.Errorf("Expected MainModule to be 'user-service', got '%s'", info.MainModule)
+	if info.Spring.MainModule != "user-service" {
+		t.Errorf("Expected MainModule to be 'user-service', got '%s'", info.Spring.MainModule)
 	}
-	if info.MainModulePath == "" {
+	if info.Spring.MainModulePath == "" {
 		t.Error("Expected MainModulePath to be set")
 	}
 }

@@ -83,31 +83,40 @@ type PatchResult struct {
 	SpringBootConfigured bool   // Whether spring-boot plugin was configured
 }
 
-// ProjectInfo contains detected information about a project.
+// ProjectInfo contains common detected information about a project.
+// Framework-specific details are stored in the Spring or GoZero fields.
 type ProjectInfo struct {
-	BuildTool          BuildTool // Maven or Gradle
-	BuildFilePath      string    // pom.xml or build.gradle path
-	SpringBootVersion  string    // Spring Boot version
-	HasSpringdocDeps   bool      // Whether springdoc dependencies exist
-	HasSpringdocPlugin bool      // Whether springdoc plugin is configured
-	SpringdocVersion   string    // Existing springdoc version if any
+	Framework     string    // Framework type: "springboot" or "gozero"
+	BuildTool     BuildTool // Maven, Gradle, or GoModules
+	BuildFilePath string    // Path to build file (pom.xml, build.gradle, or go.mod)
 
-	// Multi-module project support
-	IsMultiModule  bool     // Whether this is a multi-module project
-	Modules        []string // List of module names (for multi-module projects)
-	MainModule     string   // The main application module (if detected)
-	MainModulePath string   // Path to the main module's build file
+	// Framework-specific details (only one will be non-nil)
+	Spring *SpringInfo // Spring Boot specific info (nil for other frameworks)
+	GoZero *GoZeroInfo // go-zero specific info (nil for other frameworks)
+}
 
-	// go-zero framework support
-	Framework     string   // Framework type: "springboot" or "gozero"
-	GoVersion     string   // Go version (for go-zero projects)
-	GoModule      string   // Go module path (for go-zero projects)
-	ModuleName    string   // Go module name (for go-zero projects)
+// SpringInfo contains Spring Boot framework specific information.
+type SpringInfo struct {
+	SpringBootVersion  string   // Spring Boot version
+	HasSpringdocDeps   bool     // Whether springdoc dependencies exist
+	HasSpringdocPlugin bool     // Whether springdoc plugin is configured
+	SpringdocVersion   string   // Existing springdoc version if any
+	IsMultiModule      bool     // Whether this is a multi-module project
+	Modules            []string // List of module names
+	MainModule         string   // The main application module
+	MainModulePath     string   // Path to the main module's build file
+}
+
+// GoZeroInfo contains go-zero framework specific information.
+type GoZeroInfo struct {
+	GoVersion     string   // Go version
+	GoModule      string   // Go module path
+	ModuleName    string   // Go module name
 	HasGoZeroDeps bool     // Whether go-zero dependencies exist
-	GoZeroVersion string   // Existing go-zero version if any
-	HasGoctl      bool     // Whether goctl is available (for go-zero projects)
-	APIFiles      []string // List of .api file paths (for go-zero projects)
-	MainPackage   string   // Main package path (for go-zero projects)
+	GoZeroVersion string   // go-zero version if any
+	HasGoctl      bool     // Whether goctl is available
+	APIFiles      []string // List of .api file paths
+	MainPackage   string   // Main package path
 }
 
 // PatchOptions configures the patch behavior.

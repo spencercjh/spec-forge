@@ -44,7 +44,11 @@ func TestDetector_Detect_MavenProject(t *testing.T) {
 		t.Error("BuildFilePath should not be empty")
 	}
 
-	if !info.HasSpringdocDeps {
+	if info.Spring == nil {
+		t.Fatal("Spring should not be nil")
+	}
+
+	if !info.Spring.HasSpringdocDeps {
 		t.Error("HasSpringdocDeps should be true for this project")
 	}
 }
@@ -72,7 +76,11 @@ func TestDetector_Detect_GradleProject(t *testing.T) {
 		t.Error("BuildFilePath should not be empty")
 	}
 
-	if !info.HasSpringdocDeps {
+	if info.Spring == nil {
+		t.Fatal("Spring should not be nil")
+	}
+
+	if !info.Spring.HasSpringdocDeps {
 		t.Error("HasSpringdocDeps should be true for this project")
 	}
 }

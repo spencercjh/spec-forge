@@ -63,20 +63,24 @@ require (
 		t.Errorf("BuildFilePath = %s, want %s", info.BuildFilePath, goModPath)
 	}
 
-	if info.ModuleName != "example.com/testproject" {
-		t.Errorf("ModuleName = %s, want example.com/testproject", info.ModuleName)
+	if info.GoZero == nil {
+		t.Fatal("GoZero should not be nil")
 	}
 
-	if info.GoVersion != "1.21" {
-		t.Errorf("GoVersion = %s, want 1.21", info.GoVersion)
+	if info.GoZero.ModuleName != "example.com/testproject" {
+		t.Errorf("ModuleName = %s, want example.com/testproject", info.GoZero.ModuleName)
 	}
 
-	if !info.HasGoZeroDeps {
+	if info.GoZero.GoVersion != "1.21" {
+		t.Errorf("GoVersion = %s, want 1.21", info.GoZero.GoVersion)
+	}
+
+	if !info.GoZero.HasGoZeroDeps {
 		t.Error("HasGoZeroDeps should be true")
 	}
 
-	if info.GoZeroVersion != "v1.6.0" {
-		t.Errorf("GoZeroVersion = %s, want v1.6.0", info.GoZeroVersion)
+	if info.GoZero.GoZeroVersion != "v1.6.0" {
+		t.Errorf("GoZeroVersion = %s, want v1.6.0", info.GoZero.GoZeroVersion)
 	}
 }
 
@@ -101,12 +105,16 @@ require github.com/zeromicro/go-zero v1.5.0
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if !info.HasGoZeroDeps {
+	if info.GoZero == nil {
+		t.Fatal("GoZero should not be nil")
+	}
+
+	if !info.GoZero.HasGoZeroDeps {
 		t.Error("HasGoZeroDeps should be true for single-line require")
 	}
 
-	if info.GoZeroVersion != "v1.5.0" {
-		t.Errorf("GoZeroVersion = %s, want v1.5.0", info.GoZeroVersion)
+	if info.GoZero.GoZeroVersion != "v1.5.0" {
+		t.Errorf("GoZeroVersion = %s, want v1.5.0", info.GoZero.GoZeroVersion)
 	}
 }
 
@@ -133,12 +141,16 @@ require (
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.HasGoZeroDeps {
+	if info.GoZero == nil {
+		t.Fatal("GoZero should not be nil")
+	}
+
+	if info.GoZero.HasGoZeroDeps {
 		t.Error("HasGoZeroDeps should be false")
 	}
 
-	if info.GoZeroVersion != "" {
-		t.Errorf("GoZeroVersion should be empty, got %s", info.GoZeroVersion)
+	if info.GoZero.GoZeroVersion != "" {
+		t.Errorf("GoZeroVersion should be empty, got %s", info.GoZero.GoZeroVersion)
 	}
 }
 
@@ -179,8 +191,12 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if len(info.APIFiles) != 2 {
-		t.Errorf("Expected 2 .api files, got %d", len(info.APIFiles))
+	if info.GoZero == nil {
+		t.Fatal("GoZero should not be nil")
+	}
+
+	if len(info.GoZero.APIFiles) != 2 {
+		t.Errorf("Expected 2 .api files, got %d", len(info.GoZero.APIFiles))
 	}
 }
 
@@ -222,13 +238,17 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	// Should only find the main.api file, not the vendor one
-	if len(info.APIFiles) != 1 {
-		t.Errorf("Expected 1 .api file (vendor skipped), got %d", len(info.APIFiles))
+	if info.GoZero == nil {
+		t.Fatal("GoZero should not be nil")
 	}
 
-	if len(info.APIFiles) > 0 && info.APIFiles[0] != apiFile {
-		t.Errorf("Expected %s, got %s", apiFile, info.APIFiles[0])
+	// Should only find the main.api file, not the vendor one
+	if len(info.GoZero.APIFiles) != 1 {
+		t.Errorf("Expected 1 .api file (vendor skipped), got %d", len(info.GoZero.APIFiles))
+	}
+
+	if len(info.GoZero.APIFiles) > 0 && info.GoZero.APIFiles[0] != apiFile {
+		t.Errorf("Expected %s, got %s", apiFile, info.GoZero.APIFiles[0])
 	}
 }
 
@@ -270,9 +290,13 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Detect failed: %v", err)
 	}
 
+	if info.GoZero == nil {
+		t.Fatal("GoZero should not be nil")
+	}
+
 	// Should only find the main.api file, not the hidden one
-	if len(info.APIFiles) != 1 {
-		t.Errorf("Expected 1 .api file (hidden skipped), got %d", len(info.APIFiles))
+	if len(info.GoZero.APIFiles) != 1 {
+		t.Errorf("Expected 1 .api file (hidden skipped), got %d", len(info.GoZero.APIFiles))
 	}
 }
 
@@ -302,15 +326,19 @@ func TestDetector_Detect_EmptyProject(t *testing.T) {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.ModuleName != "example.com/empty" {
-		t.Errorf("ModuleName = %s, want example.com/empty", info.ModuleName)
+	if info.GoZero == nil {
+		t.Fatal("GoZero should not be nil")
 	}
 
-	if info.GoVersion != "" {
-		t.Errorf("GoVersion should be empty for empty go.mod, got %s", info.GoVersion)
+	if info.GoZero.ModuleName != "example.com/empty" {
+		t.Errorf("ModuleName = %s, want example.com/empty", info.GoZero.ModuleName)
 	}
 
-	if info.HasGoZeroDeps {
+	if info.GoZero.GoVersion != "" {
+		t.Errorf("GoVersion should be empty for empty go.mod, got %s", info.GoZero.GoVersion)
+	}
+
+	if info.GoZero.HasGoZeroDeps {
 		t.Error("HasGoZeroDeps should be false for empty go.mod")
 	}
 }

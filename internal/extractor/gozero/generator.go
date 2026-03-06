@@ -130,12 +130,12 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, opts *extr
 	}
 
 	// Check if goctl is available
-	if !info.HasGoctl {
+	if info.GoZero == nil || !info.GoZero.HasGoctl {
 		return nil, errors.New("goctl command not found in PATH. Please install goctl: go install github.com/zeromicro/go-zero/tools/goctl@latest")
 	}
 
 	// Generate Swagger 2.0 spec using goctl
-	swaggerPath, err := g.generateSwagger(ctx, absPath, info, opts)
+	swaggerPath, err := g.generateSwagger(ctx, absPath, info.GoZero, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, opts *extr
 }
 
 // generateSwagger generates Swagger 2.0 spec using goctl command.
-func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (string, error) {
+func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *extractor.GoZeroInfo, opts *extractor.GenerateOptions) (string, error) {
 	// Patch .api files to work around goctl parser bugs (#5425)
 	apiPatcher := NewAPIFilePatcher()
 	defer apiPatcher.Cleanup()
@@ -207,7 +207,7 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *e
 
 // findMainAPIFile finds the main API file to use for swagger generation.
 // Returns the patched file path if available, otherwise returns the original.
-func (g *Generator) findMainAPIFile(workDir string, info *extractor.ProjectInfo, patchedFiles map[string]string) string {
+func (g *Generator) findMainAPIFile(workDir string, info *extractor.GoZeroInfo, patchedFiles map[string]string) string {
 	if len(info.APIFiles) == 0 {
 		return ""
 	}

@@ -36,14 +36,10 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 		return nil, fmt.Errorf("failed to check go.mod: %w", statErr)
 	}
 
-	info := &extractor.ProjectInfo{
-		BuildTool:     BuildToolGoModules,
-		BuildFilePath: goModPath,
-		Framework:     extractor.FrameworkGoZero,
-	}
+	goZeroInfo := &extractor.GoZeroInfo{}
 
 	// Parse go.mod
-	if parseErr := d.parseGoMod(goModPath, info); parseErr != nil {
+	if parseErr := d.parseGoMod(goModPath, goZeroInfo); parseErr != nil {
 		return nil, fmt.Errorf("failed to parse go.mod: %w", parseErr)
 	}
 
@@ -52,16 +48,23 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to find .api files: %w", err)
 	}
-	info.APIFiles = apiFiles
+	goZeroInfo.APIFiles = apiFiles
 
 	// Check if goctl is available
-	info.HasGoctl = d.checkGoctl()
+	goZeroInfo.HasGoctl = d.checkGoctl()
+
+	info := &extractor.ProjectInfo{
+		Framework:     extractor.FrameworkGoZero,
+		BuildTool:     BuildToolGoModules,
+		BuildFilePath: goModPath,
+		GoZero:        goZeroInfo,
+	}
 
 	return info, nil
 }
 
 // parseGoMod parses the go.mod file and extracts project information.
-func (d *Detector) parseGoMod(goModPath string, info *extractor.ProjectInfo) error {
+func (d *Detector) parseGoMod(goModPath string, info *extractor.GoZeroInfo) error {
 	file, err := os.Open(goModPath)
 	if err != nil {
 		return fmt.Errorf("failed to open go.mod: %w", err)
@@ -117,7 +120,7 @@ func (d *Detector) parseGoMod(goModPath string, info *extractor.ProjectInfo) err
 }
 
 // parseRequireLine parses a single require line and extracts go-zero dependency info.
-func (d *Detector) parseRequireLine(line string, inRequireBlock bool, info *extractor.ProjectInfo) {
+func (d *Detector) parseRequireLine(line string, inRequireBlock bool, info *extractor.GoZeroInfo) {
 	fields := strings.Fields(line)
 
 	// Handle single-line require: require github.com/zeromicro/go-zero v1.6.0

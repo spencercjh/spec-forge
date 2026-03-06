@@ -159,9 +159,9 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 
 	// Determine the working directory
 	workDir := projectPath
-	if info.IsMultiModule && info.MainModulePath != "" {
+	if info.Spring != nil && info.Spring.IsMultiModule && info.Spring.MainModulePath != "" {
 		// For multi-module projects, run from the main module directory
-		workDir = filepath.Dir(info.MainModulePath)
+		workDir = filepath.Dir(info.Spring.MainModulePath)
 	}
 
 	absWorkDir, err := filepath.Abs(workDir)

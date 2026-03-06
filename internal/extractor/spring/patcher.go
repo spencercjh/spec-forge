@@ -36,7 +36,7 @@ func NewPatcher() *Patcher {
 }
 
 // NeedsPatch checks if the project needs to be patched.
-func (p *Patcher) NeedsPatch(info *extractor.ProjectInfo, force bool) bool {
+func (p *Patcher) NeedsPatch(info *extractor.SpringInfo, force bool) bool {
 	if force {
 		return true
 	}
@@ -69,7 +69,11 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 	}
 
 	// Check if patch is needed for other build tools
-	if !p.NeedsPatch(info, opts.Force) {
+	springInfo := info.Spring
+	if springInfo == nil {
+		springInfo = &extractor.SpringInfo{}
+	}
+	if !p.NeedsPatch(springInfo, opts.Force) {
 		return &PatchResult{
 			DependencyAdded: false,
 			PluginAdded:     false,
@@ -98,10 +102,15 @@ func (p *Patcher) Restore(buildFilePath, originalContent string) error {
 
 // patchMaven patches a Maven project using gopom.
 func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
+	springInfo := info.Spring
+	if springInfo == nil {
+		springInfo = &extractor.SpringInfo{}
+	}
+
 	// For multi-module projects, patch the main module instead of parent POM
 	buildFilePath := info.BuildFilePath
-	if info.IsMultiModule && info.MainModulePath != "" {
-		buildFilePath = info.MainModulePath
+	if springInfo.IsMultiModule && springInfo.MainModulePath != "" {
+		buildFilePath = springInfo.MainModulePath
 	}
 
 	result := &PatchResult{
@@ -134,7 +143,7 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 	}
 
 	// Add dependency if needed
-	if opts.Force || !info.HasSpringdocDeps {
+	if opts.Force || !springInfo.HasSpringdocDeps {
 		if !p.mavenParser.HasDependency(pom) {
 			p.mavenParser.AddDependency(pom, SpringdocGroupID, SpringdocWebMVCArtifactID, opts.SpringdocVersion)
 			result.DependencyAdded = true
@@ -142,7 +151,7 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 	}
 
 	// Add plugin if needed
-	if opts.Force || !info.HasSpringdocPlugin {
+	if opts.Force || !springInfo.HasSpringdocPlugin {
 		if !p.mavenParser.HasPlugin(pom) {
 			p.mavenParser.AddPlugin(pom, SpringdocGroupID, SpringdocMavenPluginArtifact, opts.MavenPluginVersion)
 			result.PluginAdded = true
@@ -174,10 +183,15 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 
 // patchGradle patches a Gradle project.
 func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
+	springInfo := info.Spring
+	if springInfo == nil {
+		springInfo = &extractor.SpringInfo{}
+	}
+
 	// For multi-module projects, patch the main module instead of root
 	buildFilePath := info.BuildFilePath
-	if info.IsMultiModule && info.MainModulePath != "" {
-		buildFilePath = info.MainModulePath
+	if springInfo.IsMultiModule && springInfo.MainModulePath != "" {
+		buildFilePath = springInfo.MainModulePath
 	}
 
 	result := &PatchResult{
@@ -206,7 +220,7 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 	modified := result.OriginalContent
 
 	// Add dependency if needed
-	if opts.Force || !info.HasSpringdocDeps {
+	if opts.Force || !springInfo.HasSpringdocDeps {
 		build, err := p.gradleParser.Parse(buildFilePath)
 		if err != nil {
 			return nil, err
@@ -221,7 +235,7 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 	}
 
 	// Add plugin if needed
-	if opts.Force || !info.HasSpringdocPlugin {
+	if opts.Force || !springInfo.HasSpringdocPlugin {
 		build, err := p.gradleParser.Parse(buildFilePath)
 		if err != nil {
 			return nil, err

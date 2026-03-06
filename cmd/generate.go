@@ -81,7 +81,6 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		"framework", extractorImpl.Name(),
 		"tool", info.BuildTool,
 		"build_file", info.BuildFilePath,
-		"multi_module", info.IsMultiModule,
 	)
 
 	// Step 2: Patch project if needed

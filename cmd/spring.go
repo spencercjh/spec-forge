@@ -64,26 +64,32 @@ func printProjectInfo(ctx context.Context, info *extractor.ProjectInfo) {
 	slog.InfoContext(ctx, "Spring Project Detection Results")
 	slog.InfoContext(ctx, "Build Tool", "tool", info.BuildTool)
 	slog.InfoContext(ctx, "Build File", "path", info.BuildFilePath)
-	slog.InfoContext(ctx, "Spring Boot", "version", info.SpringBootVersion)
 
-	if info.IsMultiModule {
+	springInfo := info.Spring
+	if springInfo == nil {
+		springInfo = &extractor.SpringInfo{}
+	}
+
+	slog.InfoContext(ctx, "Spring Boot", "version", springInfo.SpringBootVersion)
+
+	if springInfo.IsMultiModule {
 		slog.InfoContext(ctx, "Multi-Module", "enabled", "✅ Yes")
-		slog.InfoContext(ctx, "Modules", "list", info.Modules)
-		if info.MainModule != "" {
-			slog.InfoContext(ctx, "Main Module", "name", info.MainModule)
-			slog.InfoContext(ctx, "Main Module Path", "path", info.MainModulePath)
+		slog.InfoContext(ctx, "Modules", "list", springInfo.Modules)
+		if springInfo.MainModule != "" {
+			slog.InfoContext(ctx, "Main Module", "name", springInfo.MainModule)
+			slog.InfoContext(ctx, "Main Module Path", "path", springInfo.MainModulePath)
 		}
 	} else {
 		slog.InfoContext(ctx, "Multi-Module", "enabled", "❌ No")
 	}
 
-	if info.HasSpringdocDeps {
-		slog.InfoContext(ctx, "springdoc Dependency", "status", "✅ Present", "version", info.SpringdocVersion)
+	if springInfo.HasSpringdocDeps {
+		slog.InfoContext(ctx, "springdoc Dependency", "status", "✅ Present", "version", springInfo.SpringdocVersion)
 	} else {
 		slog.InfoContext(ctx, "springdoc Dependency", "status", "❌ Not found")
 	}
 
-	if info.HasSpringdocPlugin {
+	if springInfo.HasSpringdocPlugin {
 		slog.InfoContext(ctx, "springdoc Plugin", "status", "✅ Configured")
 	} else {
 		slog.InfoContext(ctx, "springdoc Plugin", "status", "❌ Not configured")

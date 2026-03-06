@@ -12,8 +12,34 @@ func TestProjectInfoDefaults(t *testing.T) {
 	if info.BuildTool != "" {
 		t.Error("BuildTool should default to empty")
 	}
+	if info.Framework != "" {
+		t.Error("Framework should default to empty")
+	}
+	if info.Spring != nil {
+		t.Error("Spring should default to nil")
+	}
+	if info.GoZero != nil {
+		t.Error("GoZero should default to nil")
+	}
+}
+
+func TestSpringInfoDefaults(t *testing.T) {
+	info := extractor.SpringInfo{}
 	if info.HasSpringdocDeps {
 		t.Error("HasSpringdocDeps should default to false")
+	}
+	if info.HasSpringdocPlugin {
+		t.Error("HasSpringdocPlugin should default to false")
+	}
+}
+
+func TestGoZeroInfoDefaults(t *testing.T) {
+	info := extractor.GoZeroInfo{}
+	if info.HasGoZeroDeps {
+		t.Error("HasGoZeroDeps should default to false")
+	}
+	if info.HasGoctl {
+		t.Error("HasGoctl should default to false")
 	}
 }
 
