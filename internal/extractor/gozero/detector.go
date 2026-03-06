@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
 // Detector detects go-zero project information.
@@ -19,7 +21,7 @@ func NewDetector() *Detector {
 }
 
 // Detect analyzes a go-zero project and returns its information.
-func (d *Detector) Detect(projectPath string) (*ProjectInfo, error) {
+func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve path: %w", err)
@@ -34,9 +36,10 @@ func (d *Detector) Detect(projectPath string) (*ProjectInfo, error) {
 		return nil, fmt.Errorf("failed to check go.mod: %w", statErr)
 	}
 
-	info := &ProjectInfo{
+	info := &extractor.ProjectInfo{
 		BuildTool:     BuildToolGoModules,
 		BuildFilePath: goModPath,
+		Framework:     extractor.FrameworkGoZero,
 	}
 
 	// Parse go.mod
@@ -58,7 +61,7 @@ func (d *Detector) Detect(projectPath string) (*ProjectInfo, error) {
 }
 
 // parseGoMod parses the go.mod file and extracts project information.
-func (d *Detector) parseGoMod(goModPath string, info *ProjectInfo) error {
+func (d *Detector) parseGoMod(goModPath string, info *extractor.ProjectInfo) error {
 	file, err := os.Open(goModPath)
 	if err != nil {
 		return fmt.Errorf("failed to open go.mod: %w", err)
@@ -114,7 +117,7 @@ func (d *Detector) parseGoMod(goModPath string, info *ProjectInfo) error {
 }
 
 // parseRequireLine parses a single require line and extracts go-zero dependency info.
-func (d *Detector) parseRequireLine(line string, inRequireBlock bool, info *ProjectInfo) {
+func (d *Detector) parseRequireLine(line string, inRequireBlock bool, info *extractor.ProjectInfo) {
 	fields := strings.Fields(line)
 
 	// Handle single-line require: require github.com/zeromicro/go-zero v1.6.0

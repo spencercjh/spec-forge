@@ -25,6 +25,60 @@ const (
 	goctlCmd              = "goctl"
 )
 
+// ExtractorName is the name of this extractor.
+const ExtractorName = "gozero"
+
+func init() {
+	// Register the go-zero extractor with the global registry.
+	extractor.Register(ExtractorName, &Extractor{})
+}
+
+// Extractor implements the extractor.Extractor interface for go-zero projects.
+type Extractor struct {
+	detector  *Detector
+	patcher   *Patcher
+	generator *Generator
+}
+
+// Name returns the extractor name.
+func (e *Extractor) Name() string {
+	return ExtractorName
+}
+
+// Detect analyzes a project and returns its information if it's a go-zero project.
+func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
+	if e.detector == nil {
+		e.detector = NewDetector()
+	}
+	return e.detector.Detect(projectPath)
+}
+
+// Patch checks if goctl is available for the go-zero project.
+func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.PatchResult, error) {
+	if e.patcher == nil {
+		e.patcher = NewPatcher()
+	}
+	_, err := e.patcher.Patch("")
+	if err != nil {
+		return nil, err
+	}
+	// go-zero doesn't modify project files, so return empty result.
+	return &extractor.PatchResult{}, nil
+}
+
+// Generate produces the OpenAPI spec from the go-zero project.
+func (e *Extractor) Generate(ctx context.Context, projectPath string, _ *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+	if e.generator == nil {
+		e.generator = NewGenerator()
+	}
+	return e.generator.Generate(ctx, projectPath, opts)
+}
+
+// Restore is a no-op for go-zero projects as we don't modify files.
+func (e *Extractor) Restore(_, _ string) error {
+	return nil
+}
+
 // Generator generates OpenAPI specs from go-zero projects.
 type Generator struct {
 	detector *Detector
@@ -96,7 +150,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, opts *extr
 }
 
 // generateSwagger generates Swagger 2.0 spec using goctl command.
-func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *ProjectInfo, opts *extractor.GenerateOptions) (string, error) {
+func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (string, error) {
 	// Patch .api files to work around goctl parser bugs (#5425)
 	apiPatcher := NewAPIFilePatcher()
 	defer apiPatcher.Cleanup()
@@ -153,7 +207,7 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *P
 
 // findMainAPIFile finds the main API file to use for swagger generation.
 // Returns the patched file path if available, otherwise returns the original.
-func (g *Generator) findMainAPIFile(workDir string, info *ProjectInfo, patchedFiles map[string]string) string {
+func (g *Generator) findMainAPIFile(workDir string, info *extractor.ProjectInfo, patchedFiles map[string]string) string {
 	if len(info.APIFiles) == 0 {
 		return ""
 	}
