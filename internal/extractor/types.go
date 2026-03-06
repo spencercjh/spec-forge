@@ -10,10 +10,7 @@ import (
 type BuildTool string
 
 // Framework type constants.
-const (
-	FrameworkSpringBoot = "springboot"
-	FrameworkGoZero     = "gozero"
-)
+const ()
 
 // Extractor is the interface for framework-specific OpenAPI spec extraction.
 // Each framework (Spring Boot, go-zero, etc.) implements this interface.

@@ -12,3 +12,7 @@ type Info struct {
 	MainModule         string   // The main application module
 	MainModulePath     string   // Path to the main module's build file
 }
+
+const (
+	FrameworkSpringBoot = "springboot"
+)

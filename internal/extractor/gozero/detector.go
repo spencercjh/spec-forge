@@ -54,7 +54,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	goZeroInfo.HasGoctl = d.checkGoctl()
 
 	info := &extractor.ProjectInfo{
-		Framework:     extractor.FrameworkGoZero,
+		Framework:     FrameworkGoZero,
 		BuildTool:     BuildToolGoModules,
 		BuildFilePath: goModPath,
 		FrameworkData: goZeroInfo,

@@ -12,3 +12,7 @@ type Info struct {
 	APIFiles      []string // List of .api file paths
 	MainPackage   string   // Main package path
 }
+
+const (
+	FrameworkGoZero = "gozero"
+)

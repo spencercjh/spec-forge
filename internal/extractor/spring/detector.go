@@ -102,7 +102,7 @@ func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.P
 	}
 
 	info := &extractor.ProjectInfo{
-		Framework:     extractor.FrameworkSpringBoot,
+		Framework:     FrameworkSpringBoot,
 		BuildTool:     BuildToolMaven,
 		BuildFilePath: pomPath,
 		FrameworkData: springInfo,
@@ -164,7 +164,7 @@ func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extract
 	}
 
 	info := &extractor.ProjectInfo{
-		Framework:     extractor.FrameworkSpringBoot,
+		Framework:     FrameworkSpringBoot,
 		BuildTool:     BuildToolGradle,
 		BuildFilePath: gradlePath,
 		FrameworkData: springInfo,
