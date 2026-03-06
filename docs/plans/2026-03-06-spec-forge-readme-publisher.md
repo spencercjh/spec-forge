@@ -398,11 +398,14 @@ type Config struct {
 Add flags to `publish` command:
 
 ```go
-publishCmd.Flags().String("readme-api-key", "", "ReadMe API key")
+// Security: API key should be supplied via README_API_KEY env var, not CLI flag
+// to prevent leaking in process listings (ps, /proc/<pid>/cmdline)
 publishCmd.Flags().String("readme-branch", "", "ReadMe version/branch")
 publishCmd.Flags().String("readme-slug", "", "ReadMe API slug")
 publishCmd.Flags().Bool("readme-use-spec-version", false, "Use OpenAPI version as ReadMe version")
 ```
+
+**Security Note:** The `--readme-api-key` flag is intentionally NOT provided. API keys must be supplied via the `README_API_KEY` environment variable to prevent credential leakage via process listings. The publisher automatically reads from this environment variable.
 
 ### 5. Dry Run Mode
 

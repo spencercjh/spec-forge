@@ -264,7 +264,7 @@ func init() {
 	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "local",
 		"publish target (local, readme)")
 	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
-		"overwrite existing spec (for remote publishers like ReadMe)")
+		"overwrite existing spec (applies to both local and remote publishers)")
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
