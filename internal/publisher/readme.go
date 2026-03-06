@@ -23,7 +23,7 @@ func NewReadMePublisher() *ReadMePublisher {
 
 // Name returns the publisher name.
 func (p *ReadMePublisher) Name() string {
-	return "readme"
+	return publisherReadme
 }
 
 // Publish uploads an OpenAPI spec to ReadMe.com.
