@@ -21,6 +21,33 @@ func wrapCommandError(err error) error {
 	return err
 }
 
+// maxErrorOutputLength is the maximum length of error output to include in error messages.
+const maxErrorOutputLength = 8 * 1024 // 8KB
+
+// combineOutput combines stdout and stderr for error messages.
+// Build tools like Maven/Gradle often output errors to stdout.
+func combineOutput(stdout, stderr string) string {
+	stdout = strings.TrimSpace(stdout)
+	stderr = strings.TrimSpace(stderr)
+
+	var combined string
+	if stdout == "" {
+		combined = stderr
+	} else if stderr == "" {
+		combined = stdout
+	} else {
+		combined = stdout + "\n" + stderr
+	}
+
+	// Truncate if too long to avoid log bloat
+	if len(combined) > maxErrorOutputLength {
+		truncated := combined[len(combined)-maxErrorOutputLength:]
+		combined = fmt.Sprintf("%s\n... (truncated, showing last %d bytes)", truncated, maxErrorOutputLength)
+	}
+
+    return combined
+}
+
 const (
 	defaultOutputFileName = "openapi"
 	defaultFormat         = "json"
@@ -211,7 +238,11 @@ func (g *Generator) generateMaven(ctx context.Context, workDir string, _ *extrac
 	}
 
 	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("maven generation failed with exit code %d: %s", result.ExitCode, result.Stderr)
+		out := combineOutput(result.Stdout, result.Stderr)
+		if out == "" {
+			return nil, fmt.Errorf("maven generation failed with exit code %d (no output)", result.ExitCode)
+		}
+		return nil, fmt.Errorf("maven generation failed with exit code %d:\n%s", result.ExitCode, out)
 	}
 
 	// Find the generated spec file
@@ -254,7 +285,11 @@ func (g *Generator) generateGradle(ctx context.Context, workDir string, _ *extra
 	}
 
 	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("gradle generation failed with exit code %d: %s", result.ExitCode, result.Stderr)
+		out := combineOutput(result.Stdout, result.Stderr)
+		if out == "" {
+			return nil, fmt.Errorf("gradle generation failed with exit code %d (no output)", result.ExitCode)
+		}
+		return nil, fmt.Errorf("gradle generation failed with exit code %d:\n%s", result.ExitCode, out)
 	}
 
 	// Find the generated spec file
