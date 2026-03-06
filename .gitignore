@@ -48,6 +48,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Worktrees
+.worktrees/
+
 # Logs
 *.log
 logs/
