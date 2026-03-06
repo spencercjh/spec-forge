@@ -161,6 +161,9 @@ func (e *CommandFailedError) Error() string {
 	if combined != "" {
 		return fmt.Sprintf("command '%s' failed with exit code %d:\n%s", e.Command, e.ExitCode, combined)
 	}
+	if e.Err != nil {
+		return fmt.Sprintf("command '%s' failed with exit code %d (no output): %v", e.Command, e.ExitCode, e.Err)
+	}
 	return fmt.Sprintf("command '%s' failed with exit code %d (no output)", e.Command, e.ExitCode)
 }
 
