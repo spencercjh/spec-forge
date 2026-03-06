@@ -28,11 +28,13 @@ The ReadMe Publisher enables uploading OpenAPI specifications directly to ReadMe
 ### rdme CLI Command
 
 ```bash
-rdme openapi upload [SPEC] --key=<API_KEY> [--branch=<version>] [--slug=<slug>] [--confirm-overwrite] [--useSpecVersion]
+rdme openapi upload [SPEC] [--branch=<version>] [--slug=<slug>] [--confirm-overwrite] [--useSpecVersion]
 ```
 
+**Authentication:**
+API key is passed via `README_API_KEY` environment variable (not command line) to prevent leaking in process listings.
+
 **Flags:**
-- `--key` (required) - ReadMe project API key
 - `--branch` - ReadMe project version (default: `stable`)
 - `--slug` - Unique identifier for the API definition
 - `--confirm-overwrite` - Skip confirmation prompts (CI-friendly)
