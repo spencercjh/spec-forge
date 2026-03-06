@@ -27,11 +27,11 @@ func (d *Detector) Detect(projectPath string) (*ProjectInfo, error) {
 
 	// Check for go.mod
 	goModPath := filepath.Join(absPath, "go.mod")
-	if _, err := os.Stat(goModPath); err != nil {
-		if os.IsNotExist(err) {
+	if _, statErr := os.Stat(goModPath); statErr != nil {
+		if os.IsNotExist(statErr) {
 			return nil, fmt.Errorf("no go.mod found in %s", absPath)
 		}
-		return nil, fmt.Errorf("failed to check go.mod: %w", err)
+		return nil, fmt.Errorf("failed to check go.mod: %w", statErr)
 	}
 
 	info := &ProjectInfo{
@@ -40,8 +40,8 @@ func (d *Detector) Detect(projectPath string) (*ProjectInfo, error) {
 	}
 
 	// Parse go.mod
-	if err := d.parseGoMod(goModPath, info); err != nil {
-		return nil, fmt.Errorf("failed to parse go.mod: %w", err)
+	if parseErr := d.parseGoMod(goModPath, info); parseErr != nil {
+		return nil, fmt.Errorf("failed to parse go.mod: %w", parseErr)
 	}
 
 	// Find .api files

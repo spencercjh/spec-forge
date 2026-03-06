@@ -48,7 +48,7 @@ func TestAPIFilePatcher_checkNeedsPatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			apiFile := filepath.Join(dir, "test.api")
-			if err := os.WriteFile(apiFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(apiFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatalf("failed to write test file: %v", err)
 			}
 
@@ -78,7 +78,7 @@ service test-api {
 
 	dir := t.TempDir()
 	apiFile := filepath.Join(dir, "test.api")
-	if err := os.WriteFile(apiFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(apiFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -112,11 +112,11 @@ func TestAPIFilePatcher_PatchAPIFiles(t *testing.T) {
 
 	// File that needs patching
 	file1 := filepath.Join(dir, "api1.api")
-	os.WriteFile(file1, []byte("prefix: /api/alert-center"), 0644)
+	os.WriteFile(file1, []byte("prefix: /api/alert-center"), 0o644)
 
 	// File that doesn't need patching
 	file2 := filepath.Join(dir, "api2.api")
-	os.WriteFile(file2, []byte(`prefix: "/api/alert-center"`), 0644)
+	os.WriteFile(file2, []byte(`prefix: "/api/alert-center"`), 0o644)
 
 	patcher := NewAPIFilePatcher()
 	result, err := patcher.PatchAPIFiles([]string{file1, file2})
@@ -144,7 +144,7 @@ func TestAPIFilePatcher_PatchAPIFiles(t *testing.T) {
 func TestAPIFilePatcher_Cleanup(t *testing.T) {
 	dir := t.TempDir()
 	apiFile := filepath.Join(dir, "test.api")
-	os.WriteFile(apiFile, []byte("prefix: /api/alert-center"), 0644)
+	os.WriteFile(apiFile, []byte("prefix: /api/alert-center"), 0o644)
 
 	patcher := NewAPIFilePatcher()
 	patcher.PatchAPIFiles([]string{apiFile})
@@ -200,7 +200,7 @@ func TestValidateAPIFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			apiFile := filepath.Join(dir, "test.api")
-			if err := os.WriteFile(apiFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(apiFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatalf("failed to write test file: %v", err)
 			}
 

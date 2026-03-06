@@ -1,6 +1,7 @@
 package gozero
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi2"
@@ -131,7 +132,7 @@ func TestPatchSwagger_SkipDashParameters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			doc := &openapi2.T{
 				Paths: map[string]*openapi2.PathItem{
-				tt.path: {
+					tt.path: {
 						Get: &openapi2.Operation{
 							Parameters: tt.params,
 						},
@@ -375,7 +376,7 @@ func TestContains(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := contains(tt.slice, tt.value)
+			got := slices.Contains(tt.slice, tt.value)
 			assert.Equal(t, tt.want, got)
 		})
 	}

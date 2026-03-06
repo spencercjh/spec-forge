@@ -3,6 +3,7 @@ package gozero
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,9 +13,10 @@ import (
 	"github.com/getkin/kin-openapi/openapi2"
 	"github.com/getkin/kin-openapi/openapi2conv"
 	"github.com/getkin/kin-openapi/openapi3"
+	"gopkg.in/yaml.v3"
+
 	"github.com/spencercjh/spec-forge/internal/executor"
 	"github.com/spencercjh/spec-forge/internal/extractor"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -75,7 +77,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, opts *extr
 
 	// Check if goctl is available
 	if !info.HasGoctl {
-		return nil, fmt.Errorf("goctl command not found in PATH. Please install goctl: go install github.com/zeromicro/go-zero/tools/goctl@latest")
+		return nil, errors.New("goctl command not found in PATH. Please install goctl: go install github.com/zeromicro/go-zero/tools/goctl@latest")
 	}
 
 	// Generate Swagger 2.0 spec using goctl
@@ -120,7 +122,7 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *P
 	// Find the main API file (usually in the api/ directory or the first one found)
 	apiFile := g.findMainAPIFile(workDir, info, patchedFiles)
 	if apiFile == "" {
-		return "", fmt.Errorf("no .api files found in project")
+		return "", errors.New("no .api files found in project")
 	}
 	args = append(args, "-api", apiFile)
 
@@ -160,7 +162,10 @@ func (g *Generator) findMainAPIFile(workDir string, info *ProjectInfo, patchedFi
 
 	// Prefer API files in the api/ directory
 	for _, apiFile := range info.APIFiles {
-		relPath, _ := filepath.Rel(workDir, apiFile)
+		relPath, err := filepath.Rel(workDir, apiFile)
+		if err != nil {
+			continue
+		}
 		if strings.HasPrefix(relPath, "api") || strings.HasPrefix(relPath, "api/") {
 			selectedFile = apiFile
 			break
@@ -188,8 +193,8 @@ func (g *Generator) convertSwaggerToOpenAPI(swaggerPath string, opts *extractor.
 	}
 
 	swagger2Doc := &openapi2.T{}
-	if err := swagger2Doc.UnmarshalJSON(data); err != nil {
-		return nil, fmt.Errorf("failed to parse Swagger 2.0 spec from %s: %w", swaggerPath, err)
+	if unmarshalErr := swagger2Doc.UnmarshalJSON(data); unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to parse Swagger 2.0 spec from %s: %w", swaggerPath, unmarshalErr)
 	}
 
 	// Apply patches for known goctl swagger bugs (#5426-5428)
@@ -227,7 +232,7 @@ func (g *Generator) convertSwaggerToOpenAPI(swaggerPath string, opts *extractor.
 	}
 
 	// Write the converted spec to file
-	if err := os.WriteFile(outputPath, outputData, 0644); err != nil {
+	if err := os.WriteFile(outputPath, outputData, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write OpenAPI 3.0 spec to %s: %w", outputPath, err)
 	}
 
@@ -250,8 +255,8 @@ func marshalYAML(doc *openapi3.T) ([]byte, error) {
 		return nil, err
 	}
 
-	// Parse JSON into interface{}
-	var jsonData interface{}
+	// Parse JSON into any
+	var jsonData any
 	if err := yaml.Unmarshal(data, &jsonData); err != nil {
 		return nil, err
 	}

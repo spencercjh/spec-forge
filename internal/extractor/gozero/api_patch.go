@@ -75,7 +75,7 @@ func (p *APIFilePatcher) checkNeedsPatch(apiFile string) (bool, error) {
 
 	// Pattern: prefix: some-value-with-hyphens (without quotes)
 	// This regex matches prefix: followed by unquoted text containing hyphens
-	re := regexp.MustCompile(`(?m)^\s*prefix:\s*([^"\s][^\s]*-[^\s]*[^"\s\n]*)`)
+	re := regexp.MustCompile(`(?m)^\s*prefix:\s*([^"\s]\S*-\S*[^"\s]*)`)
 
 	return re.Match(content), nil
 }
@@ -98,7 +98,7 @@ func (p *APIFilePatcher) createPatchedFile(apiFile string) (string, error) {
 	defer tempFile.Close()
 
 	// Regex to find unquoted prefix values with hyphens
-	re := regexp.MustCompile(`^(\s*prefix:\s*)([^"\s][^\s]*-[^\s]*[^"\s\n]*)`)
+	re := regexp.MustCompile(`^(\s*prefix:\s*)([^"\s]\S*-\S*[^"\s]*)`)
 
 	scanner := bufio.NewScanner(file)
 	writer := bufio.NewWriter(tempFile)
@@ -166,11 +166,14 @@ func ValidateAPIFile(apiFile string) error {
 		// Check for unquoted prefix with multiple hyphens
 		if strings.Contains(line, "prefix:") && strings.Contains(line, "-") {
 			// Extract the value after prefix:
-			idx := strings.Index(line, "prefix:")
-			value := strings.TrimSpace(line[idx+7:])
+			_, after, found := strings.Cut(line, "prefix:")
+			if !found {
+				continue
+			}
+			value := strings.TrimSpace(after)
 
 			// If value is not quoted and contains hyphens, it might cause issues
-			if len(value) > 0 && value[0] != '"' && strings.Count(value, "-") > 1 {
+			if value != "" && value[0] != '"' && strings.Count(value, "-") > 1 {
 				return fmt.Errorf("API file %s line %d: unquoted prefix value with multiple hyphens detected: %s\n"+
 					"This is a known goctl bug (#5425). Please wrap the value in quotes:\n"+
 					"  prefix: \"%s\"", apiFile, i+1, value, value)

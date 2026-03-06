@@ -2,6 +2,7 @@ package gozero
 
 import (
 	"regexp"
+	"slices"
 
 	"github.com/getkin/kin-openapi/openapi2"
 	"github.com/getkin/kin-openapi/openapi3"
@@ -55,7 +56,7 @@ func patchOperation(op *openapi2.Operation, validPathParams []string) {
 			}
 
 			// Patch #5428: Remove path params not in URL
-			if p.In == "path" && !contains(validPathParams, p.Name) {
+			if p.In == "path" && !slices.Contains(validPathParams, p.Name) {
 				continue
 			}
 
@@ -126,14 +127,4 @@ func extractPathParams(path string) []string {
 	}
 
 	return params
-}
-
-// contains checks if a string slice contains a specific value.
-func contains(slice []string, value string) bool {
-	for _, v := range slice {
-		if v == value {
-			return true
-		}
-	}
-	return false
 }
