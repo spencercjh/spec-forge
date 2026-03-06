@@ -45,7 +45,7 @@ require (
 )
 `
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+	if err := os.WriteFile(goModPath, []byte(goModContent), 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
@@ -91,7 +91,7 @@ go 1.20
 require github.com/zeromicro/go-zero v1.5.0
 `
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+	if err := os.WriteFile(goModPath, []byte(goModContent), 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
@@ -123,7 +123,7 @@ require (
 )
 `
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+	if err := os.WriteFile(goModPath, []byte(goModContent), 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
@@ -153,23 +153,23 @@ go 1.21
 require github.com/zeromicro/go-zero v1.6.0
 `
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+	if err := os.WriteFile(goModPath, []byte(goModContent), 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
 	// Create .api files in different directories
 	apiDir := filepath.Join(tmpDir, "api")
-	if err := os.MkdirAll(apiDir, 0755); err != nil {
+	if err := os.MkdirAll(apiDir, 0o755); err != nil {
 		t.Fatalf("Failed to create api dir: %v", err)
 	}
 
 	apiFile1 := filepath.Join(apiDir, "user.api")
-	if err := os.WriteFile(apiFile1, []byte("syntax = \"v1\""), 0644); err != nil {
+	if err := os.WriteFile(apiFile1, []byte("syntax = \"v1\""), 0o644); err != nil {
 		t.Fatalf("Failed to create .api file: %v", err)
 	}
 
 	apiFile2 := filepath.Join(tmpDir, "order.api")
-	if err := os.WriteFile(apiFile2, []byte("syntax = \"v1\""), 0644); err != nil {
+	if err := os.WriteFile(apiFile2, []byte("syntax = \"v1\""), 0o644); err != nil {
 		t.Fatalf("Failed to create .api file: %v", err)
 	}
 
@@ -195,24 +195,24 @@ go 1.21
 require github.com/zeromicro/go-zero v1.6.0
 `
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+	if err := os.WriteFile(goModPath, []byte(goModContent), 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
 	// Create .api file in main directory
 	apiFile := filepath.Join(tmpDir, "main.api")
-	if err := os.WriteFile(apiFile, []byte("syntax = \"v1\""), 0644); err != nil {
+	if err := os.WriteFile(apiFile, []byte("syntax = \"v1\""), 0o644); err != nil {
 		t.Fatalf("Failed to create .api file: %v", err)
 	}
 
 	// Create vendor directory with .api file (should be skipped)
 	vendorDir := filepath.Join(tmpDir, "vendor", "github.com", "example")
-	if err := os.MkdirAll(vendorDir, 0755); err != nil {
+	if err := os.MkdirAll(vendorDir, 0o755); err != nil {
 		t.Fatalf("Failed to create vendor dir: %v", err)
 	}
 
 	vendorAPIFile := filepath.Join(vendorDir, "vendor.api")
-	if err := os.WriteFile(vendorAPIFile, []byte("syntax = \"v1\""), 0644); err != nil {
+	if err := os.WriteFile(vendorAPIFile, []byte("syntax = \"v1\""), 0o644); err != nil {
 		t.Fatalf("Failed to create vendor .api file: %v", err)
 	}
 
@@ -243,24 +243,24 @@ go 1.21
 require github.com/zeromicro/go-zero v1.6.0
 `
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+	if err := os.WriteFile(goModPath, []byte(goModContent), 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
 	// Create .api file in main directory
 	apiFile := filepath.Join(tmpDir, "main.api")
-	if err := os.WriteFile(apiFile, []byte("syntax = \"v1\""), 0644); err != nil {
+	if err := os.WriteFile(apiFile, []byte("syntax = \"v1\""), 0o644); err != nil {
 		t.Fatalf("Failed to create .api file: %v", err)
 	}
 
 	// Create hidden directory with .api file (should be skipped)
 	hiddenDir := filepath.Join(tmpDir, ".git", "hooks")
-	if err := os.MkdirAll(hiddenDir, 0755); err != nil {
+	if err := os.MkdirAll(hiddenDir, 0o755); err != nil {
 		t.Fatalf("Failed to create hidden dir: %v", err)
 	}
 
 	hiddenAPIFile := filepath.Join(hiddenDir, "hidden.api")
-	if err := os.WriteFile(hiddenAPIFile, []byte("syntax = \"v1\""), 0644); err != nil {
+	if err := os.WriteFile(hiddenAPIFile, []byte("syntax = \"v1\""), 0o644); err != nil {
 		t.Fatalf("Failed to create hidden .api file: %v", err)
 	}
 
@@ -292,7 +292,7 @@ func TestDetector_Detect_EmptyProject(t *testing.T) {
 	goModContent := `module example.com/empty
 `
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+	if err := os.WriteFile(goModPath, []byte(goModContent), 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 

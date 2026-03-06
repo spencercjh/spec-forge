@@ -2,28 +2,74 @@
 package gozero
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
-	"github.com/spencercjh/spec-forge/internal/extractor"
+	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
-// Patcher patches go-zero projects for OpenAPI generation.
+// Patcher checks and ensures goctl tool is available for go-zero projects.
 type Patcher struct {
+	exec executor.Interface
 }
 
-// NewPatcher creates a new Patcher instance.
+// NewPatcher creates a new Patcher instance with the default executor.
 func NewPatcher() *Patcher {
-	return &Patcher{}
+	return &Patcher{
+		exec: executor.NewExecutor(),
+	}
 }
 
-// Patch modifies the project to enable OpenAPI generation.
-func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) error {
-	// TODO: Implement go-zero project patching for goctl compatibility
-	return fmt.Errorf("not implemented: go-zero project patching")
+// NewPatcherWithExecutor creates a new Patcher instance with a custom executor.
+// This is primarily used for testing.
+func NewPatcherWithExecutor(exec executor.Interface) *Patcher {
+	return &Patcher{
+		exec: exec,
+	}
 }
 
-// Restore restores the project to its original state.
-func (p *Patcher) Restore(projectPath string) error {
-	// TODO: Implement restoration of patched files
-	return fmt.Errorf("not implemented: go-zero project restore")
+// PatchResult contains the result of a patch operation.
+type PatchResult struct {
+	GoctlAvailable bool   // Whether goctl is available
+	GoctlVersion   string // Version of goctl if available
+}
+
+// Patch checks if goctl is installed and available.
+// For go-zero projects, patching primarily involves verifying that goctl
+// (the go-zero toolchain) is available for API processing.
+func (p *Patcher) Patch(_ string) (*PatchResult, error) {
+	ctx := context.Background()
+
+	opts := &executor.ExecuteOptions{
+		Command: "goctl",
+		Args:    []string{"--version"},
+	}
+
+	result, err := p.exec.Execute(ctx, opts)
+	if err != nil {
+		// Check if the command was not found
+		var cmdNotFound *executor.CommandNotFoundError
+		if errors.As(err, &cmdNotFound) {
+			return nil, errors.New(
+				"goctl is not installed. goctl is required for processing go-zero API files.\n" +
+					"To install goctl, run:\n" +
+					"  go install github.com/zeromicro/go-zero/tools/goctl@latest",
+			)
+		}
+
+		// Command failed (non-zero exit code)
+		return nil, fmt.Errorf("goctl version check failed: %w", err)
+	}
+
+	// goctl is available
+	return &PatchResult{
+		GoctlAvailable: true,
+		GoctlVersion:   result.Stdout,
+	}, nil
+}
+
+// NeedsPatch always returns true for go-zero projects since we need to verify goctl availability.
+func (p *Patcher) NeedsPatch(_ *ProjectInfo) bool {
+	return true
 }
