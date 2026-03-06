@@ -17,3 +17,15 @@ const (
 const (
 	GoctlPackage = "github.com/zeromicro/go-zero/tools/goctl"
 )
+
+// ProjectInfo contains detected information about a go-zero project.
+type ProjectInfo struct {
+	BuildTool     extractor.BuildTool // Always "gomodules" for go-zero
+	BuildFilePath string              // Path to go.mod
+	ModuleName    string              // Module name from go.mod
+	GoVersion     string              // Go version from go.mod
+	HasGoZeroDeps bool                // Whether go-zero dependencies exist
+	GoZeroVersion string              // go-zero version if detected
+	APIFiles      []string            // List of .api file paths
+	HasGoctl      bool                // Whether goctl is available
+}
