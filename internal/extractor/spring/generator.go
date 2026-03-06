@@ -21,18 +21,31 @@ func wrapCommandError(err error) error {
 	return err
 }
 
+// maxErrorOutputLength is the maximum length of error output to include in error messages.
+const maxErrorOutputLength = 8 * 1024 // 8KB
+
 // combineOutput combines stdout and stderr for error messages.
 // Build tools like Maven/Gradle often output errors to stdout.
 func combineOutput(stdout, stderr string) string {
 	stdout = strings.TrimSpace(stdout)
 	stderr = strings.TrimSpace(stderr)
+
+	var combined string
 	if stdout == "" {
-		return stderr
+		combined = stderr
+	} else if stderr == "" {
+		combined = stdout
+	} else {
+		combined = stdout + "\n" + stderr
 	}
-	if stderr == "" {
-		return stdout
-	}
-	return stdout + "\n" + stderr
+
+	// Truncate if too long to avoid log bloat
+	if len(combined) > maxErrorOutputLength {
+	 truncated := combined[len(combined)-maxErrorOutputLength:]
+        combined = fmt.Sprintf("%s\n... (truncated, showing last %d bytes)", truncated)
+    }
+
+    return combined
 }
 
 const (
