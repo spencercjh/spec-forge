@@ -20,7 +20,7 @@ func NewLocalPublisher() *LocalPublisher {
 
 // Name returns the publisher name.
 func (p *LocalPublisher) Name() string {
-	return "local"
+	return publisherLocal
 }
 
 // Publish writes an OpenAPI spec to a local file.
@@ -42,9 +42,9 @@ func (p *LocalPublisher) Publish(ctx context.Context, spec *openapi3.T, opts *Pu
 	format := opts.Format
 	if format == "" {
 		if filepath.Ext(opts.OutputPath) == ".json" {
-			format = "json"
+			format = formatJSON
 		} else {
-			format = "yaml"
+			format = formatYAML
 		}
 	}
 
