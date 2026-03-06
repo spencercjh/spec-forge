@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/spencercjh/spec-forge/internal/extractor/gozero"
 )
 
@@ -15,16 +16,12 @@ func TestNewGenerator(t *testing.T) {
 	}
 }
 
-func TestGenerator_Generate_NotImplemented(t *testing.T) {
+func TestGenerator_Generate_NoGoMod(t *testing.T) {
 	g := gozero.NewGenerator()
 	ctx := context.Background()
-	_, err := g.Generate(ctx, "/tmp/test-project", nil, nil)
+	_, err := g.Generate(ctx, "/tmp/non-existent-project", &extractor.GenerateOptions{})
 
 	if err == nil {
-		t.Error("Generate should return error for unimplemented method")
-	}
-
-	if err != nil && err.Error() != "not implemented: go-zero spec generation" {
-		t.Errorf("Generate error message = %v, want 'not implemented: go-zero spec generation'", err)
+		t.Error("Generate should return error for project without go.mod")
 	}
 }
