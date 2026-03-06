@@ -187,17 +187,18 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		}
 
 		// Build publish options
+		// Only allow automatic overwrite for local publisher; default to no overwrite for others
 		pubOpts := &publisher.PublishOptions{
 			OutputPath: filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath)),
 			Format:     config.Get().Output.Format,
-			Overwrite:  true,
+			Overwrite:  pub.Name() == "local",
 		}
 
 		// Add ReadMe-specific options if using ReadMe publisher
 		if pub.Name() == "readme" {
 			cfg := config.Get()
 			pubOpts.ReadMe = &publisher.ReadMeOptions{
-				APIKey:         cfg.ReadMe.APIKey,
+				APIKey:         resolveReadMeAPIKey(cfg.ReadMe),
 				Branch:         cfg.ReadMe.Branch,
 				Slug:           cfg.ReadMe.Slug,
 				UseSpecVersion: cfg.ReadMe.UseSpecVersion,
@@ -422,4 +423,19 @@ func copySpecToOutput(srcPath, outputDir string) error {
 	}
 
 	return nil
+}
+
+// resolveReadMeAPIKey resolves ReadMe API key from config or environment.
+// Priority: 1) cfg.APIKey, 2) cfg.APIKeyEnv (or README_API_KEY as default)
+func resolveReadMeAPIKey(cfg config.ReadMeConfig) string {
+	// First check explicit config
+	if cfg.APIKey != "" {
+		return cfg.APIKey
+	}
+	// Then check environment variable
+	envName := cfg.APIKeyEnv
+	if envName == "" {
+		envName = "README_API_KEY"
+	}
+	return os.Getenv(envName)
 }

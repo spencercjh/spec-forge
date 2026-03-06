@@ -37,8 +37,13 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 		return nil, errors.New("readme options are required")
 	}
 
-	if opts.ReadMe.APIKey == "" {
-		return nil, errors.New("readme API key is required")
+	// Resolve API key from options or environment variable
+	apiKey := opts.ReadMe.APIKey
+	if apiKey == "" {
+		apiKey = os.Getenv("README_API_KEY")
+	}
+	if apiKey == "" {
+		return nil, errors.New("readme API key is required (set --readme-api-key flag or README_API_KEY env var)")
 	}
 
 	// Create temp file for the spec
@@ -80,7 +85,7 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 			env = append(env, v)
 		}
 	}
-	env = append(env, "README_API_KEY="+opts.ReadMe.APIKey)
+	env = append(env, "README_API_KEY="+apiKey)
 	cmd.Env = env
 
 	output, err := cmd.CombinedOutput()

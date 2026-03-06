@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	publishFormat string
-	publishOutput string
-	publishTarget string
+	publishFormat    string
+	publishOutput    string
+	publishTarget    string
+	publishOverwrite bool
 
 	// ReadMe-specific flags
 	readMeAPIKey         string
@@ -71,12 +72,18 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	opts := &publisher.PublishOptions{
 		OutputPath: publishOutput,
 		Format:     publishFormat,
+		Overwrite:  publishOverwrite,
 	}
 
 	// Add ReadMe-specific options if using ReadMe publisher
 	if pub.Name() == "readme" {
+		// Resolve API key from flag or environment variable
+		apiKey := readMeAPIKey
+		if apiKey == "" {
+			apiKey = os.Getenv("README_API_KEY")
+		}
 		opts.ReadMe = &publisher.ReadMeOptions{
-			APIKey:         readMeAPIKey,
+			APIKey:         apiKey,
 			Branch:         readMeBranch,
 			Slug:           readMeSlug,
 			UseSpecVersion: readMeUseSpecVersion,
@@ -105,8 +112,9 @@ func init() {
 	rootCmd.AddCommand(publishCmd)
 
 	publishCmd.Flags().StringVarP(&publishFormat, "format", "f", "yaml", "output format (yaml or json)")
-	publishCmd.Flags().StringVarP(&publishOutput, "output", "o", "./openapi", "output path or directory")
+	publishCmd.Flags().StringVarP(&publishOutput, "output", "o", "./openapi.yaml", "output file path (for local publisher)")
 	publishCmd.Flags().StringVarP(&publishTarget, "to", "t", "local", "publish target (local, readme)")
+	publishCmd.Flags().BoolVar(&publishOverwrite, "overwrite", false, "overwrite existing file")
 
 	// ReadMe-specific flags
 	publishCmd.Flags().StringVar(&readMeAPIKey, "readme-api-key", "", "ReadMe API key (or set README_API_KEY env var)")
