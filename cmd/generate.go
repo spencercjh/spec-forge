@@ -38,6 +38,10 @@ var (
 	generateLanguage string
 	// generateOutput is the output directory for generated spec
 	generateOutput string
+	// generateSkipPublish controls whether to skip publishing
+	generateSkipPublish bool
+	// generatePublishTarget is the publish target (local, readme)
+	generatePublishTarget string
 )
 
 // generateCmd represents the generate command
@@ -168,20 +172,71 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		slog.InfoContext(ctx, "Enrichment skipped", "status", "⏭️")
 	}
 
-	// Step 7: Copy to output directory if specified
-	finalSpecPath := genResult.SpecFilePath
-	if outputDir != "" {
+	// Step 7: Publish the spec (default: local publisher)
+	if !generateSkipPublish {
+		// Determine publish target
+		target := generatePublishTarget
+		if target == "" {
+			target = "local" // Default to local
+		}
+
+		// Create publisher using factory
+		pub, err := publisher.NewPublisher(target)
+		if err != nil {
+			return errWrap("failed to create publisher", err)
+		}
+
+		// Build publish options
+		pubOpts := &publisher.PublishOptions{
+			OutputPath: filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath)),
+			Format:     config.Get().Output.Format,
+			Overwrite:  true,
+		}
+
+		// Add ReadMe-specific options if using ReadMe publisher
+		if pub.Name() == "readme" {
+			cfg := config.Get()
+			pubOpts.ReadMe = &publisher.ReadMeOptions{
+				APIKey:         cfg.ReadMe.APIKey,
+				Branch:         cfg.ReadMe.Branch,
+				Slug:           cfg.ReadMe.Slug,
+				UseSpecVersion: cfg.ReadMe.UseSpecVersion,
+			}
+		}
+
+		// Load spec for publishing
+		loader := openapi3.NewLoader()
+		spec, err := loader.LoadFromFile(genResult.SpecFilePath)
+		if err != nil {
+			return errWrap("failed to load spec for publishing", err)
+		}
+
+		// Publish
+		pubResult, err := pub.Publish(ctx, spec, pubOpts)
+		if err != nil {
+			return errWrap("failed to publish spec", err)
+		}
+
+		slog.InfoContext(ctx, "Spec published",
+			"target", pub.Name(),
+			"path", pubResult.Path,
+			"format", pubResult.Format,
+			"bytes", pubResult.BytesWritten,
+		)
+		if pubResult.Message != "" {
+			slog.InfoContext(ctx, "Publisher output", "message", pubResult.Message)
+		}
+	} else if outputDir != "" {
+		// Skip publish: just copy to output directory
 		if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
 			return errWrap("failed to copy spec to output directory", err)
 		}
-		finalSpecPath = filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
-		slog.InfoContext(ctx, "Spec copied to output directory", "path", finalSpecPath)
+		finalSpecPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
+		slog.InfoContext(ctx, "Spec copied to output directory (publish skipped)", "path", finalSpecPath)
 	}
 
 	// Step 8: Output final result
-	slog.InfoContext(ctx, "Generation complete",
-		"spec_file", finalSpecPath,
-	)
+	slog.InfoContext(ctx, "Generation complete")
 
 	return nil
 }
@@ -201,6 +256,10 @@ func init() {
 		"language for AI-generated descriptions (e.g., en, zh)")
 	generateCmd.Flags().StringVarP(&generateOutput, "output", "o", "",
 		"output directory for generated spec (default: project's target/build dir)")
+	generateCmd.Flags().BoolVar(&generateSkipPublish, "skip-publish", false,
+		"skip publishing the generated spec (just copy to output directory)")
+	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "local",
+		"publish target (local, readme)")
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
