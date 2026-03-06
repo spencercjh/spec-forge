@@ -110,6 +110,7 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 			Command:  opts.Command,
 			Args:     opts.Args,
 			ExitCode: result.ExitCode,
+			Stdout:   result.Stdout,
 			Stderr:   result.Stderr,
 			Err:      err,
 		}
@@ -137,15 +138,30 @@ type CommandFailedError struct {
 	Command  string
 	Args     []string
 	ExitCode int
+	Stdout   string
 	Stderr   string
 	Err      error
 }
 
 func (e *CommandFailedError) Error() string {
-	if e.Stderr != "" {
-		return fmt.Sprintf("command '%s' failed with exit code %d: %s", e.Command, e.ExitCode, e.Stderr)
+	// Build tools like Maven/Gradle often output errors to stdout, not stderr
+	// Combine both for better error messages
+	var output strings.Builder
+	if e.Stdout != "" {
+		output.WriteString(e.Stdout)
 	}
-	return fmt.Sprintf("command '%s' failed with exit code %d", e.Command, e.ExitCode)
+	if e.Stderr != "" {
+		if output.Len() > 0 {
+			output.WriteString("\n")
+		}
+		output.WriteString(e.Stderr)
+	}
+
+	combined := strings.TrimSpace(output.String())
+	if combined != "" {
+		return fmt.Sprintf("command '%s' failed with exit code %d:\n%s", e.Command, e.ExitCode, combined)
+	}
+	return fmt.Sprintf("command '%s' failed with exit code %d (no output)", e.Command, e.ExitCode)
 }
 
 func (e *CommandFailedError) Unwrap() error {

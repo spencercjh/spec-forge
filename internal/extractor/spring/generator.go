@@ -21,6 +21,20 @@ func wrapCommandError(err error) error {
 	return err
 }
 
+// combineOutput combines stdout and stderr for error messages.
+// Build tools like Maven/Gradle often output errors to stdout.
+func combineOutput(stdout, stderr string) string {
+	stdout = strings.TrimSpace(stdout)
+	stderr = strings.TrimSpace(stderr)
+	if stdout == "" {
+		return stderr
+	}
+	if stderr == "" {
+		return stdout
+	}
+	return stdout + "\n" + stderr
+}
+
 const (
 	defaultOutputFileName = "openapi"
 	defaultFormat         = "json"
@@ -211,7 +225,7 @@ func (g *Generator) generateMaven(ctx context.Context, workDir string, _ *extrac
 	}
 
 	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("maven generation failed with exit code %d: %s", result.ExitCode, result.Stderr)
+		return nil, fmt.Errorf("maven generation failed with exit code %d:\n%s", result.ExitCode, combineOutput(result.Stdout, result.Stderr))
 	}
 
 	// Find the generated spec file
@@ -254,7 +268,7 @@ func (g *Generator) generateGradle(ctx context.Context, workDir string, _ *extra
 	}
 
 	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("gradle generation failed with exit code %d: %s", result.ExitCode, result.Stderr)
+		return nil, fmt.Errorf("gradle generation failed with exit code %d:\n%s", result.ExitCode, combineOutput(result.Stdout, result.Stderr))
 	}
 
 	// Find the generated spec file
