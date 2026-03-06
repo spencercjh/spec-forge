@@ -3,9 +3,15 @@ package publisher
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
+
+// ErrUnknownPublisher is returned when an unknown publisher type is requested.
+var ErrUnknownPublisher = errors.New("unknown publisher type")
 
 // PublishOptions configures how the OpenAPI spec is published.
 type PublishOptions struct {
@@ -35,12 +41,15 @@ type ReadMeOptions struct {
 
 // PublishResult contains the result of publishing an OpenAPI spec.
 type PublishResult struct {
-	// Path is the absolute path to the published spec file
+	// Path is the absolute path to the published spec file (local publisher)
+	// or a URL/identifier for remote publishers (e.g., ReadMe)
 	Path string
 	// Format is the output format used
 	Format string
 	// BytesWritten is the number of bytes written
 	BytesWritten int
+	// Message contains additional info (e.g., CLI output for remote publishers)
+	Message string
 }
 
 // Publisher defines the interface for publishing OpenAPI specs.
@@ -54,17 +63,23 @@ type Publisher interface {
 
 // Format constants
 const (
-	formatJSON = "json"
-	formatYAML = "yaml"
+	formatJSON      = "json"
+	formatYAML      = "yaml"
+	publisherLocal  = "local"
+	publisherReadme = "readme"
 )
 
 // NewPublisher creates a Publisher based on the destination type.
 // Supported types: "local" (default), "readme"
-func NewPublisher(destType string) Publisher {
-	switch destType {
-	case "readme":
-		return NewReadMePublisher()
+// For unknown types, returns error.
+func NewPublisher(destType string) (Publisher, error) {
+	normalizedType := strings.ToLower(strings.TrimSpace(destType))
+	switch normalizedType {
+	case publisherLocal, "":
+		return NewLocalPublisher(), nil
+	case publisherReadme:
+		return NewReadMePublisher(), nil
 	default:
-		return NewLocalPublisher()
+		return nil, fmt.Errorf("%w: %q", ErrUnknownPublisher, destType)
 	}
 }

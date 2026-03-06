@@ -38,6 +38,12 @@ var (
 	generateLanguage string
 	// generateOutput is the output directory for generated spec
 	generateOutput string
+	// generateSkipPublish controls whether to skip publishing
+	generateSkipPublish bool
+	// generatePublishTarget is the publish target (local, readme)
+	generatePublishTarget string
+	// generatePublishOverwrite controls whether to overwrite existing remote spec
+	generatePublishOverwrite bool
 )
 
 // generateCmd represents the generate command
@@ -168,20 +174,72 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		slog.InfoContext(ctx, "Enrichment skipped", "status", "⏭️")
 	}
 
-	// Step 7: Copy to output directory if specified
-	finalSpecPath := genResult.SpecFilePath
-	if outputDir != "" {
+	// Step 7: Publish the spec (default: local publisher)
+	if !generateSkipPublish {
+		// Determine publish target
+		target := generatePublishTarget
+		if target == "" {
+			target = "local" // Default to local
+		}
+
+		// Create publisher using factory
+		pub, err := publisher.NewPublisher(target)
+		if err != nil {
+			return errWrap("failed to create publisher", err)
+		}
+
+		// Build publish options
+		// Default to overwrite for all publishers (convenient for CI), user can disable with --publish-overwrite=false
+		pubOpts := &publisher.PublishOptions{
+			OutputPath: filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath)),
+			Format:     config.Get().Output.Format,
+			Overwrite:  generatePublishOverwrite,
+		}
+
+		// Add ReadMe-specific options if using ReadMe publisher
+		if pub.Name() == "readme" {
+			cfg := config.Get()
+			pubOpts.ReadMe = &publisher.ReadMeOptions{
+				APIKey:         resolveReadMeAPIKey(cfg.ReadMe),
+				Branch:         cfg.ReadMe.Branch,
+				Slug:           cfg.ReadMe.Slug,
+				UseSpecVersion: cfg.ReadMe.UseSpecVersion,
+			}
+		}
+
+		// Load spec for publishing
+		loader := openapi3.NewLoader()
+		spec, err := loader.LoadFromFile(genResult.SpecFilePath)
+		if err != nil {
+			return errWrap("failed to load spec for publishing", err)
+		}
+
+		// Publish
+		pubResult, err := pub.Publish(ctx, spec, pubOpts)
+		if err != nil {
+			return errWrap("failed to publish spec", err)
+		}
+
+		slog.InfoContext(ctx, "Spec published",
+			"target", pub.Name(),
+			"path", pubResult.Path,
+			"format", pubResult.Format,
+			"bytes", pubResult.BytesWritten,
+		)
+		if pubResult.Message != "" {
+			slog.InfoContext(ctx, "Publisher output", "message", pubResult.Message)
+		}
+	} else if outputDir != "" {
+		// Skip publish: just copy to output directory
 		if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
 			return errWrap("failed to copy spec to output directory", err)
 		}
-		finalSpecPath = filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
-		slog.InfoContext(ctx, "Spec copied to output directory", "path", finalSpecPath)
+		finalSpecPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
+		slog.InfoContext(ctx, "Spec copied to output directory (publish skipped)", "path", finalSpecPath)
 	}
 
 	// Step 8: Output final result
-	slog.InfoContext(ctx, "Generation complete",
-		"spec_file", finalSpecPath,
-	)
+	slog.InfoContext(ctx, "Generation complete")
 
 	return nil
 }
@@ -201,6 +259,12 @@ func init() {
 		"language for AI-generated descriptions (e.g., en, zh)")
 	generateCmd.Flags().StringVarP(&generateOutput, "output", "o", "",
 		"output directory for generated spec (default: project's target/build dir)")
+	generateCmd.Flags().BoolVar(&generateSkipPublish, "skip-publish", false,
+		"skip publishing the generated spec (just copy to output directory)")
+	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "local",
+		"publish target (local, readme)")
+	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
+		"overwrite existing spec (applies to both local and remote publishers)")
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
@@ -363,4 +427,19 @@ func copySpecToOutput(srcPath, outputDir string) error {
 	}
 
 	return nil
+}
+
+// resolveReadMeAPIKey resolves ReadMe API key from config or environment.
+// Priority: 1) cfg.APIKey, 2) cfg.APIKeyEnv (or README_API_KEY as default)
+func resolveReadMeAPIKey(cfg config.ReadMeConfig) string {
+	// First check explicit config
+	if cfg.APIKey != "" {
+		return cfg.APIKey
+	}
+	// Then check environment variable
+	envName := cfg.APIKeyEnv
+	if envName == "" {
+		envName = "README_API_KEY"
+	}
+	return os.Getenv(envName)
 }

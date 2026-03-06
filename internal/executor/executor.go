@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-
-	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
 // Default timeout for command execution.
@@ -21,7 +19,11 @@ type ExecuteOptions struct {
 	Args       []string      // Command arguments
 	WorkingDir string        // Working directory for the command
 	Timeout    time.Duration // Execution timeout (default: 5 minutes)
-	Env        []string      // Additional environment variables
+	Env        []string      // Environment variables (replaces entire env if set)
+	// EnvAppendMode determines how Env is applied:
+	// - false (default): Env replaces the entire environment (useful for security-sensitive vars)
+	// - true: Env is appended to the current environment
+	EnvAppendMode bool
 }
 
 // ExecuteResult contains the result of command execution.
@@ -67,7 +69,11 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 	}
 
 	if len(opts.Env) > 0 {
-		cmd.Env = append(cmd.Environ(), opts.Env...)
+		if opts.EnvAppendMode {
+			cmd.Env = append(cmd.Environ(), opts.Env...)
+		} else {
+			cmd.Env = opts.Env
+		}
 	}
 
 	var stdout, stderr strings.Builder
@@ -178,13 +184,9 @@ func getInstallHint(command string) string {
 		return "Install Maven from https://maven.apache.org/install.html or use your package manager"
 	case "gradle":
 		return "Install Gradle from https://gradle.org/install/ or use your package manager"
+	case "rdme":
+		return "Install rdme from https://github.com/readmeio/rdme#installation (npm install -g rdme)"
 	default:
 		return ""
 	}
 }
-
-// Compile-time assertion that Executor implements Interface.
-var _ Interface = (*Executor)(nil)
-
-// Compile-time assertion for extractor types usage.
-var _ = extractor.GenerateOptions{}
