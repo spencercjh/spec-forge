@@ -56,6 +56,7 @@ func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.P
 	info := &extractor.ProjectInfo{
 		BuildTool:     BuildToolMaven,
 		BuildFilePath: pomPath,
+		Framework:     extractor.FrameworkSpringBoot,
 	}
 
 	// Parse pom.xml
@@ -112,6 +113,7 @@ func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extract
 	info := &extractor.ProjectInfo{
 		BuildTool:     BuildToolGradle,
 		BuildFilePath: gradlePath,
+		Framework:     extractor.FrameworkSpringBoot,
 	}
 
 	// Check for multi-module project via settings.gradle
