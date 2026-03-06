@@ -5,20 +5,29 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
+
+	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
 // ReadMePublisher publishes OpenAPI specs to ReadMe.com using the rdme CLI.
-type ReadMePublisher struct{}
+type ReadMePublisher struct {
+	exec executor.Interface
+}
 
-// NewReadMePublisher creates a new ReadMePublisher.
+// NewReadMePublisher creates a new ReadMePublisher with default executor.
 func NewReadMePublisher() *ReadMePublisher {
-	return &ReadMePublisher{}
+	return NewReadMePublisherWithExecutor(executor.NewExecutor())
+}
+
+// NewReadMePublisherWithExecutor creates a new ReadMePublisher with the given executor.
+// This is useful for testing with a mock executor.
+func NewReadMePublisherWithExecutor(exec executor.Interface) *ReadMePublisher {
+	return &ReadMePublisher{exec: exec}
 }
 
 // Name returns the publisher name.
@@ -73,24 +82,18 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 	// Build rdme command args (without API key)
 	args := p.buildArgs(tmpFile, opts)
 
-	// Execute rdme CLI with API key via environment variable
+	// Build sanitized environment with API key
 	// SECURITY: API key is passed via env var to avoid leaking in process listings
-	cmd := exec.CommandContext(ctx, "rdme", args...)
+	env := p.buildEnv(apiKey)
 
-	// Ensure README_API_KEY is set deterministically by removing all existing entries
-	// and appending exactly one README_API_KEY=<key> entry.
-	env := make([]string, 0, len(os.Environ())+1)
-	for _, v := range os.Environ() {
-		if !strings.HasPrefix(v, "README_API_KEY=") {
-			env = append(env, v)
-		}
-	}
-	env = append(env, "README_API_KEY="+apiKey)
-	cmd.Env = env
-
-	output, err := cmd.CombinedOutput()
+	// Execute rdme CLI via executor
+	result, err := p.exec.Execute(ctx, &executor.ExecuteOptions{
+		Command: "rdme",
+		Args:    args,
+		Env:     env,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("rdme command failed: %w\noutput: %s", err, string(output))
+		return nil, p.wrapExecuteError(err, result)
 	}
 
 	// Build location identifier for the uploaded spec
@@ -100,7 +103,7 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 		Path:         location,
 		Format:       format,
 		BytesWritten: len(data),
-		Message:      strings.TrimSpace(string(output)),
+		Message:      strings.TrimSpace(result.Stdout),
 	}, nil
 }
 
@@ -151,6 +154,19 @@ func (p *ReadMePublisher) buildArgs(specPath string, opts *PublishOptions) []str
 	return args
 }
 
+// buildEnv creates a sanitized environment with README_API_KEY set deterministically.
+// It filters out any existing README_API_KEY entries to avoid duplicates.
+func (p *ReadMePublisher) buildEnv(apiKey string) []string {
+	env := make([]string, 0, len(os.Environ())+1)
+	for _, v := range os.Environ() {
+		if !strings.HasPrefix(v, "README_API_KEY=") {
+			env = append(env, v)
+		}
+	}
+	env = append(env, "README_API_KEY="+apiKey)
+	return env
+}
+
 // buildLocation creates a human-readable location string for the uploaded spec.
 func (p *ReadMePublisher) buildLocation(opts *ReadMeOptions) string {
 	var parts []string
@@ -168,4 +184,36 @@ func (p *ReadMePublisher) buildLocation(opts *ReadMeOptions) string {
 	}
 
 	return "readme.com/" + strings.Join(parts, "/")
+}
+
+// wrapExecuteError wraps executor errors with appropriate context.
+func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteResult) error {
+	// Handle command not found
+	var cmdNotFound *executor.CommandNotFoundError
+	if errors.As(err, &cmdNotFound) {
+		return fmt.Errorf("rdme CLI not found: %w", err)
+	}
+
+	// Handle command failure - include output for debugging
+	var cmdFailed *executor.CommandFailedError
+	if errors.As(err, &cmdFailed) {
+		output := cmdFailed.Stdout
+		if cmdFailed.Stderr != "" {
+			output += "\n" + cmdFailed.Stderr
+		}
+		return fmt.Errorf("rdme command failed: %w\noutput: %s", err, strings.TrimSpace(output))
+	}
+
+	// Other errors (timeout, etc.)
+	if result != nil {
+		output := result.Stdout
+		if result.Stderr != "" {
+			output += "\n" + result.Stderr
+		}
+		if output != "" {
+			return fmt.Errorf("rdme command failed: %w\noutput: %s", err, strings.TrimSpace(output))
+		}
+	}
+
+	return fmt.Errorf("rdme command failed: %w", err)
 }
