@@ -10,6 +10,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tmc/langchaingo v0.1.14
 	github.com/vifraa/gopom v1.0.0
+	golang.org/x/mod v0.33.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

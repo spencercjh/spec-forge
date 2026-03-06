@@ -2,7 +2,6 @@
 package gozero
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/spencercjh/spec-forge/internal/extractor"
+	"golang.org/x/mod/modfile"
 )
 
 // Detector detects go-zero project information.
@@ -65,82 +65,36 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 
 // parseGoMod parses the go.mod file and extracts project information.
 func (d *Detector) parseGoMod(goModPath string, info *Info) error {
-	file, err := os.Open(goModPath)
+	data, err := os.ReadFile(goModPath)
 	if err != nil {
-		return fmt.Errorf("failed to open go.mod: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	inRequireBlock := false
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		trimmed := strings.TrimSpace(line)
-
-		// Skip empty lines and comments
-		if trimmed == "" || strings.HasPrefix(trimmed, "//") {
-			continue
-		}
-
-		// Parse module name
-		fields := strings.Fields(trimmed)
-		if len(fields) >= 2 && fields[0] == "module" {
-			info.ModuleName = fields[1]
-			continue
-		}
-
-		// Parse go version
-		if len(fields) >= 2 && fields[0] == "go" {
-			info.GoVersion = fields[1]
-			continue
-		}
-
-		// Detect require block start
-		if strings.HasPrefix(trimmed, "require (") {
-			inRequireBlock = true
-			continue
-		}
-
-		// Detect require block end
-		if inRequireBlock && trimmed == ")" {
-			inRequireBlock = false
-			continue
-		}
-
-		// Parse require statements (inside or outside block)
-		d.parseRequireLine(trimmed, inRequireBlock, info)
+		return fmt.Errorf("failed to read go.mod: %w", err)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading go.mod: %w", err)
+	f, err := modfile.Parse(goModPath, data, nil)
+	if err != nil {
+		return fmt.Errorf("failed to parse go.mod: %w", err)
+	}
+
+	// Extract module name
+	if f.Module != nil {
+		info.ModuleName = f.Module.Mod.Path
+	}
+
+	// Extract Go version
+	if f.Go != nil {
+		info.GoVersion = f.Go.Version
+	}
+
+	// Check for go-zero dependency
+	for _, req := range f.Require {
+		if req != nil && strings.Contains(req.Mod.Path, "go-zero") {
+			info.HasGoZeroDeps = true
+			info.GoZeroVersion = req.Mod.Version
+			break
+		}
 	}
 
 	return nil
-}
-
-// parseRequireLine parses a single require line and extracts go-zero dependency info.
-func (d *Detector) parseRequireLine(line string, inRequireBlock bool, info *Info) {
-	fields := strings.Fields(line)
-
-	// Handle single-line require: require github.com/zeromicro/go-zero v1.6.0
-	if len(fields) >= 3 && fields[0] == "require" && !inRequireBlock {
-		if strings.Contains(fields[1], "go-zero") {
-			info.HasGoZeroDeps = true
-			info.GoZeroVersion = fields[2]
-		}
-		return
-	}
-
-	// Handle require block entries: github.com/zeromicro/go-zero v1.6.0
-	if inRequireBlock && len(fields) >= 2 {
-		if strings.Contains(fields[0], "go-zero") {
-			info.HasGoZeroDeps = true
-			if len(fields) >= 2 {
-				info.GoZeroVersion = fields[1]
-			}
-		}
-	}
 }
 
 // findAPIFiles walks the project directory and finds all .api files.
