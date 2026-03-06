@@ -50,7 +50,7 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 	// Determine format
 	format := opts.Format
 	if format == "" {
-		format = "yaml"
+		format = formatYAML
 	}
 
 	// Write spec to temp file
@@ -83,7 +83,7 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 
 func (p *ReadMePublisher) marshalSpec(spec *openapi3.T, format string) ([]byte, error) {
 	switch format {
-	case "json":
+	case formatJSON:
 		return spec.MarshalJSON()
 	default:
 		yamlData, err := spec.MarshalYAML()

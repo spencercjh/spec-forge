@@ -23,7 +23,8 @@ type PublishOptions struct {
 // ReadMeOptions contains ReadMe-specific publishing options.
 type ReadMeOptions struct {
 	// APIKey is the ReadMe project API key (required)
-	APIKey string
+	//nolint:gosec // G117
+	APIKey string `json:"apiKey"`
 	// Branch is the ReadMe project version (default: stable)
 	Branch string
 	// Slug is the unique identifier for the API definition
@@ -50,6 +51,12 @@ type Publisher interface {
 	// Name returns the publisher name (e.g., "local", "apifox", "postman")
 	Name() string
 }
+
+// Format constants
+const (
+	formatJSON = "json"
+	formatYAML = "yaml"
+)
 
 // NewPublisher creates a Publisher based on the destination type.
 // Supported types: "local" (default), "readme"
