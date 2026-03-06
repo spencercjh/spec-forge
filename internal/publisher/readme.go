@@ -191,6 +191,9 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 	// Handle command not found
 	var cmdNotFound *executor.CommandNotFoundError
 	if errors.As(err, &cmdNotFound) {
+		if strings.TrimSpace(cmdNotFound.Hint) != "" {
+			return fmt.Errorf("rdme CLI not found: %w\n%s", err, strings.TrimSpace(cmdNotFound.Hint))
+		}
 		return fmt.Errorf("rdme CLI not found: %w", err)
 	}
 

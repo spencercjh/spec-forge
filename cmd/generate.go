@@ -263,7 +263,7 @@ func init() {
 		"skip publishing the generated spec (just copy to output directory)")
 	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "local",
 		"publish target (local, readme)")
-	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", true,
+	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
 		"overwrite existing spec (for remote publishers like ReadMe)")
 }
 

@@ -256,20 +256,17 @@ readme:
 
 ### Testing with Standalone Publish Command
 
+**Recommended (Secure):** Use environment variable for API key:
 ```bash
-# Method 1: Using environment variable for API key
 README_API_KEY="rdme_xxx" ./build/spec-forge publish \
     ./integration-tests/maven-springboot-openapi-demo/target/openapi.json \
     --to readme \
     --readme-slug "your-api-slug"
-
-# Method 2: Using flag for API key
-./build/spec-forge publish \
-    ./integration-tests/maven-springboot-openapi-demo/target/openapi.json \
-    --to readme \
-    --readme-api-key "rdme_xxx" \
-    --readme-slug "your-api-slug"
 ```
+
+**Security Note:** Do NOT pass API keys via `--readme-api-key` flag in production,
+as it may be visible to other users via process listings (`ps`, `/proc/<pid>/cmdline`).
+Always supply secrets via environment variables.
 
 ### Testing with Full Generate Pipeline
 
@@ -285,9 +282,9 @@ LLM_API_KEY="your-llm-key" \
 
 ### Overwrite Behavior
 
-By default, `--publish-overwrite` is `true` for CI convenience:
-- **Default (`--publish-overwrite`)**: Automatically overwrites existing ReadMe spec
-- **Safe mode (`--publish-overwrite=false`)**: Prompts for confirmation (or fails in CI)
+By default, `--publish-overwrite` is `false` for safety:
+- **Safe mode (default)**: Preserves existing ReadMe spec, fails if already exists
+- **CI mode (`--publish-overwrite`)**: Automatically overwrites existing spec
 
 ### ReadMe Publisher Security
 

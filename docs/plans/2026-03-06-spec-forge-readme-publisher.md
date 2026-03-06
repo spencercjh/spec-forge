@@ -2,9 +2,9 @@
 
 > **Goal:** Add ReadMe.com publisher to upload OpenAPI specs using the `rdme` CLI tool.
 
-**Architecture:** Implement `ReadMePublisher` that wraps the `rdme openapi upload` CLI command. The publisher writes the spec to a temp file, invokes `rdme` CLI with appropriate flags, and returns the result.
+**Architecture:** Implement `ReadMePublisher` that wraps the `rdme openapi upload` CLI command. The publisher writes the spec to a temp file, uses the shared `executor.Interface` to invoke the `rdme` CLI with appropriate flags, and returns the result.
 
-**Tech Stack:** Go, `os/exec` for CLI invocation, existing `Publisher` interface
+**Tech Stack:** Go, shared `executor.Interface` for CLI invocation (backed by `os/exec` in production), existing `Publisher` interface
 
 ---
 
@@ -336,30 +336,29 @@ func TestReadMePublisher_BuildArgs(t *testing.T) {
 
 ## Future Improvements
 
-### 1. Executor Interface Integration
+### 1. ✓ Executor Interface Integration (COMPLETED)
 
-**Current:** Direct `os/exec` usage
-**Improvement:** Use `internal/executor.Interface` for consistency with `spring/generator.go`
+**Status:** Implemented. ReadMePublisher now uses `executor.Interface` for consistent timeout handling, error wrapping, and testability.
 
 ```go
 type ReadMePublisher struct {
-    executor executor.Interface
+    exec executor.Interface
 }
 
 func NewReadMePublisherWithExecutor(exec executor.Interface) *ReadMePublisher {
-    return &ReadMePublisher{executor: exec}
+    return &ReadMePublisher{exec: exec}
 }
 ```
 
-Benefits:
+Benefits delivered:
 - Consistent timeout handling
 - Easier mocking for tests
 - Centralized command execution logic
+- Command-not-found hints for rdme
 
-### 2. Environment Variable Handling
+### 2. ✓ Environment Variable Handling (COMPLETED)
 
-**Current:** Simple `append` to env
-**Improvement:** Filter existing `README_API_KEY` entries to avoid duplicates
+**Status:** Implemented. `buildEnv()` method filters all existing `README_API_KEY` entries before injecting the resolved key.
 
 ```go
 func sanitizeEnv(env []string) []string {
