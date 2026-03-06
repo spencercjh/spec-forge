@@ -71,7 +71,21 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 	// Execute rdme CLI with API key via environment variable
 	// SECURITY: API key is passed via env var to avoid leaking in process listings
 	cmd := exec.CommandContext(ctx, "rdme", args...)
-	cmd.Env = append(os.Environ(), "README_API_KEY="+opts.ReadMe.APIKey)
+
+	// Ensure README_API_KEY is set deterministically without duplicates
+	env := os.Environ()
+	apiKeySet := false
+	for i, v := range env {
+		if strings.HasPrefix(v, "README_API_KEY=") {
+			env[i] = "README_API_KEY=" + opts.ReadMe.APIKey
+			apiKeySet = true
+			break
+		}
+	}
+	if !apiKeySet {
+		env = append(env, "README_API_KEY="+opts.ReadMe.APIKey)
+	}
+	cmd.Env = env
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
