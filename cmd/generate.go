@@ -42,6 +42,8 @@ var (
 	generateSkipPublish bool
 	// generatePublishTarget is the publish target (local, readme)
 	generatePublishTarget string
+	// generatePublishOverwrite controls whether to overwrite existing remote spec
+	generatePublishOverwrite bool
 )
 
 // generateCmd represents the generate command
@@ -187,11 +189,11 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		}
 
 		// Build publish options
-		// Only allow automatic overwrite for local publisher; default to no overwrite for others
+		// Default to overwrite for all publishers (convenient for CI), user can disable with --publish-overwrite=false
 		pubOpts := &publisher.PublishOptions{
 			OutputPath: filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath)),
 			Format:     config.Get().Output.Format,
-			Overwrite:  pub.Name() == "local",
+			Overwrite:  generatePublishOverwrite,
 		}
 
 		// Add ReadMe-specific options if using ReadMe publisher
@@ -261,6 +263,8 @@ func init() {
 		"skip publishing the generated spec (just copy to output directory)")
 	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "local",
 		"publish target (local, readme)")
+	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", true,
+		"overwrite existing spec (for remote publishers like ReadMe)")
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
