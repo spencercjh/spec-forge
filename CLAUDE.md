@@ -74,6 +74,28 @@ Spring Project → springdoc plugin → openapi.json → Enricher (LLM) → open
 
 ## Critical Constraints
 
+### DCO (Developer Certificate of Origin) - MANDATORY
+
+> **⚠️ IMPORTANT:** All commits MUST include a `Signed-off-by` line. PRs without this will be blocked by DCO check.
+
+**When creating commits, always use the `-s` flag:**
+
+```bash
+git commit -s -m "your message"
+```
+
+This automatically adds:
+```
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+**If DCO check fails on existing commits, fix with:**
+```bash
+# Rebase all commits since main and add signoff
+git rebase -i main --exec "git commit --amend --no-edit -s"
+git push --force-with-lease
+```
+
 ### springdoc Commands (MUST follow official docs)
 
 > **Reference:** https://springdoc.org/#plugins
