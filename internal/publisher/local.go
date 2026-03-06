@@ -53,7 +53,7 @@ func (p *LocalPublisher) Publish(ctx context.Context, spec *openapi3.T, opts *Pu
 	var marshalErr error
 
 	switch format {
-	case "json":
+	case formatJSON:
 		data, marshalErr = spec.MarshalJSON()
 	default:
 		var yamlData any

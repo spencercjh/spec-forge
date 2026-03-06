@@ -45,7 +45,7 @@ func combineOutput(stdout, stderr string) string {
 		combined = fmt.Sprintf("%s\n... (truncated, showing last %d bytes)", truncated, maxErrorOutputLength)
 	}
 
-    return combined
+	return combined
 }
 
 const (

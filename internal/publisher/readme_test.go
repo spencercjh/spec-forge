@@ -65,62 +65,76 @@ func TestReadMePublisher_BuildArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		path     string
-		opts     *ReadMeOptions
+		opts     *PublishOptions
 		expected []string
 	}{
 		{
-			name: "minimal options",
+			name: "minimal options without overwrite",
 			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key"},
+			opts: &PublishOptions{
+				ReadMe: &ReadMeOptions{APIKey: "test-key"},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
+			},
+		},
+		{
+			name: "minimal options with overwrite",
+			path: "/tmp/spec.yaml",
+			opts: &PublishOptions{
+				Overwrite: true,
+				ReadMe:    &ReadMeOptions{APIKey: "test-key"},
+			},
+			expected: []string{
+				"openapi", "upload", "/tmp/spec.yaml",
 				"--confirm-overwrite",
 			},
 		},
 		{
 			name: "with branch",
 			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0"},
+			opts: &PublishOptions{
+				ReadMe: &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0"},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
-				"--confirm-overwrite",
 				"--branch", "v1.0.0",
 			},
 		},
 		{
 			name: "with slug",
 			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key", Slug: "my-api"},
+			opts: &PublishOptions{
+				ReadMe: &ReadMeOptions{APIKey: "test-key", Slug: "my-api"},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
-				"--confirm-overwrite",
 				"--slug", "my-api",
 			},
 		},
 		{
 			name: "with useSpecVersion",
 			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key", UseSpecVersion: true},
+			opts: &PublishOptions{
+				ReadMe: &ReadMeOptions{APIKey: "test-key", UseSpecVersion: true},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
-				"--confirm-overwrite",
 				"--useSpecVersion",
 			},
 		},
 		{
 			name: "full options",
 			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0", Slug: "my-api"},
+			opts: &PublishOptions{
+				Overwrite: true,
+				ReadMe:    &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0", Slug: "my-api"},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
-				"--confirm-overwrite",
-				"--branch", "v1.0.0",
 				"--slug", "my-api",
+				"--branch", "v1.0.0",
+				"--confirm-overwrite",
 			},
 		},
 	}
