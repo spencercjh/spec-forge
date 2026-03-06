@@ -15,6 +15,21 @@ type PublishOptions struct {
 	Format string
 	// Overwrite existing file if true
 	Overwrite bool
+
+	// ReadMe-specific options
+	ReadMe *ReadMeOptions
+}
+
+// ReadMeOptions contains ReadMe-specific publishing options.
+type ReadMeOptions struct {
+	// APIKey is the ReadMe project API key (required)
+	APIKey string
+	// Branch is the ReadMe project version (default: stable)
+	Branch string
+	// Slug is the unique identifier for the API definition
+	Slug string
+	// UseSpecVersion uses OpenAPI info.version for ReadMe project version
+	UseSpecVersion bool
 }
 
 // PublishResult contains the result of publishing an OpenAPI spec.
@@ -34,4 +49,15 @@ type Publisher interface {
 
 	// Name returns the publisher name (e.g., "local", "apifox", "postman")
 	Name() string
+}
+
+// NewPublisher creates a Publisher based on the destination type.
+// Supported types: "local" (default), "readme"
+func NewPublisher(destType string) Publisher {
+	switch destType {
+	case "readme":
+		return NewReadMePublisher()
+	default:
+		return NewLocalPublisher()
+	}
 }
