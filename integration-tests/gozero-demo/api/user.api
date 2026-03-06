@@ -1,0 +1,120 @@
+syntax = "v1"
+
+info (
+	title:   "User Management API"
+	desc:    "User management REST API - equivalent to Spring Boot demo"
+	version: "1.0.0"
+)
+
+// User entity representing a user in the system
+type User {
+	Id       int64  `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	FullName string `json:"fullName"`
+	Age      int    `json:"age"`
+}
+
+// Generic API response wrapper
+type ApiResponse {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    any    `json:"data"`
+}
+
+// User response wrapper
+type UserResponse {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    *User  `json:"data"`
+}
+
+// User list response wrapper
+type UserListResponse {
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
+	Data    UserList `json:"data"`
+}
+
+// User list data
+type UserList {
+	Content    []User `json:"content"`
+	PageNumber int    `json:"pageNumber"`
+	PageSize   int    `json:"pageSize"`
+	Total      int64  `json:"total"`
+	TotalPages int    `json:"totalPages"`
+}
+
+// Pagination request
+type ListUsersRequest {
+	Page     int    `form:"page,default=0"`
+	Size     int    `form:"size,default=10"`
+	Username string `form:"username,optional"`
+}
+
+// Get user by ID request
+type GetUserRequest {
+	Id int64 `path:"id"`
+}
+
+// Create user request
+type CreateUserRequest {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	FullName string `json:"fullName"`
+	Age      int    `json:"age"`
+}
+
+// Update profile request (form data)
+type UpdateProfileRequest {
+	Id       int64  `path:"id"`
+	FullName string `form:"fullName,optional"`
+	Email    string `form:"email,optional"`
+	Age      int    `form:"age,optional"`
+}
+
+// File upload request
+type UploadFileRequest {
+	UserId int64 `form:"userId,optional"`
+}
+
+// File upload result
+type FileUploadResult {
+	Filename    string `json:"filename"`
+	Size        int64  `json:"size"`
+	ContentType string `json:"contentType"`
+	Message     string `json:"message"`
+}
+
+// File upload response
+type FileUploadResponse {
+	Code    int              `json:"code"`
+	Message string           `json:"message"`
+	Data    FileUploadResult `json:"data"`
+}
+
+@server (
+	prefix: "/api/v1"
+	group: users
+)
+service user-api {
+	// Get user by ID
+	@handler GetUserHandler
+	get /users/:id (GetUserRequest) returns (UserResponse)
+
+	// List users with pagination
+	@handler ListUsersHandler
+	get /users (ListUsersRequest) returns (UserListResponse)
+
+	// Create a new user
+	@handler CreateUserHandler
+	post /users (CreateUserRequest) returns (UserResponse)
+
+	// Upload a file for a user
+	@handler UploadFileHandler
+	post /users/upload (UploadFileRequest) returns (FileUploadResponse)
+
+	// Update user profile using form data
+	@handler UpdateProfileHandler
+	post /users/:id/profile (UpdateProfileRequest) returns (UserResponse)
+}
