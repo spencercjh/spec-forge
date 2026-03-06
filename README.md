@@ -105,9 +105,21 @@ LLM_API_KEY="sk-xxx" spec-forge enrich ./openapi.json \
 | Publisher                         | Status         |
 |-----------------------------------|----------------|
 | Local File                        | ✅ Supported    |
-| [ReadMe.com](https://readme.com/) | 🚧 Coming soon |
+| [ReadMe.com](https://readme.com/) | ✅ Supported    |
 | Apifox                            | 🚧 Coming soon |
 | Postman                           | 🚧 Coming soon |
+
+### Publishing to ReadMe.com
+
+```bash
+# Install rdme CLI
+npm install -g rdme
+
+# Publish to ReadMe (API key via environment variable)
+README_API_KEY="rdme_xxx" spec-forge publish ./openapi.json --to readme --readme-slug my-api
+
+# Or with full generate pipeline
+README_API_KEY="rdme_xxx" spec-forge generate ./my-project --publish-target readme
 
 ## License
 
