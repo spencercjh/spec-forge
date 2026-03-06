@@ -12,6 +12,16 @@ type Config struct {
 	Enrich  EnrichConfig  `mapstructure:"enrich"`
 	Output  OutputConfig  `mapstructure:"output"`
 	Extract ExtractConfig `mapstructure:"extract"`
+	ReadMe  ReadMeConfig  `mapstructure:"readme"`
+}
+
+// ReadMeConfig contains ReadMe publishing settings.
+type ReadMeConfig struct {
+	APIKey         string `mapstructure:"apiKey"`
+	APIKeyEnv      string `mapstructure:"apiKeyEnv"`
+	Branch         string `mapstructure:"branch"`
+	Slug           string `mapstructure:"slug"`
+	UseSpecVersion bool   `mapstructure:"useSpecVersion"`
 }
 
 // EnrichConfig contains LLM enrichment settings.
