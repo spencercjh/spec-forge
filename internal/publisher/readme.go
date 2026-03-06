@@ -27,6 +27,7 @@ func (p *ReadMePublisher) Name() string {
 }
 
 // Publish uploads an OpenAPI spec to ReadMe.com.
+// The API key is passed via README_API_KEY environment variable to avoid leaking in process listings.
 func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *PublishOptions) (*PublishResult, error) {
 	if spec == nil {
 		return nil, errors.New("spec is nil")
@@ -64,20 +65,27 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 		return nil, fmt.Errorf("failed to write temp file: %w", writeErr)
 	}
 
-	// Build rdme command
-	args := p.buildArgs(tmpFile, opts.ReadMe)
+	// Build rdme command args (without API key)
+	args := p.buildArgs(tmpFile, opts)
 
-	// Execute rdme CLI
+	// Execute rdme CLI with API key via environment variable
+	// SECURITY: API key is passed via env var to avoid leaking in process listings
 	cmd := exec.CommandContext(ctx, "rdme", args...)
+	cmd.Env = append(os.Environ(), "README_API_KEY="+opts.ReadMe.APIKey)
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("rdme command failed: %w\noutput: %s", err, string(output))
 	}
 
+	// Build URL for the uploaded spec
+	location := p.buildLocation(opts.ReadMe)
+
 	return &PublishResult{
-		Path:         strings.TrimSpace(string(output)),
+		Path:         location,
 		Format:       format,
 		BytesWritten: len(data),
+		Message:      strings.TrimSpace(string(output)),
 	}, nil
 }
 
@@ -94,25 +102,55 @@ func (p *ReadMePublisher) marshalSpec(spec *openapi3.T, format string) ([]byte, 
 	}
 }
 
-func (p *ReadMePublisher) buildArgs(specPath string, opts *ReadMeOptions) []string {
+// buildArgs constructs rdme CLI arguments.
+// The API key is read from README_API_KEY environment variable.
+func (p *ReadMePublisher) buildArgs(specPath string, opts *PublishOptions) []string {
 	args := []string{
 		"openapi", "upload",
 		specPath,
-		"--key", opts.APIKey,
-		"--confirm-overwrite",
 	}
 
-	if opts.Branch != "" {
-		args = append(args, "--branch", opts.Branch)
+	readmeOpts := opts.ReadMe
+
+	// Add slug if specified
+	if readmeOpts.Slug != "" {
+		args = append(args, "--slug", readmeOpts.Slug)
 	}
 
-	if opts.Slug != "" {
-		args = append(args, "--slug", opts.Slug)
+	// Add branch if specified
+	if readmeOpts.Branch != "" {
+		args = append(args, "--branch", readmeOpts.Branch)
 	}
 
-	if opts.UseSpecVersion {
+	// Add useSpecVersion if enabled
+	if readmeOpts.UseSpecVersion {
 		args = append(args, "--useSpecVersion")
 	}
 
+	// Only add confirm-overwrite if Overwrite is explicitly set to true
+	// This respects the PublishOptions.Overwrite safety control
+	if opts.Overwrite {
+		args = append(args, "--confirm-overwrite")
+	}
+
 	return args
+}
+
+// buildLocation creates a human-readable location string for the uploaded spec.
+func (p *ReadMePublisher) buildLocation(opts *ReadMeOptions) string {
+	var parts []string
+
+	if opts.Slug != "" {
+		parts = append(parts, "slug:"+opts.Slug)
+	}
+
+	if opts.Branch != "" {
+		parts = append(parts, "branch:"+opts.Branch)
+	}
+
+	if len(parts) == 0 {
+		return "readme.com (default)"
+	}
+
+	return "readme.com/" + strings.Join(parts, "/")
 }
