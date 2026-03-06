@@ -78,7 +78,7 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 		return nil, fmt.Errorf("rdme command failed: %w\noutput: %s", err, string(output))
 	}
 
-	// Build URL for the uploaded spec
+	// Build location identifier for the uploaded spec
 	location := p.buildLocation(opts.ReadMe)
 
 	return &PublishResult{

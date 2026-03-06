@@ -37,8 +37,6 @@ type ReadMeOptions struct {
 	Slug string
 	// UseSpecVersion uses OpenAPI info.version for ReadMe project version
 	UseSpecVersion bool
-	// ConfirmOverwrite explicitly confirms over overwrite flag
-	ConfirmOverwrite bool
 }
 
 // PublishResult contains the result of publishing an OpenAPI spec.
@@ -82,6 +80,6 @@ func NewPublisher(destType string) (Publisher, error) {
 	case publisherReadme:
 		return NewReadMePublisher(), nil
 	default:
-		return nil, fmt.Errorf("unknown publisher type: %q", destType)
+		return nil, fmt.Errorf("%w: %q", ErrUnknownPublisher, destType)
 	}
 }
