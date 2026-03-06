@@ -230,6 +230,71 @@ Then run with config:
 LLM_API_KEY="your-key" ./build/spec-forge enrich ./path/to/openapi.json -v
 ```
 
+## Testing ReadMe.com Publisher
+
+The ReadMe publisher uploads OpenAPI specs to ReadMe.com using the `rdme` CLI tool.
+
+### Prerequisites
+
+```bash
+# Install rdme CLI globally
+npm install -g rdme
+
+# Verify installation
+rdme --version
+```
+
+### ReadMe Configuration
+
+Add to `.spec-forge.yaml`:
+
+```yaml
+readme:
+  slug: your-api-slug           # Required: API identifier in ReadMe
+  branch: stable                # Optional: version/branch (default: stable)
+```
+
+### Testing with Standalone Publish Command
+
+```bash
+# Method 1: Using environment variable for API key
+README_API_KEY="rdme_xxx" ./build/spec-forge publish \
+    ./integration-tests/maven-springboot-openapi-demo/target/openapi.json \
+    --to readme \
+    --readme-slug "your-api-slug"
+
+# Method 2: Using flag for API key
+./build/spec-forge publish \
+    ./integration-tests/maven-springboot-openapi-demo/target/openapi.json \
+    --to readme \
+    --readme-api-key "rdme_xxx" \
+    --readme-slug "your-api-slug"
+```
+
+### Testing with Full Generate Pipeline
+
+```bash
+# Full pipeline: generate → validate → enrich → publish
+LLM_API_KEY="your-llm-key" \
+  README_API_KEY="rdme_xxx" \
+  ./build/spec-forge generate \
+  ./integration-tests/maven-springboot-openapi-demo \
+  --publish-target readme \
+  -v
+```
+
+### Overwrite Behavior
+
+By default, `--publish-overwrite` is `true` for CI convenience:
+- **Default (`--publish-overwrite`)**: Automatically overwrites existing ReadMe spec
+- **Safe mode (`--publish-overwrite=false`)**: Prompts for confirmation (or fails in CI)
+
+### ReadMe Publisher Security
+
+- API key is passed via `README_API_KEY` environment variable to `rdme` CLI
+- Never pass API key via command line arguments (would appear in `ps aux`)
+- The publisher filters out any existing `README_API_KEY` entries before injecting the key
+
 ## Related Documentation
 
 - Design doc: `docs/plans/2026-03-03-spec-forge-design.md`
