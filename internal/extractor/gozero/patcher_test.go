@@ -120,7 +120,7 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 	patcher := gozero.NewPatcher()
 
 	// NeedsPatch should always return true for go-zero projects
-	info := &gozero.ProjectInfo{
+	info := &gozero.Info{
 		HasGoctl: true,
 	}
 

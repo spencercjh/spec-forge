@@ -70,6 +70,6 @@ func (p *Patcher) Patch(_ string) (*PatchResult, error) {
 }
 
 // NeedsPatch always returns true for go-zero projects since we need to verify goctl availability.
-func (p *Patcher) NeedsPatch(_ *ProjectInfo) bool {
+func (p *Patcher) NeedsPatch(_ *Info) bool {
 	return true
 }
