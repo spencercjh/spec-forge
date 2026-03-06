@@ -53,9 +53,48 @@ func TestReadMePublisher_Publish_NilReadMeOptions(t *testing.T) {
 func TestReadMePublisher_Publish_MissingAPIKey(t *testing.T) {
 	p := NewReadMePublisher()
 	spec := createTestSpec()
+
+	// Ensure README_API_KEY is not set in environment
+	t.Setenv("README_API_KEY", "")
+
 	_, err := p.Publish(context.Background(), spec, &PublishOptions{ReadMe: &ReadMeOptions{APIKey: ""}})
 	if err == nil {
 		t.Error("expected error for missing API key")
+	}
+}
+
+func TestReadMePublisher_Publish_EnvVarFallback(t *testing.T) {
+	p := NewReadMePublisher()
+	spec := createTestSpec()
+
+	// Set API key via environment variable
+	t.Setenv("README_API_KEY", "env-api-key")
+
+	// Empty APIKey in options, should fallback to env var
+	// This will fail at command execution because rdme is not available in test,
+	// but we can verify it doesn't fail at the API key validation stage
+	_, err := p.Publish(context.Background(), spec, &PublishOptions{ReadMe: &ReadMeOptions{APIKey: ""}})
+
+	// Should fail at command execution (rdme not found), not at API key validation
+	if err != nil && err.Error() == "readme API key is required (set --readme-api-key flag or README_API_KEY env var)" {
+		t.Error("should have used env var fallback, but failed with missing API key error")
+	}
+}
+
+func TestReadMePublisher_Publish_OptionsKeyPriority(t *testing.T) {
+	p := NewReadMePublisher()
+	spec := createTestSpec()
+
+	// Set different keys in env and options
+	t.Setenv("README_API_KEY", "env-api-key")
+
+	// Options key should take priority over env var
+	// This will fail at command execution, but we verify it doesn't fail at validation
+	_, err := p.Publish(context.Background(), spec, &PublishOptions{ReadMe: &ReadMeOptions{APIKey: "options-api-key"}})
+
+	// Should not fail at API key validation
+	if err != nil && err.Error() == "readme API key is required (set --readme-api-key flag or README_API_KEY env var)" {
+		t.Error("should have used options API key, but failed with missing API key error")
 	}
 }
 

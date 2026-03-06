@@ -92,22 +92,22 @@ LLM_API_KEY="sk-xxx" spec-forge enrich ./openapi.json \
 
 ## Supported Frameworks
 
-| Framework   | Language       | Status         |
-|-------------|----------------|----------------|
-| Spring Boot | Java           | ✅ Supported    |
-| go-zero     | Go             | 🚧 Coming soon |
-| Hertz       | Go             | 🚧 Coming soon |
-| Kitex       | Go             | 🚧 Coming soon |
-| gRPC        | Multi-language | 🚧 Coming soon |
+| Framework                                     | Language       | Status         |
+|-----------------------------------------------|----------------|----------------|
+| [Spring Boot](https://springdoc.org/#plugins) | Java           | ✅ Supported    |
+| go-zero                                       | Go             | 🚧 Coming soon |
+| Hertz                                         | Go             | 🚧 Coming soon |
+| Kitex                                         | Go             | 🚧 Coming soon |
+| gRPC                                          | Multi-language | 🚧 Coming soon |
 
 ## Supported Publishers
 
-| Publisher  | Status         |
-|------------|----------------|
-| Local File | ✅ Supported    |
-| README.com | 🚧 Coming soon |
-| Apifox     | 🚧 Coming soon |
-| Postman    | 🚧 Coming soon |
+| Publisher                         | Status         |
+|-----------------------------------|----------------|
+| Local File                        | ✅ Supported    |
+| [ReadMe.com](https://readme.com/) | 🚧 Coming soon |
+| Apifox                            | 🚧 Coming soon |
+| Postman                           | 🚧 Coming soon |
 
 ## License
 
