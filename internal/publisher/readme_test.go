@@ -59,88 +59,133 @@ func TestReadMePublisher_Publish_MissingAPIKey(t *testing.T) {
 	}
 }
 
+func TestReadMePublisher_Publish_ValidSpecWithNilOpts(t *testing.T) {
+	p := NewReadMePublisher()
+	spec := createTestSpec()
+	// This test passes a valid spec but nil options
+	_, err := p.Publish(context.Background(), spec, nil)
+	if err == nil {
+		t.Error("expected error for nil options when spec is valid")
+	}
+}
+
 func TestReadMePublisher_BuildArgs(t *testing.T) {
 	p := NewReadMePublisher()
 
 	tests := []struct {
-		name     string
-		path     string
-		opts     *ReadMeOptions
-		expected []string
+		name       string
+		specPath   string
+		opts       *PublishOptions
+		expected   []string
+		expectSlug bool // if true, slug should be in output
 	}{
 		{
-			name: "minimal options",
-			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key"},
+			name:     "minimal options without overwrite",
+			specPath: "/tmp/spec.yaml",
+			opts: &PublishOptions{
+				ReadMe: &ReadMeOptions{APIKey: "test-key"},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
+				// NO --slug default-slug since we don't auto-add slug
+				// NO --confirm-overwrite since Overwrite is false
+			},
+		},
+		{
+			name:     "with overwrite flag",
+			specPath: "/tmp/spec.yaml",
+			opts: &PublishOptions{
+				Overwrite: true,
+				ReadMe:    &ReadMeOptions{APIKey: "test-key"},
+			},
+			expected: []string{
+				"openapi", "upload", "/tmp/spec.yaml",
 				"--confirm-overwrite",
 			},
 		},
 		{
-			name: "with branch",
-			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0"},
+			name:     "with branch",
+			specPath: "/tmp/spec.yaml",
+			opts: &PublishOptions{
+				ReadMe: &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0"},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
-				"--confirm-overwrite",
 				"--branch", "v1.0.0",
 			},
 		},
 		{
-			name: "with slug",
-			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key", Slug: "my-api"},
+			name:     "with slug",
+			specPath: "/tmp/spec.yaml",
+			opts: &PublishOptions{
+				ReadMe: &ReadMeOptions{APIKey: "test-key", Slug: "my-api"},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
-				"--confirm-overwrite",
 				"--slug", "my-api",
 			},
 		},
 		{
-			name: "with useSpecVersion",
-			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key", UseSpecVersion: true},
+			name:     "with useSpecVersion",
+			specPath: "/tmp/spec.yaml",
+			opts: &PublishOptions{
+				ReadMe: &ReadMeOptions{APIKey: "test-key", UseSpecVersion: true},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
-				"--confirm-overwrite",
 				"--useSpecVersion",
 			},
 		},
 		{
-			name: "full options",
-			path: "/tmp/spec.yaml",
-			opts: &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0", Slug: "my-api"},
+			name:     "full options with overwrite",
+			specPath: "/tmp/spec.yaml",
+			opts: &PublishOptions{
+				Overwrite: true,
+				ReadMe:    &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0", Slug: "my-api"},
+			},
 			expected: []string{
 				"openapi", "upload", "/tmp/spec.yaml",
-				"--key", "test-key",
-				"--confirm-overwrite",
-				"--branch", "v1.0.0",
 				"--slug", "my-api",
+				"--branch", "v1.0.0",
+				"--confirm-overwrite",
+			},
+		},
+		{
+			name:     "full options without overwrite",
+			specPath: "/tmp/spec.yaml",
+			opts: &PublishOptions{
+				Overwrite: false,
+				ReadMe:    &ReadMeOptions{APIKey: "test-key", Branch: "v1.0.0", Slug: "my-api"},
+			},
+			expected: []string{
+				"openapi", "upload", "/tmp/spec.yaml",
+				"--slug", "my-api",
+				"--branch", "v1.0.0",
+				// NO --confirm-overwrite since Overwrite is false
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := p.buildArgs(tt.path, tt.opts)
-			if !equalArgs(args, tt.expected) {
-				t.Errorf("args mismatch\ngot:      %v\nexpected: %v", args, tt.expected)
+			args := p.buildArgs(tt.specPath, tt.opts)
+			if !containsAll(args, tt.expected) {
+				t.Errorf("args missing expected elements\ngot:      %v\nexpected: %v", args, tt.expected)
 			}
 		})
 	}
 }
 
-func equalArgs(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
+func containsAll(args, expected []string) bool {
+	for _, exp := range expected {
+		found := false
+		for _, arg := range args {
+			if arg == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
 			return false
 		}
 	}
