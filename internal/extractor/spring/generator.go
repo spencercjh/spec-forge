@@ -58,11 +58,6 @@ const (
 // ExtractorName is the name of this extractor.
 const ExtractorName = "springboot"
 
-func init() {
-	// Register the Spring Boot extractor with the global registry.
-	extractor.Register(ExtractorName, &Extractor{})
-}
-
 // Extractor implements the extractor.Extractor interface for Spring Boot projects.
 type Extractor struct {
 	detector  *Detector
@@ -159,9 +154,11 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 
 	// Determine the working directory
 	workDir := projectPath
-	if info.Spring != nil && info.Spring.IsMultiModule && info.Spring.MainModulePath != "" {
-		// For multi-module projects, run from the main module directory
-		workDir = filepath.Dir(info.Spring.MainModulePath)
+	if info.FrameworkData != nil {
+		if springInfo, ok := info.FrameworkData.(*Info); ok && springInfo.IsMultiModule && springInfo.MainModulePath != "" {
+			// For multi-module projects, run from the main module directory
+			workDir = filepath.Dir(springInfo.MainModulePath)
+		}
 	}
 
 	absWorkDir, err := filepath.Abs(workDir)

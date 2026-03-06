@@ -36,7 +36,7 @@ func NewPatcher() *Patcher {
 }
 
 // NeedsPatch checks if the project needs to be patched.
-func (p *Patcher) NeedsPatch(info *extractor.SpringInfo, force bool) bool {
+func (p *Patcher) NeedsPatch(info *Info, force bool) bool {
 	if force {
 		return true
 	}
@@ -62,17 +62,19 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 		opts.GradlePluginVersion = DefaultSpringdocGradlePlugin
 	}
 
+	// Get Spring info from framework data
+	springInfo, ok := info.FrameworkData.(*Info)
+	if !ok || springInfo == nil {
+		springInfo = &Info{}
+	}
+
 	// For Maven projects, we always need to check spring-boot-maven-plugin configuration
 	// even if springdoc is already configured, because start/stop goals might be missing
 	if info.BuildTool == BuildToolMaven {
-		return p.patchMaven(info, opts)
+		return p.patchMaven(info, springInfo, opts)
 	}
 
 	// Check if patch is needed for other build tools
-	springInfo := info.Spring
-	if springInfo == nil {
-		springInfo = &extractor.SpringInfo{}
-	}
 	if !p.NeedsPatch(springInfo, opts.Force) {
 		return &PatchResult{
 			DependencyAdded: false,
@@ -101,12 +103,7 @@ func (p *Patcher) Restore(buildFilePath, originalContent string) error {
 }
 
 // patchMaven patches a Maven project using gopom.
-func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
-	springInfo := info.Spring
-	if springInfo == nil {
-		springInfo = &extractor.SpringInfo{}
-	}
-
+func (p *Patcher) patchMaven(info *extractor.ProjectInfo, springInfo *Info, opts *extractor.PatchOptions) (*PatchResult, error) {
 	// For multi-module projects, patch the main module instead of parent POM
 	buildFilePath := info.BuildFilePath
 	if springInfo.IsMultiModule && springInfo.MainModulePath != "" {
@@ -183,9 +180,9 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, opts *extractor.PatchO
 
 // patchGradle patches a Gradle project.
 func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*PatchResult, error) {
-	springInfo := info.Spring
-	if springInfo == nil {
-		springInfo = &extractor.SpringInfo{}
+	springInfo, ok := info.FrameworkData.(*Info)
+	if !ok || springInfo == nil {
+		springInfo = &Info{}
 	}
 
 	// For multi-module projects, patch the main module instead of root

@@ -19,8 +19,7 @@ import (
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 	"github.com/spencercjh/spec-forge/internal/extractor"
-	_ "github.com/spencercjh/spec-forge/internal/extractor/gozero" // registers gozero extractor
-	_ "github.com/spencercjh/spec-forge/internal/extractor/spring" // registers spring extractor
+	"github.com/spencercjh/spec-forge/internal/extractor/builtin" // registers built-in extractors
 	"github.com/spencercjh/spec-forge/internal/publisher"
 	"github.com/spencercjh/spec-forge/internal/validator"
 )
@@ -72,7 +71,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	slog.InfoContext(ctx, "Generating OpenAPI spec", "path", path)
 
 	// Step 1: Detect framework - try all registered extractors
-	extractorImpl, info, err := extractor.DetectFramework(path)
+	extractorImpl, info, err := builtin.DetectFramework(path)
 	if err != nil {
 		return errWrap("no supported framework detected", err)
 	}

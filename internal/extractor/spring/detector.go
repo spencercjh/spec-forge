@@ -53,7 +53,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 
 // detectMavenProject analyzes a Maven project.
 func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.ProjectInfo, error) {
-	springInfo := &extractor.SpringInfo{}
+	springInfo := &Info{}
 
 	// Parse pom.xml
 	pom, err := d.mavenParser.Parse(pomPath)
@@ -105,7 +105,7 @@ func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.P
 		Framework:     extractor.FrameworkSpringBoot,
 		BuildTool:     BuildToolMaven,
 		BuildFilePath: pomPath,
-		Spring:        springInfo,
+		FrameworkData: springInfo,
 	}
 
 	return info, nil
@@ -113,7 +113,7 @@ func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.P
 
 // detectGradleProject analyzes a Gradle project.
 func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extractor.ProjectInfo, error) {
-	springInfo := &extractor.SpringInfo{}
+	springInfo := &Info{}
 
 	// Check for multi-module project via settings.gradle
 	settingsPath := filepath.Join(projectPath, "settings.gradle")
@@ -167,7 +167,7 @@ func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extract
 		Framework:     extractor.FrameworkSpringBoot,
 		BuildTool:     BuildToolGradle,
 		BuildFilePath: gradlePath,
-		Spring:        springInfo,
+		FrameworkData: springInfo,
 	}
 
 	return info, nil

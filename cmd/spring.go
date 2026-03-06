@@ -65,9 +65,9 @@ func printProjectInfo(ctx context.Context, info *extractor.ProjectInfo) {
 	slog.InfoContext(ctx, "Build Tool", "tool", info.BuildTool)
 	slog.InfoContext(ctx, "Build File", "path", info.BuildFilePath)
 
-	springInfo := info.Spring
-	if springInfo == nil {
-		springInfo = &extractor.SpringInfo{}
+	springInfo, ok := info.FrameworkData.(*spring.Info)
+	if !ok || springInfo == nil {
+		springInfo = &spring.Info{}
 	}
 
 	slog.InfoContext(ctx, "Spring Boot", "version", springInfo.SpringBootVersion)

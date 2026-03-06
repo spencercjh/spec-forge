@@ -19,7 +19,7 @@ func TestNewGenerator(t *testing.T) {
 func TestGenerator_Generate_NoGoMod(t *testing.T) {
 	g := gozero.NewGenerator()
 	ctx := context.Background()
-	_, err := g.Generate(ctx, "/tmp/non-existent-project", &extractor.GenerateOptions{})
+	_, err := g.Generate(ctx, "/tmp/non-existent-project", &extractor.ProjectInfo{}, &extractor.GenerateOptions{})
 
 	if err == nil {
 		t.Error("Generate should return error for project without go.mod")

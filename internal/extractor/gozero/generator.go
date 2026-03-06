@@ -28,11 +28,6 @@ const (
 // ExtractorName is the name of this extractor.
 const ExtractorName = "gozero"
 
-func init() {
-	// Register the go-zero extractor with the global registry.
-	extractor.Register(ExtractorName, &Extractor{})
-}
-
 // Extractor implements the extractor.Extractor interface for go-zero projects.
 type Extractor struct {
 	detector  *Detector
@@ -67,11 +62,11 @@ func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.Patch
 }
 
 // Generate produces the OpenAPI spec from the go-zero project.
-func (e *Extractor) Generate(ctx context.Context, projectPath string, _ *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
 	if e.generator == nil {
 		e.generator = NewGenerator()
 	}
-	return e.generator.Generate(ctx, projectPath, opts)
+	return e.generator.Generate(ctx, projectPath, info, opts)
 }
 
 // Restore is a no-op for go-zero projects as we don't modify files.
@@ -102,7 +97,7 @@ func NewGeneratorWithExecutor(exec executor.Interface) *Generator {
 }
 
 // Generate generates OpenAPI spec by invoking goctl command and converting Swagger 2.0 to OpenAPI 3.0.
-func (g *Generator) Generate(ctx context.Context, projectPath string, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+func (g *Generator) Generate(ctx context.Context, projectPath string, projectInfo *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
 	if opts == nil {
 		opts = &extractor.GenerateOptions{}
 	}
@@ -123,19 +118,28 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, opts *extr
 		return nil, fmt.Errorf("failed to resolve project path: %w", err)
 	}
 
-	// Detect project info
-	info, err := g.detector.Detect(absPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect go-zero project: %w", err)
+	// Get go-zero info from project info
+	info, ok := projectInfo.FrameworkData.(*Info)
+	if !ok || info == nil {
+		// If FrameworkData is not set, detect it
+		detectedInfo, detectErr := g.detector.Detect(absPath)
+		if detectErr != nil {
+			return nil, fmt.Errorf("failed to detect go-zero project: %w", detectErr)
+		}
+		var typeOk bool
+		info, typeOk = detectedInfo.FrameworkData.(*Info)
+		if !typeOk {
+			return nil, errors.New("failed to get go-zero info from detected project")
+		}
 	}
 
 	// Check if goctl is available
-	if info.GoZero == nil || !info.GoZero.HasGoctl {
+	if !info.HasGoctl {
 		return nil, errors.New("goctl command not found in PATH. Please install goctl: go install github.com/zeromicro/go-zero/tools/goctl@latest")
 	}
 
 	// Generate Swagger 2.0 spec using goctl
-	swaggerPath, err := g.generateSwagger(ctx, absPath, info.GoZero, opts)
+	swaggerPath, err := g.generateSwagger(ctx, absPath, info, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +154,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, opts *extr
 }
 
 // generateSwagger generates Swagger 2.0 spec using goctl command.
-func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *extractor.GoZeroInfo, opts *extractor.GenerateOptions) (string, error) {
+func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *Info, opts *extractor.GenerateOptions) (string, error) {
 	// Patch .api files to work around goctl parser bugs (#5425)
 	apiPatcher := NewAPIFilePatcher()
 	defer apiPatcher.Cleanup()
@@ -207,7 +211,7 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *e
 
 // findMainAPIFile finds the main API file to use for swagger generation.
 // Returns the patched file path if available, otherwise returns the original.
-func (g *Generator) findMainAPIFile(workDir string, info *extractor.GoZeroInfo, patchedFiles map[string]string) string {
+func (g *Generator) findMainAPIFile(workDir string, info *Info, patchedFiles map[string]string) string {
 	if len(info.APIFiles) == 0 {
 		return ""
 	}

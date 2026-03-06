@@ -63,24 +63,29 @@ require (
 		t.Errorf("BuildFilePath = %s, want %s", info.BuildFilePath, goModPath)
 	}
 
-	if info.GoZero == nil {
-		t.Fatal("GoZero should not be nil")
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
 	}
 
-	if info.GoZero.ModuleName != "example.com/testproject" {
-		t.Errorf("ModuleName = %s, want example.com/testproject", info.GoZero.ModuleName)
+	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *gozero.Info")
 	}
 
-	if info.GoZero.GoVersion != "1.21" {
-		t.Errorf("GoVersion = %s, want 1.21", info.GoZero.GoVersion)
+	if goZeroInfo.ModuleName != "example.com/testproject" {
+		t.Errorf("ModuleName = %s, want example.com/testproject", goZeroInfo.ModuleName)
 	}
 
-	if !info.GoZero.HasGoZeroDeps {
+	if goZeroInfo.GoVersion != "1.21" {
+		t.Errorf("GoVersion = %s, want 1.21", goZeroInfo.GoVersion)
+	}
+
+	if !goZeroInfo.HasGoZeroDeps {
 		t.Error("HasGoZeroDeps should be true")
 	}
 
-	if info.GoZero.GoZeroVersion != "v1.6.0" {
-		t.Errorf("GoZeroVersion = %s, want v1.6.0", info.GoZero.GoZeroVersion)
+	if goZeroInfo.GoZeroVersion != "v1.6.0" {
+		t.Errorf("GoZeroVersion = %s, want v1.6.0", goZeroInfo.GoZeroVersion)
 	}
 }
 
@@ -105,16 +110,21 @@ require github.com/zeromicro/go-zero v1.5.0
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.GoZero == nil {
-		t.Fatal("GoZero should not be nil")
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
 	}
 
-	if !info.GoZero.HasGoZeroDeps {
+	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *gozero.Info")
+	}
+
+	if !goZeroInfo.HasGoZeroDeps {
 		t.Error("HasGoZeroDeps should be true for single-line require")
 	}
 
-	if info.GoZero.GoZeroVersion != "v1.5.0" {
-		t.Errorf("GoZeroVersion = %s, want v1.5.0", info.GoZero.GoZeroVersion)
+	if goZeroInfo.GoZeroVersion != "v1.5.0" {
+		t.Errorf("GoZeroVersion = %s, want v1.5.0", goZeroInfo.GoZeroVersion)
 	}
 }
 
@@ -141,16 +151,21 @@ require (
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.GoZero == nil {
-		t.Fatal("GoZero should not be nil")
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
 	}
 
-	if info.GoZero.HasGoZeroDeps {
+	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *gozero.Info")
+	}
+
+	if goZeroInfo.HasGoZeroDeps {
 		t.Error("HasGoZeroDeps should be false")
 	}
 
-	if info.GoZero.GoZeroVersion != "" {
-		t.Errorf("GoZeroVersion should be empty, got %s", info.GoZero.GoZeroVersion)
+	if goZeroInfo.GoZeroVersion != "" {
+		t.Errorf("GoZeroVersion should be empty, got %s", goZeroInfo.GoZeroVersion)
 	}
 }
 
@@ -191,12 +206,17 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.GoZero == nil {
-		t.Fatal("GoZero should not be nil")
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
 	}
 
-	if len(info.GoZero.APIFiles) != 2 {
-		t.Errorf("Expected 2 .api files, got %d", len(info.GoZero.APIFiles))
+	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *gozero.Info")
+	}
+
+	if len(goZeroInfo.APIFiles) != 2 {
+		t.Errorf("Expected 2 .api files, got %d", len(goZeroInfo.APIFiles))
 	}
 }
 
@@ -238,17 +258,22 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.GoZero == nil {
-		t.Fatal("GoZero should not be nil")
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
+	}
+
+	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *gozero.Info")
 	}
 
 	// Should only find the main.api file, not the vendor one
-	if len(info.GoZero.APIFiles) != 1 {
-		t.Errorf("Expected 1 .api file (vendor skipped), got %d", len(info.GoZero.APIFiles))
+	if len(goZeroInfo.APIFiles) != 1 {
+		t.Errorf("Expected 1 .api file (vendor skipped), got %d", len(goZeroInfo.APIFiles))
 	}
 
-	if len(info.GoZero.APIFiles) > 0 && info.GoZero.APIFiles[0] != apiFile {
-		t.Errorf("Expected %s, got %s", apiFile, info.GoZero.APIFiles[0])
+	if len(goZeroInfo.APIFiles) > 0 && goZeroInfo.APIFiles[0] != apiFile {
+		t.Errorf("Expected %s, got %s", apiFile, goZeroInfo.APIFiles[0])
 	}
 }
 
@@ -290,13 +315,18 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.GoZero == nil {
-		t.Fatal("GoZero should not be nil")
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
+	}
+
+	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *gozero.Info")
 	}
 
 	// Should only find the main.api file, not the hidden one
-	if len(info.GoZero.APIFiles) != 1 {
-		t.Errorf("Expected 1 .api file (hidden skipped), got %d", len(info.GoZero.APIFiles))
+	if len(goZeroInfo.APIFiles) != 1 {
+		t.Errorf("Expected 1 .api file (hidden skipped), got %d", len(goZeroInfo.APIFiles))
 	}
 }
 
@@ -326,19 +356,24 @@ func TestDetector_Detect_EmptyProject(t *testing.T) {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.GoZero == nil {
-		t.Fatal("GoZero should not be nil")
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
 	}
 
-	if info.GoZero.ModuleName != "example.com/empty" {
-		t.Errorf("ModuleName = %s, want example.com/empty", info.GoZero.ModuleName)
+	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *gozero.Info")
 	}
 
-	if info.GoZero.GoVersion != "" {
-		t.Errorf("GoVersion should be empty for empty go.mod, got %s", info.GoZero.GoVersion)
+	if goZeroInfo.ModuleName != "example.com/empty" {
+		t.Errorf("ModuleName = %s, want example.com/empty", goZeroInfo.ModuleName)
 	}
 
-	if info.GoZero.HasGoZeroDeps {
+	if goZeroInfo.GoVersion != "" {
+		t.Errorf("GoVersion should be empty for empty go.mod, got %s", goZeroInfo.GoVersion)
+	}
+
+	if goZeroInfo.HasGoZeroDeps {
 		t.Error("HasGoZeroDeps should be false for empty go.mod")
 	}
 }
