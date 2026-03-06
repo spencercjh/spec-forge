@@ -6,6 +6,12 @@ import "time"
 // BuildTool represents the build tool type for a project.
 type BuildTool string
 
+// Framework type constants.
+const (
+	FrameworkSpringBoot = "springboot"
+	FrameworkGoZero     = "gozero"
+)
+
 // ProjectInfo contains detected information about a Spring project.
 type ProjectInfo struct {
 	BuildTool          BuildTool // Maven or Gradle
@@ -20,6 +26,15 @@ type ProjectInfo struct {
 	Modules        []string // List of module names (for multi-module projects)
 	MainModule     string   // The main application module (if detected)
 	MainModulePath string   // Path to the main module's build file
+
+	// go-zero framework support
+	Framework     string   // Framework type: "springboot" or "gozero"
+	GoVersion     string   // Go version (for go-zero projects)
+	GoModule      string   // Go module path (for go-zero projects)
+	HasGoZeroDeps bool     // Whether go-zero dependencies exist
+	GoZeroVersion string   // Existing go-zero version if any
+	APIFiles      []string // List of .api file paths (for go-zero projects)
+	MainPackage   string   // Main package path (for go-zero projects)
 }
 
 // PatchOptions configures the patch behavior.
