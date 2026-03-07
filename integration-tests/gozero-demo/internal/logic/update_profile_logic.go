@@ -8,7 +8,6 @@ import (
 
 	"github.com/spencercjh/gozero-demo/internal/svc"
 	"github.com/spencercjh/gozero-demo/internal/types"
-
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -29,5 +28,5 @@ func NewUpdateProfileLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Upd
 func (l *UpdateProfileLogic) UpdateProfile(req *types.UpdateProfileRequest) (resp *types.UserResponse, err error) {
 	// todo: add your logic here and delete this line
 
-	return
+	return resp, err
 }

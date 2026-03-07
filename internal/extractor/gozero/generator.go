@@ -206,10 +206,9 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 		return "", errors.New("no .api files found in project")
 	}
 	slog.Debug("selected main API file", "file", apiFile)
-	args = append(args, "-api", apiFile)
 
-	// Add output directory (required by goctl)
-	args = append(args, "-dir", workDir)
+	// Add api file and output directory (required by goctl)
+	args = append(args, "-api", apiFile, "-dir", workDir)
 
 	// Execute goctl command
 	slog.Debug("executing goctl command", "command", goctlCmd, "args", args, "workDir", workDir)

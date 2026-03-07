@@ -10,7 +10,6 @@ import (
 	"github.com/spencercjh/gozero-demo/internal/config"
 	"github.com/spencercjh/gozero-demo/internal/handler"
 	"github.com/spencercjh/gozero-demo/internal/svc"
-
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"
 )
