@@ -200,6 +200,9 @@ func (p *ASTParser) parseRouteCall(file string, call *ast.CallExpr) *Route {
 		fullPath = group.BasePath + path
 	}
 
+	// Convert Gin path format (:id) to OpenAPI path format ({id})
+	fullPath = convertPathFormat(fullPath)
+
 	// Extract handler name
 	handlerName := extractHandlerName(call.Args[1])
 
@@ -219,6 +222,37 @@ func isHTTPMethod(s string) bool {
 		return true
 	}
 	return false
+}
+
+// convertPathFormat converts Gin path format (:param) to OpenAPI path format ({param}).
+func convertPathFormat(path string) string {
+	// Replace :param with {param}
+	// Handle patterns like :id, :userId, etc.
+	result := ""
+	for i := 0; i < len(path); i++ {
+		if path[i] == ':' {
+			// Find the end of the parameter name
+			j := i + 1
+			for j < len(path) && isValidParamChar(path[j]) {
+				j++
+			}
+			if j > i+1 {
+				// Convert :param to {param}
+				result += "{" + path[i+1:j] + "}"
+				i = j - 1
+			} else {
+				result += string(path[i])
+			}
+		} else {
+			result += string(path[i])
+		}
+	}
+	return result
+}
+
+// isValidParamChar checks if a character is valid for a parameter name.
+func isValidParamChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
 }
 
 // extractStringLiteral extracts a string from an AST expression.

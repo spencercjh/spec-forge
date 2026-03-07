@@ -50,22 +50,28 @@ internal/
 ├── executor/             # Shell command execution with timeout
 ├── extractor/            # OpenAPI spec extraction
 │   ├── types.go          # GenerateOptions, GenerateResult, etc.
-│   ├── builtin/          # Built-in extractor registry
-│   ├── spring/           # Spring Boot implementation
+│   ├── spring/           # Spring Boot specific implementation
 │   │   ├── detector.go   # Project type detection (Maven/Gradle)
 │   │   ├── patcher.go    # springdoc dependency injection
 │   │   ├── generator.go  # Maven/Gradle command execution
 │   │   ├── maven.go      # POM parsing, spring-boot plugin config
 │   │   └── gradle.go     # build.gradle parsing
-│   ├── gozero/           # go-zero implementation
+│   ├── gozero/           # go-zero framework support
 │   │   ├── detector.go   # go.mod parsing, dependency detection
 │   │   ├── patcher.go    # go-swagger installation check
 │   │   └── generator.go  # goctl command execution
-│   └── grpcprotoc/       # gRPC-protoc implementation
-│       ├── detector.go   # .proto file detection, buf.yaml rejection
-│       ├── patcher.go    # protoc tools check
-│       ├── generator.go  # protoc command execution
-│       └── grpcprotoc.go # Info struct with ProtoFiles, ServiceProtoFiles
+│   ├── grpcprotoc/       # gRPC-protoc implementation
+│   │   ├── detector.go   # .proto file detection, buf.yaml rejection
+│   │   ├── patcher.go    # protoc tools check
+│   │   ├── generator.go  # protoc command execution
+│   │   └── grpcprotoc.go # Info struct with ProtoFiles, ServiceProtoFiles
+│   └── gin/              # Gin framework support (AST-based)
+│       ├── detector.go   # go.mod parsing for gin dependency
+│       ├── patcher.go    # No-op (no patching needed)
+│       ├── generator.go  # AST-based OpenAPI generation
+│       ├── ast_parser.go # Go AST parsing for routes
+│       ├── handler_analyzer.go # Handler function analysis
+│       └── schema_extractor.go # Go struct to OpenAPI schema
 ├── validator/            # kin-openapi validation
 ├── enricher/             # LLM-based description enrichment
 │   ├── enricher.go       # Main enricher interface
@@ -168,7 +174,7 @@ API keys should be provided via environment variables:
 
 ## Functional Testing with Example Projects
 
-The `integration-tests/` directory contains example Spring Boot projects for testing:
+The `integration-tests/` directory contains example projects for testing:
 
 ```
 integration-tests/
@@ -177,7 +183,41 @@ integration-tests/
 ├── maven-springboot-openapi-demo/     # Maven-based Spring Boot project
 ├── gradle-springboot-openapi-demo/    # Gradle-based Spring Boot project
 ├── maven-multi-module-demo/           # Multi-module Maven project
-└── gradle-multi-module-demo/          # Multi-module Gradle project
+├── gradle-multi-module-demo/          # Multi-module Gradle project
+└── gin-demo/                          # Gin framework project
+```
+
+### Gin Framework Development
+
+The Gin extractor is located in `internal/extractor/gin/`.
+
+**Architecture:**
+- Uses Go AST (go/ast, go/parser) for static analysis
+- No runtime execution required (unlike Spring Boot)
+- Patcher is a no-op (no dependencies to install)
+
+**Key Components:**
+- `ASTParser` - Parses Go files and extracts routes
+- `HandlerAnalyzer` - Analyzes handler functions for params/responses
+- `SchemaExtractor` - Converts Go structs to OpenAPI schemas
+
+**Testing:**
+```bash
+# Run Gin-specific tests
+go test -v ./internal/extractor/gin/...
+
+# Run Gin e2e test (requires go.mod with gin dependency)
+go test -v -tags=e2e ./integration-tests/... -run TestGinDemo
+```
+
+**Example Usage:**
+```bash
+# Generate OpenAPI spec from a Gin project
+spec-forge generate ./integration-tests/gin-demo
+
+# Generate with AI enrichment
+LLM_API_KEY="your-key" spec-forge generate ./integration-tests/gin-demo \
+    --enrich --language zh
 ```
 
 ### Running E2E Tests

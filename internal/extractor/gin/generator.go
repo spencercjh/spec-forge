@@ -132,7 +132,7 @@ func (g *Generator) buildOpenAPIDoc(info *Info, routes []Route, handlerInfos map
 			doc.Paths.Set(route.FullPath, pathItem)
 		}
 
-		operation := g.buildOperation(route, handlerInfos[route.HandlerName])
+		operation := g.buildOperation(route, handlerInfos[route.HandlerName], schemas)
 		setOperationForMethod(pathItem, route.Method, operation)
 	}
 
@@ -140,7 +140,7 @@ func (g *Generator) buildOpenAPIDoc(info *Info, routes []Route, handlerInfos map
 }
 
 // buildOperation builds an OpenAPI operation from a route.
-func (g *Generator) buildOperation(route Route, handlerInfo *HandlerInfo) *openapi3.Operation {
+func (g *Generator) buildOperation(route Route, handlerInfo *HandlerInfo, schemas openapi3.Schemas) *openapi3.Operation {
 	operation := &openapi3.Operation{
 		OperationID: route.HandlerName,
 		Summary:     route.HandlerName,
@@ -181,13 +181,18 @@ func (g *Generator) buildOperation(route Route, handlerInfo *HandlerInfo) *opena
 
 	// Request body
 	if handlerInfo.BodyType != "" && handlerInfo.BodyType != "map[string]any" {
+		var schemaRef *openapi3.SchemaRef
+		if _, exists := schemas[handlerInfo.BodyType]; exists {
+			schemaRef = &openapi3.SchemaRef{Ref: "#/components/schemas/" + handlerInfo.BodyType}
+		} else {
+			// Fallback to generic object if schema not found
+			schemaRef = &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}}
+		}
 		operation.RequestBody = &openapi3.RequestBodyRef{
 			Value: &openapi3.RequestBody{
 				Content: openapi3.Content{
 					"application/json": {
-						Schema: &openapi3.SchemaRef{
-							Ref: "#/components/schemas/" + handlerInfo.BodyType,
-						},
+						Schema: schemaRef,
 					},
 				},
 			},
@@ -208,11 +213,16 @@ func (g *Generator) buildOperation(route Route, handlerInfo *HandlerInfo) *opena
 				response.Content["application/json"] = &openapi3.MediaType{
 					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
 				}
-			} else {
+			} else if _, exists := schemas[resp.GoType]; exists {
 				response.Content["application/json"] = &openapi3.MediaType{
 					Schema: &openapi3.SchemaRef{
 						Ref: "#/components/schemas/" + resp.GoType,
 					},
+				}
+			} else {
+				// Fallback to generic object if schema not found
+				response.Content["application/json"] = &openapi3.MediaType{
+					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
 				}
 			}
 		}
@@ -286,6 +296,11 @@ func (g *Generator) writeOutput(doc *openapi3.T, opts *extractor.GenerateOptions
 
 	if err != nil {
 		return "", err
+	}
+
+	// Create output directory if it doesn't exist
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	outputPath := filepath.Join(outputDir, outputFile+ext)
