@@ -86,25 +86,82 @@ func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec) (*openapi3
 
 		fieldName := field.Names[0].Name
 		propertyName := fieldName
-		fieldSchema := e.fieldToSchema(field.Type)
+		fieldSchemaRef := e.fieldToSchemaRef(field.Type)
 
 		// Parse struct tags
 		if field.Tag != nil {
 			tag := strings.Trim(field.Tag.Value, "`")
-			propertyName = e.applyTags(fieldSchema, tag, fieldName, schema)
+			propertyName = e.applyTags(fieldSchemaRef.Value, tag, fieldName, schema)
 		}
 
-		schema.Properties[propertyName] = &openapi3.SchemaRef{Value: fieldSchema}
+		schema.Properties[propertyName] = fieldSchemaRef
 	}
 
 	return schema, nil
+}
+
+// fieldToSchemaRef converts a Go type to OpenAPI schema reference.
+// It returns a $ref for custom types and inline schemas for primitive types.
+func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		// Check if it's a basic type first
+		schema := goTypeToSchema(t.Name)
+		if schema.Type != nil && (*schema.Type)[0] != "object" {
+			return &openapi3.SchemaRef{Value: schema}
+		}
+		// It's a custom type - create a reference
+		if e.findTypeSpec(t.Name) != nil {
+			ref := fmt.Sprintf("#/components/schemas/%s", t.Name)
+			return &openapi3.SchemaRef{Ref: ref}
+		}
+		return &openapi3.SchemaRef{Value: schema}
+	case *ast.StarExpr:
+		// Pointer - unwrap and process underlying type
+		return e.fieldToSchemaRef(t.X)
+	case *ast.ArrayType:
+		itemSchemaRef := e.fieldToSchemaRef(t.Elt)
+		return &openapi3.SchemaRef{
+			Value: &openapi3.Schema{
+				Type:  &openapi3.Types{"array"},
+				Items: itemSchemaRef,
+			},
+		}
+	case *ast.MapType:
+		valueSchemaRef := e.fieldToSchemaRef(t.Value)
+		return &openapi3.SchemaRef{
+			Value: &openapi3.Schema{
+				Type:                 &openapi3.Types{"object"},
+				AdditionalProperties: openapi3.AdditionalProperties{Schema: valueSchemaRef},
+			},
+		}
+	case *ast.SelectorExpr:
+		// Package qualified type (e.g., time.Time)
+		if x, ok := t.X.(*ast.Ident); ok {
+			fullName := x.Name + "." + t.Sel.Name
+			return &openapi3.SchemaRef{Value: goTypeToSchema(fullName)}
+		}
+	}
+
+	return &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}}
 }
 
 // fieldToSchema converts a Go type to OpenAPI schema.
 func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 	switch t := expr.(type) {
 	case *ast.Ident:
-		return goTypeToSchema(t.Name)
+		// Check if it's a basic type first
+		schema := goTypeToSchema(t.Name)
+		if schema.Type != nil && (*schema.Type)[0] != "object" {
+			return schema
+		}
+		// It's a custom type - check if we know about it
+		if e.findTypeSpec(t.Name) != nil {
+			// Return a placeholder schema with type object
+			// The reference will be created by the caller if needed
+			return &openapi3.Schema{Type: &openapi3.Types{"object"}}
+		}
+		return schema
 	case *ast.StarExpr:
 		// Pointer - unwrap and process underlying type
 		return e.fieldToSchema(t.X)

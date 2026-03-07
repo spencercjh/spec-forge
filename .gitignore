@@ -67,3 +67,4 @@ integration-tests/gozero-demo/openapi.yaml
 integration-tests/gozero-demo/openapi.json
 
 integration-tests/gin-demo/openapi.yaml
+/openapi/openapi.yaml

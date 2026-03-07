@@ -147,14 +147,17 @@ func TestGinDemo(t *testing.T) {
 		t.Fatal("expected Components.Schemas to be defined")
 	}
 
-	// Note: Types wrapped in ApiResponse.Data (interface{}) cannot be directly extracted
-	// because the handler uses: c.JSON(200, ApiResponse{Data: user})
-	// The extractor only sees ApiResponse, not the inner types
+	// The extractor now supports extracting types wrapped in ApiResponse.Data
+	// by tracking variable assignments and resolving composite literal fields
+	// e.g., c.JSON(200, ApiResponse{Data: user}) extracts User as the response type
 	expectedSchemas := []string{
 		"CreateUserRequest",
 		"ListUsersRequest",
 		"UpdateProfileRequest",
 		"ApiResponse",
+		"User",
+		"PageResult",
+		"FileUploadResult",
 	}
 
 	for _, schemaName := range expectedSchemas {

@@ -86,9 +86,16 @@ func (a *HandlerAnalyzer) buildVarTypeMap(body *ast.BlockStmt) map[string]string
 				for i, lhs := range node.Lhs {
 					if i < len(node.Rhs) {
 						if ident, ok := lhs.(*ast.Ident); ok {
+							// Check if RHS is a composite literal with type
 							if comp, ok := node.Rhs[i].(*ast.CompositeLit); ok {
 								if typeIdent, ok := comp.Type.(*ast.Ident); ok {
 									varTypeMap[ident.Name] = typeIdent.Name
+								}
+							} else {
+								// Try to infer type from variable name using heuristic
+								// e.g., "user" -> "User", "result" -> "Result"
+								if inferredType := inferTypeFromVarName(ident.Name); inferredType != "" {
+									varTypeMap[ident.Name] = inferredType
 								}
 							}
 						}
@@ -100,6 +107,37 @@ func (a *HandlerAnalyzer) buildVarTypeMap(body *ast.BlockStmt) map[string]string
 	})
 
 	return varTypeMap
+}
+
+// inferTypeFromVarName tries to infer type from variable name using common patterns.
+// e.g., "user" -> "User", "users" -> "User", "result" -> "Result"
+func inferTypeFromVarName(varName string) string {
+	if varName == "" {
+		return ""
+	}
+
+	// Common variable name -> type mappings
+	mappings := map[string]string{
+		"user":   "User",
+		"users":  "User",
+		"req":    "",
+		"result": "",
+		"data":   "",
+		"item":   "",
+		"items":  "",
+	}
+
+	if typ, ok := mappings[varName]; ok {
+		return typ
+	}
+
+	// Try to capitalize first letter (heuristic)
+	// e.g., "pageResult" -> "PageResult"
+	if len(varName) > 0 && varName[0] >= 'a' && varName[0] <= 'z' {
+		return string(varName[0]-'a'+'A') + varName[1:]
+	}
+
+	return varName
 }
 
 // parseHandlerCall parses a call expression in a handler.
@@ -216,7 +254,7 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 	case "JSON":
 		if len(call.Args) >= 2 {
 			statusCode := extractStatusCode(call.Args[0])
-			goType := extractTypeFromResponse(call.Args[1])
+			goType := extractTypeFromResponse(call.Args[1], varTypeMap)
 			info.Responses = append(info.Responses, ResponseInfo{
 				StatusCode: statusCode,
 				GoType:     goType,
@@ -225,7 +263,7 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 	case "XML":
 		if len(call.Args) >= 2 {
 			statusCode := extractStatusCode(call.Args[0])
-			goType := extractTypeFromResponse(call.Args[1])
+			goType := extractTypeFromResponse(call.Args[1], varTypeMap)
 			info.Responses = append(info.Responses, ResponseInfo{
 				StatusCode: statusCode,
 				GoType:     goType,
@@ -234,7 +272,7 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 	case "YAML":
 		if len(call.Args) >= 2 {
 			statusCode := extractStatusCode(call.Args[0])
-			goType := extractTypeFromResponse(call.Args[1])
+			goType := extractTypeFromResponse(call.Args[1], varTypeMap)
 			info.Responses = append(info.Responses, ResponseInfo{
 				StatusCode: statusCode,
 				GoType:     goType,
@@ -353,11 +391,29 @@ func statusCodeFromName(name string) int {
 }
 
 // extractTypeFromResponse extracts type from response argument.
-func extractTypeFromResponse(expr ast.Expr) string {
+func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string {
 	switch e := expr.(type) {
 	case *ast.Ident:
+		// If it's a variable, try to get its actual type from the map
+		if actualType, ok := varTypeMap[e.Name]; ok {
+			return actualType
+		}
 		return e.Name
 	case *ast.CompositeLit:
+		// First check if this is ApiResponse{Data: user} pattern
+		// Try to extract the type from the Data field
+		for _, elt := range e.Elts {
+			if kv, ok := elt.(*ast.KeyValueExpr); ok {
+				if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "Data" {
+					// Found Data field, recursively extract its type
+					dataType := extractTypeFromResponse(kv.Value, varTypeMap)
+					if dataType != "" {
+						return dataType
+					}
+				}
+			}
+		}
+		// Fall back to extracting the composite literal type itself
 		if ident, ok := e.Type.(*ast.Ident); ok {
 			return ident.Name
 		}
@@ -372,6 +428,17 @@ func extractTypeFromResponse(expr ast.Expr) string {
 			if sel.Sel.Name == "H" {
 				return "map[string]any"
 			}
+		}
+		// Could be a function call that returns a type, try to extract from return type
+		if ident, ok := e.Fun.(*ast.Ident); ok {
+			if actualType, ok := varTypeMap[ident.Name]; ok {
+				return actualType
+			}
+		}
+	case *ast.UnaryExpr:
+		// &variable -> dereference and get the type
+		if e.Op == token.AND {
+			return extractTypeFromResponse(e.X, varTypeMap)
 		}
 	}
 	return ""
