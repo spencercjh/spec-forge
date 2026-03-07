@@ -191,14 +191,13 @@ func (p *ReadMePublisher) buildLocation(opts *ReadMeOptions) string {
 // wrapExecuteError wraps executor errors with appropriate context.
 func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteResult) error {
 	// Handle command not found
-	if cmdNotFound, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
-		if strings.TrimSpace(cmdNotFound.Hint) != "" {
-			return fmt.Errorf("rdme CLI not found: %w\n%s", err, strings.TrimSpace(cmdNotFound.Hint))
-		}
-		return fmt.Errorf("rdme CLI not found: %w", err)
+	//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
+	if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
+		return fmt.Errorf("rdme CLI not found: %w\nTo install rdme, run: npm install -g rdme", err)
 	}
 
 	// Handle command failure - include output for debugging
+	//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
 	if cmdFailed, ok := errors.AsType[*executor.CommandFailedError](err); ok {
 		output := cmdFailed.Stdout
 		if cmdFailed.Stderr != "" {

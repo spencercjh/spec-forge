@@ -13,10 +13,18 @@ import (
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
+// installHints maps commands to their installation instructions.
+var installHints = map[string]string{
+	"mvn":    "Install Maven from https://maven.apache.org/install.html or use your package manager",
+	"gradle": "Install Gradle from https://gradle.org/install/ or use your package manager",
+}
+
 // wrapCommandError wraps executor errors with helpful hints.
 func wrapCommandError(err error) error {
-	if cmdNotFound, ok := errors.AsType[*executor.CommandNotFoundError](err); ok && cmdNotFound.Hint != "" {
-		return fmt.Errorf("%w\nHint: %s", err, cmdNotFound.Hint)
+	if cmdNotFound, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
+		if hint, exists := installHints[cmdNotFound.Command]; exists {
+			return fmt.Errorf("%w\nHint: %s", err, hint)
+		}
 	}
 	return err
 }

@@ -52,8 +52,8 @@ func (p *Patcher) Patch(_ string) (*PatchResult, error) {
 	result, err := p.exec.Execute(ctx, opts)
 	if err != nil {
 		// Check if the command was not found
-		var cmdNotFound *executor.CommandNotFoundError
-		if errors.As(err, &cmdNotFound) {
+		//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
+		if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
 			slog.Error("goctl not found", "error", err)
 			return nil, errors.New(
 				"goctl is not installed. goctl is required for processing go-zero API files.\n" +

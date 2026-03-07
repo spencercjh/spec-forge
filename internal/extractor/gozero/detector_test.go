@@ -164,8 +164,7 @@ require (
 		t.Fatal("expected Detect to fail when no go-zero dependencies are present")
 	}
 
-	var notGoZeroErr *gozero.ErrNotGoZeroProject
-	if !errors.As(err, &notGoZeroErr) {
+	if _, ok := errors.AsType[*gozero.ErrNotGoZeroProject](err); !ok {
 		t.Errorf("expected error to be *gozero.ErrNotGoZeroProject, got: %T", err)
 	}
 }
@@ -357,8 +356,7 @@ func TestDetector_Detect_EmptyProject(t *testing.T) {
 		t.Fatal("expected Detect to fail when no go-zero dependency is present")
 	}
 
-	var notGoZeroErr *gozero.ErrNotGoZeroProject
-	if !errors.As(err, &notGoZeroErr) {
+	if _, ok := errors.AsType[*gozero.ErrNotGoZeroProject](err); !ok {
 		t.Errorf("expected error to be *gozero.ErrNotGoZeroProject, got: %T", err)
 	}
 }

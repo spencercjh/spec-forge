@@ -126,7 +126,7 @@ func TestReadMePublisher_Publish_OptionsKeyPriority(t *testing.T) {
 
 func TestReadMePublisher_Publish_CommandNotFound(t *testing.T) {
 	mock := &mockExecutor{
-		err: &executor.CommandNotFoundError{Command: "rdme", Hint: "Install rdme"},
+		err: &executor.CommandNotFoundError{Command: "rdme"},
 	}
 	p := NewReadMePublisherWithExecutor(mock)
 	spec := createTestSpec()

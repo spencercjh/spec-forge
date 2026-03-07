@@ -57,7 +57,6 @@ func TestPatcher_Patch_GoctlNotFound(t *testing.T) {
 		},
 		err: &executor.CommandNotFoundError{
 			Command: "goctl",
-			Hint:    "",
 		},
 	}
 
