@@ -7,10 +7,11 @@ import (
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
-const FrameworkName = "gin"
-
-// ExtractorName is the name of the Gin extractor.
-const ExtractorName = "gin"
+const (
+	FrameworkName = "gin"
+	// ExtractorName is the name of the Gin extractor.
+	ExtractorName = "gin"
+)
 
 // Extractor implements extractor.Extractor for Gin projects.
 type Extractor struct {
