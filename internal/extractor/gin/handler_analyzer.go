@@ -104,10 +104,58 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 				})
 			}
 		}
-	case "ShouldBindJSON", "BindJSON", "ShouldBind":
+	case "ShouldBindJSON", "BindJSON", "ShouldBind", "Bind":
 		if len(call.Args) >= 1 {
 			if typeName := extractTypeFromArg(call.Args[0]); typeName != "" {
 				info.BodyType = typeName
+			}
+		}
+	case "ShouldBindXML", "BindXML":
+		if len(call.Args) >= 1 {
+			if typeName := extractTypeFromArg(call.Args[0]); typeName != "" {
+				info.BodyType = typeName
+			}
+		}
+	case "ShouldBindYAML", "BindYAML":
+		if len(call.Args) >= 1 {
+			if typeName := extractTypeFromArg(call.Args[0]); typeName != "" {
+				info.BodyType = typeName
+			}
+		}
+	case "ShouldBindQuery", "BindQuery":
+		if len(call.Args) >= 1 {
+			if typeName := extractTypeFromArg(call.Args[0]); typeName != "" {
+				info.BodyType = typeName
+			}
+		}
+	case "PostForm":
+		if len(call.Args) >= 1 {
+			if name := extractStringLiteral(call.Args[0]); name != "" {
+				info.QueryParams = append(info.QueryParams, ParamInfo{
+					Name:     name,
+					GoType:   "string",
+					Required: true,
+				})
+			}
+		}
+	case "DefaultPostForm":
+		if len(call.Args) >= 1 {
+			if name := extractStringLiteral(call.Args[0]); name != "" {
+				info.QueryParams = append(info.QueryParams, ParamInfo{
+					Name:     name,
+					GoType:   "string",
+					Required: false,
+				})
+			}
+		}
+	case "FormFile":
+		if len(call.Args) >= 1 {
+			if name := extractStringLiteral(call.Args[0]); name != "" {
+				info.QueryParams = append(info.QueryParams, ParamInfo{
+					Name:     name,
+					GoType:   "file",
+					Required: true,
+				})
 			}
 		}
 	case "JSON":
@@ -117,6 +165,48 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 			info.Responses = append(info.Responses, ResponseInfo{
 				StatusCode: statusCode,
 				GoType:     goType,
+			})
+		}
+	case "XML":
+		if len(call.Args) >= 2 {
+			statusCode := extractStatusCode(call.Args[0])
+			goType := extractTypeFromResponse(call.Args[1])
+			info.Responses = append(info.Responses, ResponseInfo{
+				StatusCode: statusCode,
+				GoType:     goType,
+			})
+		}
+	case "YAML":
+		if len(call.Args) >= 2 {
+			statusCode := extractStatusCode(call.Args[0])
+			goType := extractTypeFromResponse(call.Args[1])
+			info.Responses = append(info.Responses, ResponseInfo{
+				StatusCode: statusCode,
+				GoType:     goType,
+			})
+		}
+	case "String":
+		if len(call.Args) >= 2 {
+			statusCode := extractStatusCode(call.Args[0])
+			info.Responses = append(info.Responses, ResponseInfo{
+				StatusCode: statusCode,
+				GoType:     "string",
+			})
+		}
+	case "Data":
+		if len(call.Args) >= 2 {
+			statusCode := extractStatusCode(call.Args[0])
+			info.Responses = append(info.Responses, ResponseInfo{
+				StatusCode: statusCode,
+				GoType:     "binary",
+			})
+		}
+	case "Redirect":
+		if len(call.Args) >= 2 {
+			statusCode := extractStatusCode(call.Args[0])
+			info.Responses = append(info.Responses, ResponseInfo{
+				StatusCode: statusCode,
+				GoType:     "",
 			})
 		}
 	}
