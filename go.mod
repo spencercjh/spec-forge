@@ -1,6 +1,6 @@
 module github.com/spencercjh/spec-forge
 
-go 1.26.0
+go 1.26
 
 require (
 	github.com/getkin/kin-openapi v0.133.0

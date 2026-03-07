@@ -38,11 +38,11 @@ func NewUnsupportedProviderError(provider string) *UnsupportedProviderError {
 // NewProvider creates a provider based on the provider type
 func NewProvider(cfg Config) (Provider, error) { //nolint:gocritic // copying config is acceptable
 	switch cfg.Provider {
-	case "openai":
+	case OpenAIProviderName:
 		return newOpenAIProvider(cfg.APIKey, cfg.Model)
 	case "anthropic":
 		return newAnthropicProvider(cfg.APIKey, cfg.Model)
-	case "ollama":
+	case OllamaProviderName:
 		baseURL := cfg.BaseURL
 		if baseURL == "" {
 			baseURL = "http://localhost:11434"
