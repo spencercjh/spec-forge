@@ -1,8 +1,13 @@
 // Package grpcprotoc provides gRPC-protoc framework extraction functionality.
 package grpcprotoc
 
+import "github.com/spencercjh/spec-forge/internal/extractor"
+
 // FrameworkName is the identifier for this extractor.
 const FrameworkName = "grpc-protoc"
+
+// BuildToolProtoc represents protoc as the build tool.
+const BuildToolProtoc extractor.BuildTool = "protoc"
 
 // Info holds gRPC-protoc specific project information.
 type Info struct {
