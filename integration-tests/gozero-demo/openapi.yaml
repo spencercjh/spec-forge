@@ -1,0 +1,270 @@
+components: {}
+info:
+    title: User Management API
+    version: 1.0.0
+openapi: 3.0.3
+paths:
+    /api/v1/users:
+        get:
+            operationId: listUsersHandler
+            parameters:
+                - in: query
+                  name: page
+                  required: true
+                  schema:
+                    default: 0
+                    type: integer
+                - in: query
+                  name: size
+                  required: true
+                  schema:
+                    default: 10
+                    type: integer
+                - in: query
+                  name: username
+                  schema:
+                    allowEmptyValue: true
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    code:
+                                        type: integer
+                                    data:
+                                        properties:
+                                            content:
+                                                items:
+                                                    properties:
+                                                        age:
+                                                            type: integer
+                                                        email:
+                                                            type: string
+                                                        fullName:
+                                                            type: string
+                                                        id:
+                                                            type: integer
+                                                        username:
+                                                            type: string
+                                                    required:
+                                                        - id
+                                                        - username
+                                                        - email
+                                                        - fullName
+                                                        - age
+                                                    type: object
+                                                type: array
+                                            pageNumber:
+                                                type: integer
+                                            pageSize:
+                                                type: integer
+                                            total:
+                                                type: integer
+                                            totalPages:
+                                                type: integer
+                                        required:
+                                            - content
+                                            - pageNumber
+                                            - pageSize
+                                            - total
+                                            - totalPages
+                                        type: object
+                                    message:
+                                        type: string
+                                type: object
+                    description: ""
+            summary: ListUsersHandler
+        post:
+            operationId: createUserHandler
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            properties:
+                                age:
+                                    type: integer
+                                email:
+                                    type: string
+                                fullName:
+                                    type: string
+                                username:
+                                    type: string
+                            required:
+                                - username
+                                - email
+                                - fullName
+                                - age
+                            type: object
+                required: true
+                x-originalParamName: body
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    code:
+                                        type: integer
+                                    data:
+                                        properties:
+                                            age:
+                                                type: integer
+                                            email:
+                                                type: string
+                                            fullName:
+                                                type: string
+                                            id:
+                                                type: integer
+                                            username:
+                                                type: string
+                                        required:
+                                            - id
+                                            - username
+                                            - email
+                                            - fullName
+                                            - age
+                                        type: object
+                                    message:
+                                        type: string
+                                type: object
+                    description: ""
+            summary: CreateUserHandler
+    /api/v1/users/{id}:
+        get:
+            operationId: getUserHandler
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    code:
+                                        type: integer
+                                    data:
+                                        properties:
+                                            age:
+                                                type: integer
+                                            email:
+                                                type: string
+                                            fullName:
+                                                type: string
+                                            id:
+                                                type: integer
+                                            username:
+                                                type: string
+                                        required:
+                                            - id
+                                            - username
+                                            - email
+                                            - fullName
+                                            - age
+                                        type: object
+                                    message:
+                                        type: string
+                                type: object
+                    description: ""
+            summary: GetUserHandler
+    /api/v1/users/{id}/profile:
+        post:
+            operationId: updateProfileHandler
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            properties:
+                                age:
+                                    allowEmptyValue: true
+                                    type: integer
+                                    x-formData-name: age
+                                email:
+                                    allowEmptyValue: true
+                                    type: string
+                                    x-formData-name: email
+                                fullName:
+                                    allowEmptyValue: true
+                                    type: string
+                                    x-formData-name: fullName
+                            type: object
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    code:
+                                        type: integer
+                                    data:
+                                        properties:
+                                            age:
+                                                type: integer
+                                            email:
+                                                type: string
+                                            fullName:
+                                                type: string
+                                            id:
+                                                type: integer
+                                            username:
+                                                type: string
+                                        required:
+                                            - id
+                                            - username
+                                            - email
+                                            - fullName
+                                            - age
+                                        type: object
+                                    message:
+                                        type: string
+                                type: object
+                    description: ""
+            summary: UpdateProfileHandler
+    /api/v1/users/upload:
+        post:
+            operationId: uploadFileHandler
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                properties:
+                                    code:
+                                        type: integer
+                                    data:
+                                        properties:
+                                            contentType:
+                                                type: string
+                                            filename:
+                                                type: string
+                                            message:
+                                                type: string
+                                            size:
+                                                type: integer
+                                        required:
+                                            - filename
+                                            - size
+                                            - contentType
+                                            - message
+                                        type: object
+                                    message:
+                                        type: string
+                                type: object
+                    description: ""
+            summary: UploadFileHandler
+x-date: "2026-03-08 01:46:51"
+x-description: This is a goctl generated swagger file.
+x-github: https://github.com/zeromicro/go-zero
+x-go-zero-doc: https://go-zero.dev/
+x-goctl-version: 1.9.2
