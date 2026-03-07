@@ -8,6 +8,9 @@ import (
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
+// OpenAIProviderName is the name of the OpenAI provider.
+const OpenAIProviderName = "openai"
+
 // OpenAIProvider implements Provider for OpenAI using langchaingo
 type OpenAIProvider struct {
 	llm   llms.Model
@@ -41,5 +44,5 @@ func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, e
 
 // Name returns the provider name
 func (p *OpenAIProvider) Name() string {
-	return "openai"
+	return OpenAIProviderName
 }

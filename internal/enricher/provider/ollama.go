@@ -8,6 +8,9 @@ import (
 	"github.com/tmc/langchaingo/llms/ollama"
 )
 
+// OllamaProviderName is the name of the Ollama provider.
+const OllamaProviderName = "ollama"
+
 // OllamaProvider implements Provider for Ollama local LLM using langchaingo
 type OllamaProvider struct {
 	llm     llms.Model
@@ -39,12 +42,12 @@ func newOllamaProvider(baseURL, model string) (*OllamaProvider, error) {
 func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, error) {
 	response, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
 	if err != nil {
-		return "", fmt.Errorf("ollama generation failed: %w", err)
+		return "", fmt.Errorf("%s generation failed: %w", OllamaProviderName, err)
 	}
 	return response, nil
 }
 
 // Name returns the provider name
 func (p *OllamaProvider) Name() string {
-	return "ollama"
+	return OllamaProviderName
 }
