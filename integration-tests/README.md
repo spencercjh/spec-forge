@@ -10,6 +10,7 @@ This directory contains end-to-end tests for the spec-forge CLI tool.
 | `gradle-springboot-openapi-demo` | Gradle | Single module Spring Boot project |
 | `maven-multi-module-demo` | Maven | Multi-module Spring Boot project |
 | `gradle-multi-module-demo` | Gradle | Multi-module Spring Boot project |
+| `gozero-demo` | Go Modules | go-zero framework project |
 
 ## Running Tests
 
@@ -48,9 +49,13 @@ go test -tags=e2e ./...
 
 ## Test Coverage
 
-| Test | Description |
-|------|-------------|
-| `TestE2E_MavenSpringBoot_Generate` | Tests generate flow for Maven project |
-| `TestE2E_MavenSpringBoot_GenerateEnrich` | Tests complete generate → enrich flow |
-| `TestE2E_GradleSpringBoot_Generate` | Tests generate flow for Gradle project |
-| `TestE2E_ErrorHandling_CommandNotFound` | Tests error handling for missing commands |
+| Test File | Tests | Description |
+|-----------|-------|-------------|
+| `spring_maven_test.go` | `TestE2E_MavenSpringBoot_Generate` | Tests generate flow for Maven project |
+| | `TestE2E_MavenSpringBoot_GenerateEnrich` | Tests complete generate → enrich flow |
+| | `spring_gradle_test.go` | `TestE2E_GradleSpringBoot_Generate` | Tests generate flow for Gradle project |
+| | `gozero_test.go` | `TestE2E_GoZero_Generate` | Tests generate flow for go-zero project |
+| | `TestE2E_GoZero_Detect` | Tests detection of go-zero project info |
+| | `TestE2E_GoZero_NoGoctl` | Tests graceful handling when goctl missing |
+| | `error_test.go` | `TestE2E_ErrorHandling_CommandNotFound` | Tests error handling for missing commands |
+| | `mock_provider_test.go` | `countingMockProvider` | Shared mock provider for enrichment tests |

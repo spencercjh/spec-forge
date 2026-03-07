@@ -95,7 +95,7 @@ LLM_API_KEY="sk-xxx" spec-forge enrich ./openapi.json \
 | Framework                                                                                                                                    | Language       | Status         |
 |----------------------------------------------------------------------------------------------------------------------------------------------|----------------|----------------|
 | [Spring Boot](https://springdoc.org/#plugins)                                                                                                | Java           | ✅ Supported    |
-| [go-zero](https://go-zero.dev/reference/cli-guide/swagger/)                                                                                  | Go             | 🚧 Coming soon |
+| [go-zero](https://go-zero.dev/reference/cli-guide/swagger/)                                                                                  | Go             | ✅ Supported    |
 | [Hertz](https://github.com/hertz-contrib/swagger-generate/tree/main/protoc-gen-http-swagger)                                                 | Go             | 🚧 Coming soon |
 | [Kitex](https://github.com/hertz-contrib/swagger-generate/tree/main/protoc-gen-rpc-swagger)                                                  | Go             | 🚧 Coming soon |
 | [gRPC](https://github.com/grpc-ecosystem/grpc-gateway?tab=readme-ov-file#6-optional-generate-openapi-definitions-using-protoc-gen-openapiv2) | Multi-language | 🚧 Coming soon |
