@@ -2,6 +2,7 @@
 package gozero_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,6 +48,12 @@ require (
 	goModPath := filepath.Join(tmpDir, "go.mod")
 	if err := os.WriteFile(goModPath, []byte(goModContent), 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
+	}
+
+	// Create a .api file (required for detection)
+	apiFile := filepath.Join(tmpDir, "test.api")
+	if err := os.WriteFile(apiFile, []byte("syntax = \"v1\""), 0o644); err != nil {
+		t.Fatalf("Failed to create .api file: %v", err)
 	}
 
 	detector := gozero.NewDetector()
@@ -104,6 +111,12 @@ require github.com/zeromicro/go-zero v1.5.0
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
+	// Create a .api file (required for detection)
+	apiFile := filepath.Join(tmpDir, "test.api")
+	if err := os.WriteFile(apiFile, []byte("syntax = \"v1\""), 0o644); err != nil {
+		t.Fatalf("Failed to create .api file: %v", err)
+	}
+
 	detector := gozero.NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
@@ -146,26 +159,14 @@ require (
 	}
 
 	detector := gozero.NewDetector()
-	info, err := detector.Detect(tmpDir)
-	if err != nil {
-		t.Fatalf("Detect failed: %v", err)
+	_, err := detector.Detect(tmpDir)
+	if err == nil {
+		t.Fatal("expected Detect to fail when no go-zero dependencies are present")
 	}
 
-	if info.FrameworkData == nil {
-		t.Fatal("FrameworkData should not be nil")
-	}
-
-	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
-	if !ok {
-		t.Fatal("FrameworkData should be *gozero.Info")
-	}
-
-	if goZeroInfo.HasGoZeroDeps {
-		t.Error("HasGoZeroDeps should be false")
-	}
-
-	if goZeroInfo.GoZeroVersion != "" {
-		t.Errorf("GoZeroVersion should be empty, got %s", goZeroInfo.GoZeroVersion)
+	var notGoZeroErr *gozero.ErrNotGoZeroProject
+	if !errors.As(err, &notGoZeroErr) {
+		t.Errorf("expected error to be *gozero.ErrNotGoZeroProject, got: %T", err)
 	}
 }
 
@@ -340,7 +341,7 @@ func TestDetector_Detect_InvalidPath(t *testing.T) {
 }
 
 func TestDetector_Detect_EmptyProject(t *testing.T) {
-	// Create temp dir with empty go.mod
+	// Create temp dir with empty go.mod (no go-zero dependency)
 	tmpDir := t.TempDir()
 
 	goModContent := `module example.com/empty
@@ -351,29 +352,13 @@ func TestDetector_Detect_EmptyProject(t *testing.T) {
 	}
 
 	detector := gozero.NewDetector()
-	info, err := detector.Detect(tmpDir)
-	if err != nil {
-		t.Fatalf("Detect failed: %v", err)
+	_, err := detector.Detect(tmpDir)
+	if err == nil {
+		t.Fatal("expected Detect to fail when no go-zero dependency is present")
 	}
 
-	if info.FrameworkData == nil {
-		t.Fatal("FrameworkData should not be nil")
-	}
-
-	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
-	if !ok {
-		t.Fatal("FrameworkData should be *gozero.Info")
-	}
-
-	if goZeroInfo.ModuleName != "example.com/empty" {
-		t.Errorf("ModuleName = %s, want example.com/empty", goZeroInfo.ModuleName)
-	}
-
-	if goZeroInfo.GoVersion != "" {
-		t.Errorf("GoVersion should be empty for empty go.mod, got %s", goZeroInfo.GoVersion)
-	}
-
-	if goZeroInfo.HasGoZeroDeps {
-		t.Error("HasGoZeroDeps should be false for empty go.mod")
+	var notGoZeroErr *gozero.ErrNotGoZeroProject
+	if !errors.As(err, &notGoZeroErr) {
+		t.Errorf("expected error to be *gozero.ErrNotGoZeroProject, got: %T", err)
 	}
 }

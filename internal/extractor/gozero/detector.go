@@ -8,9 +8,19 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spencercjh/spec-forge/internal/extractor"
 	"golang.org/x/mod/modfile"
+
+	"github.com/spencercjh/spec-forge/internal/extractor"
 )
+
+// ErrNotGoZeroProject is returned when the project is not a go-zero project.
+type ErrNotGoZeroProject struct {
+	Reason string
+}
+
+func (e *ErrNotGoZeroProject) Error() string {
+	return "not a go-zero project: " + e.Reason
+}
 
 // Detector detects go-zero project information.
 type Detector struct{}
@@ -43,11 +53,22 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 		return nil, fmt.Errorf("failed to parse go.mod: %w", parseErr)
 	}
 
+	// Reject if no go-zero dependency found
+	if !goZeroInfo.HasGoZeroDeps {
+		return nil, &ErrNotGoZeroProject{Reason: "no go-zero dependency found in go.mod"}
+	}
+
 	// Find .api files
 	apiFiles, err := d.findAPIFiles(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find .api files: %w", err)
 	}
+
+	// Reject if no .api files found
+	if len(apiFiles) == 0 {
+		return nil, &ErrNotGoZeroProject{Reason: "no .api files found in project"}
+	}
+
 	goZeroInfo.APIFiles = apiFiles
 
 	// Check if goctl is available
@@ -85,9 +106,10 @@ func (d *Detector) parseGoMod(goModPath string, info *Info) error {
 		info.GoVersion = f.Go.Version
 	}
 
-	// Check for go-zero dependency
+	// Check for go-zero dependency (exact match to avoid false positives)
+	const goZeroModulePath = "github.com/zeromicro/go-zero"
 	for _, req := range f.Require {
-		if req != nil && strings.Contains(req.Mod.Path, "go-zero") {
+		if req != nil && req.Mod.Path == goZeroModulePath {
 			info.HasGoZeroDeps = true
 			info.GoZeroVersion = req.Mod.Version
 			break

@@ -36,7 +36,9 @@ func PatchSwagger(doc *openapi2.T) {
 
 	// Patch schema definitions
 	for _, schemaRef := range doc.Definitions {
-		patchSchema(schemaRef.Value)
+		if schemaRef != nil && schemaRef.Value != nil {
+			patchSchema(schemaRef.Value)
+		}
 	}
 }
 
@@ -90,7 +92,9 @@ func patchSchema(schema *openapi2.Schema) {
 
 	// Patch nested schemas in properties
 	for _, propRef := range schema.Properties {
-		patchSchema(propRef.Value)
+		if propRef != nil {
+			patchSchema(propRef.Value)
+		}
 	}
 
 	// Patch items schema if present
@@ -104,7 +108,9 @@ func patchSchema(schema *openapi2.Schema) {
 
 	// Patch allOf schemas
 	for _, allOfRef := range schema.AllOf {
-		patchSchema(allOfRef.Value)
+		if allOfRef != nil {
+			patchSchema(allOfRef.Value)
+		}
 	}
 
 	// Patch not schema

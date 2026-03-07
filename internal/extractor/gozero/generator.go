@@ -264,8 +264,18 @@ func (g *Generator) convertSwaggerToOpenAPI(swaggerPath string, opts *extractor.
 		return nil, fmt.Errorf("failed to convert Swagger 2.0 to OpenAPI 3.0: %w", err)
 	}
 
-	// Determine output path
-	workDir := filepath.Dir(swaggerPath)
+	// Determine output directory (respect opts.OutputDir if provided)
+	var outputDir string
+	if opts.OutputDir != "" {
+		outputDir = opts.OutputDir
+		// Ensure output directory exists
+		if mkdirErr := os.MkdirAll(outputDir, 0o755); mkdirErr != nil {
+			return nil, fmt.Errorf("failed to create output directory %s: %w", outputDir, mkdirErr)
+		}
+	} else {
+		outputDir = filepath.Dir(swaggerPath)
+	}
+
 	outputFile := opts.OutputFile
 	if outputFile == "" {
 		outputFile = defaultOutputFileName
@@ -276,13 +286,13 @@ func (g *Generator) convertSwaggerToOpenAPI(swaggerPath string, opts *extractor.
 
 	// Marshal based on format
 	if opts.Format == "yaml" {
-		outputPath = filepath.Join(workDir, outputFile+".yaml")
+		outputPath = filepath.Join(outputDir, outputFile+".yaml")
 		outputData, err = marshalYAML(openAPIDoc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal OpenAPI 3.0 to YAML: %w", err)
 		}
 	} else {
-		outputPath = filepath.Join(workDir, outputFile+".json")
+		outputPath = filepath.Join(outputDir, outputFile+".json")
 		outputData, err = openAPIDoc.MarshalJSON()
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal OpenAPI 3.0 to JSON: %w", err)

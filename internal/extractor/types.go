@@ -9,9 +9,6 @@ import (
 // BuildTool represents the build tool type for a project.
 type BuildTool string
 
-// Framework type constants.
-const ()
-
 // Extractor is the interface for framework-specific OpenAPI spec extraction.
 // Each framework (Spring Boot, go-zero, etc.) implements this interface.
 type Extractor interface {
