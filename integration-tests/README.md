@@ -52,10 +52,10 @@ go test -tags=e2e ./...
 | Test File | Tests | Description |
 |-----------|-------|-------------|
 | `spring_maven_test.go` | `TestE2E_MavenSpringBoot_Generate` | Tests generate flow for Maven project |
-| | `TestE2E_MavenSpringBoot_GenerateEnrich` | Tests complete generate → enrich flow |
-| | `spring_gradle_test.go` | `TestE2E_GradleSpringBoot_Generate` | Tests generate flow for Gradle project |
-| | `gozero_test.go` | `TestE2E_GoZero_Generate` | Tests generate flow for go-zero project |
-| | `TestE2E_GoZero_Detect` | Tests detection of go-zero project info |
-| | `TestE2E_GoZero_NoGoctl` | Tests graceful handling when goctl missing |
-| | `error_test.go` | `TestE2E_ErrorHandling_CommandNotFound` | Tests error handling for missing commands |
-| | `mock_provider_test.go` | `countingMockProvider` | Shared mock provider for enrichment tests |
+| `spring_maven_test.go` | `TestE2E_MavenSpringBoot_GenerateEnrich` | Tests complete generate → enrich flow |
+| `spring_gradle_test.go` | `TestE2E_GradleSpringBoot_Generate` | Tests generate flow for Gradle project |
+| `gozero_test.go` | `TestE2E_GoZero_Generate` | Tests generate flow for go-zero project |
+| `gozero_test.go` | `TestE2E_GoZero_Detect` | Tests detection of go-zero project info |
+| `gozero_test.go` | `TestE2E_GoZero_NoGoctl` | Tests graceful handling when goctl missing |
+| `error_test.go` | `TestE2E_ErrorHandling_CommandNotFound` | Tests error handling for missing commands |
+| `mock_provider_test.go` | `countingMockProvider` | Shared mock provider for enrichment tests |
