@@ -63,3 +63,6 @@ output/
 # Claude Code
 .claude/
 .go-version
+integration-tests/gozero-demo/openapi.yaml
+integration-tests/gozero-demo/openapi.json
+
