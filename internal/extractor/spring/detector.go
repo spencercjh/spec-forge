@@ -53,10 +53,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 
 // detectMavenProject analyzes a Maven project.
 func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.ProjectInfo, error) {
-	info := &extractor.ProjectInfo{
-		BuildTool:     BuildToolMaven,
-		BuildFilePath: pomPath,
-	}
+	springInfo := &Info{}
 
 	// Parse pom.xml
 	pom, err := d.mavenParser.Parse(pomPath)
@@ -67,41 +64,48 @@ func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.P
 	// Check for multi-module project
 	modules := d.mavenParser.GetModules(pom)
 	if len(modules) > 0 {
-		info.IsMultiModule = true
-		info.Modules = modules
+		springInfo.IsMultiModule = true
+		springInfo.Modules = modules
 
 		// Find the main module (one with Spring Boot plugin)
 		mainModule, mainModulePath := d.mavenParser.FindMainModule(projectPath, modules)
 		if mainModule != "" {
-			info.MainModule = mainModule
-			info.MainModulePath = mainModulePath
+			springInfo.MainModule = mainModule
+			springInfo.MainModulePath = mainModulePath
 		}
 	}
 
 	// Extract project information from parent POM
-	info.SpringBootVersion = d.mavenParser.GetSpringBootVersion(pom)
-	info.HasSpringdocDeps = d.mavenParser.HasSpringdocDependency(pom)
-	info.SpringdocVersion = d.mavenParser.GetSpringdocVersion(pom)
-	info.HasSpringdocPlugin = d.mavenParser.HasSpringdocPlugin(pom)
+	springInfo.SpringBootVersion = d.mavenParser.GetSpringBootVersion(pom)
+	springInfo.HasSpringdocDeps = d.mavenParser.HasSpringdocDependency(pom)
+	springInfo.SpringdocVersion = d.mavenParser.GetSpringdocVersion(pom)
+	springInfo.HasSpringdocPlugin = d.mavenParser.HasSpringdocPlugin(pom)
 
 	// For multi-module projects, also check subproject pom files
-	if info.IsMultiModule && info.MainModulePath != "" {
-		subPom, err := d.mavenParser.Parse(info.MainModulePath)
+	if springInfo.IsMultiModule && springInfo.MainModulePath != "" {
+		subPom, err := d.mavenParser.Parse(springInfo.MainModulePath)
 		if err == nil {
 			// Merge subproject info
 			if subVersion := d.mavenParser.GetSpringBootVersion(subPom); subVersion != "" {
-				info.SpringBootVersion = subVersion
+				springInfo.SpringBootVersion = subVersion
 			}
 			if d.mavenParser.HasSpringdocDependency(subPom) {
-				info.HasSpringdocDeps = true
+				springInfo.HasSpringdocDeps = true
 				if v := d.mavenParser.GetSpringdocVersion(subPom); v != "" {
-					info.SpringdocVersion = v
+					springInfo.SpringdocVersion = v
 				}
 			}
 			if d.mavenParser.HasSpringdocPlugin(subPom) {
-				info.HasSpringdocPlugin = true
+				springInfo.HasSpringdocPlugin = true
 			}
 		}
+	}
+
+	info := &extractor.ProjectInfo{
+		Framework:     FrameworkSpringBoot,
+		BuildTool:     BuildToolMaven,
+		BuildFilePath: pomPath,
+		FrameworkData: springInfo,
 	}
 
 	return info, nil
@@ -109,10 +113,7 @@ func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.P
 
 // detectGradleProject analyzes a Gradle project.
 func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extractor.ProjectInfo, error) {
-	info := &extractor.ProjectInfo{
-		BuildTool:     BuildToolGradle,
-		BuildFilePath: gradlePath,
-	}
+	springInfo := &Info{}
 
 	// Check for multi-module project via settings.gradle
 	settingsPath := filepath.Join(projectPath, "settings.gradle")
@@ -122,14 +123,14 @@ func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extract
 
 	modules := d.gradleParser.ParseModules(settingsPath)
 	if len(modules) > 0 {
-		info.IsMultiModule = true
-		info.Modules = modules
+		springInfo.IsMultiModule = true
+		springInfo.Modules = modules
 
 		// Find the main module (one with Spring Boot plugin)
 		mainModule, mainModulePath := d.gradleParser.FindMainModule(projectPath, modules)
 		if mainModule != "" {
-			info.MainModule = mainModule
-			info.MainModulePath = mainModulePath
+			springInfo.MainModule = mainModule
+			springInfo.MainModulePath = mainModulePath
 		}
 	}
 
@@ -140,26 +141,33 @@ func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extract
 	}
 
 	// Extract project information
-	info.SpringBootVersion = d.gradleParser.GetSpringBootVersion(build)
-	info.HasSpringdocDeps = d.gradleParser.HasSpringdocDependency(build)
-	info.SpringdocVersion = d.gradleParser.GetSpringdocVersion(build)
-	info.HasSpringdocPlugin = d.gradleParser.HasSpringdocPlugin(build)
+	springInfo.SpringBootVersion = d.gradleParser.GetSpringBootVersion(build)
+	springInfo.HasSpringdocDeps = d.gradleParser.HasSpringdocDependency(build)
+	springInfo.SpringdocVersion = d.gradleParser.GetSpringdocVersion(build)
+	springInfo.HasSpringdocPlugin = d.gradleParser.HasSpringdocPlugin(build)
 
 	// For multi-module projects, also check subproject build files
-	if info.IsMultiModule && info.MainModulePath != "" {
-		subBuild, err := d.gradleParser.Parse(info.MainModulePath)
+	if springInfo.IsMultiModule && springInfo.MainModulePath != "" {
+		subBuild, err := d.gradleParser.Parse(springInfo.MainModulePath)
 		if err == nil {
 			// Merge subproject info
 			if subVersion := d.gradleParser.GetSpringBootVersion(subBuild); subVersion != "" {
-				info.SpringBootVersion = subVersion
+				springInfo.SpringBootVersion = subVersion
 			}
 			if d.gradleParser.HasSpringdocDependency(subBuild) {
-				info.HasSpringdocDeps = true
+				springInfo.HasSpringdocDeps = true
 			}
 			if d.gradleParser.HasSpringdocPlugin(subBuild) {
-				info.HasSpringdocPlugin = true
+				springInfo.HasSpringdocPlugin = true
 			}
 		}
+	}
+
+	info := &extractor.ProjectInfo{
+		Framework:     FrameworkSpringBoot,
+		BuildTool:     BuildToolGradle,
+		BuildFilePath: gradlePath,
+		FrameworkData: springInfo,
 	}
 
 	return info, nil

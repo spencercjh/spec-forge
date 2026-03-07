@@ -19,7 +19,7 @@ import (
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 	"github.com/spencercjh/spec-forge/internal/extractor"
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
+	"github.com/spencercjh/spec-forge/internal/extractor/builtin" // registers built-in extractors
 	"github.com/spencercjh/spec-forge/internal/publisher"
 	"github.com/spencercjh/spec-forge/internal/validator"
 )
@@ -70,35 +70,33 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 
 	slog.InfoContext(ctx, "Generating OpenAPI spec", "path", path)
 
-	// Step 1: Detect project
-	detector := spring.NewDetector()
-	info, err := detector.Detect(path)
+	// Step 1: Detect framework - try all registered extractors
+	extractorImpl, info, err := builtin.DetectFramework(path)
 	if err != nil {
-		return errWrap("detection failed", err)
+		return errWrap("no supported framework detected", err)
 	}
 
 	slog.InfoContext(ctx, "Detected project",
+		"framework", extractorImpl.Name(),
 		"tool", info.BuildTool,
 		"build_file", info.BuildFilePath,
-		"multi_module", info.IsMultiModule,
 	)
 
 	// Step 2: Patch project if needed
-	patcher := spring.NewPatcher()
 	patchOpts := &extractor.PatchOptions{
 		KeepPatched: generateKeepPatched,
 	}
 
-	result, err := patcher.Patch(path, patchOpts)
+	patchResult, err := extractorImpl.Patch(path, patchOpts)
 	if err != nil {
 		return errWrap("patch failed", err)
 	}
 
 	// Step 3: If we patched the file and should restore later, defer the restore
-	if !generateKeepPatched && result.OriginalContent != "" {
+	if !generateKeepPatched && patchResult.OriginalContent != "" {
 		defer func() {
 			slog.InfoContext(ctx, "Restoring original build file...")
-			if restoreErr := patcher.Restore(result.BuildFilePath, result.OriginalContent); restoreErr != nil {
+			if restoreErr := extractorImpl.Restore(patchResult.BuildFilePath, patchResult.OriginalContent); restoreErr != nil {
 				slog.WarnContext(ctx, "failed to restore original file", "error", restoreErr)
 			} else {
 				slog.InfoContext(ctx, "Original build file restored", "status", "✅")
@@ -106,18 +104,17 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		}()
 	}
 
-	if result.DependencyAdded {
-		slog.InfoContext(ctx, "springdoc dependency added temporarily", "status", "✅")
+	if patchResult.DependencyAdded {
+		slog.InfoContext(ctx, "dependencies added temporarily", "status", "✅")
 	}
-	if result.PluginAdded {
-		slog.InfoContext(ctx, "springdoc plugin added temporarily", "status", "✅")
+	if patchResult.PluginAdded {
+		slog.InfoContext(ctx, "plugin added temporarily", "status", "✅")
 	}
-	if result.SpringBootConfigured {
+	if patchResult.SpringBootConfigured {
 		slog.InfoContext(ctx, "spring-boot-maven-plugin configured with start/stop goals", "status", "✅")
 	}
 
 	// Step 4: Generate OpenAPI spec
-	generator := spring.NewGenerator()
 
 	// Determine output directory
 	outputDir := generateOutput
@@ -132,7 +129,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		SkipTests: true,
 	}
 
-	genResult, err := generator.Generate(ctx, path, info, genOpts)
+	genResult, err := extractorImpl.Generate(ctx, path, info, genOpts)
 	if err != nil {
 		return errWrap("generation failed", err)
 	}

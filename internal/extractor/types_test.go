@@ -12,8 +12,11 @@ func TestProjectInfoDefaults(t *testing.T) {
 	if info.BuildTool != "" {
 		t.Error("BuildTool should default to empty")
 	}
-	if info.HasSpringdocDeps {
-		t.Error("HasSpringdocDeps should default to false")
+	if info.Framework != "" {
+		t.Error("Framework should default to empty")
+	}
+	if info.FrameworkData != nil {
+		t.Error("FrameworkData should default to nil")
 	}
 }
 

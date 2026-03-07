@@ -105,7 +105,6 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 		if errors.Is(execErr.Err, exec.ErrNotFound) {
 			return result, &CommandNotFoundError{
 				Command: opts.Command,
-				Hint:    getInstallHint(opts.Command),
 			}
 		}
 	}
@@ -128,7 +127,6 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 // CommandNotFoundError indicates the command was not found in PATH.
 type CommandNotFoundError struct {
 	Command string
-	Hint    string
 }
 
 func (e *CommandNotFoundError) Error() string {
@@ -175,18 +173,4 @@ func (e *CommandFailedError) Error() string {
 
 func (e *CommandFailedError) Unwrap() error {
 	return e.Err
-}
-
-// getInstallHint returns installation hints for common build tools.
-func getInstallHint(command string) string {
-	switch command {
-	case "mvn":
-		return "Install Maven from https://maven.apache.org/install.html or use your package manager"
-	case "gradle":
-		return "Install Gradle from https://gradle.org/install/ or use your package manager"
-	case "rdme":
-		return "Install rdme from https://github.com/readmeio/rdme#installation (npm install -g rdme)"
-	default:
-		return ""
-	}
 }

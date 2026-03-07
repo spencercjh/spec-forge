@@ -280,7 +280,7 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 	patcher := spring.NewPatcher()
 
 	t.Run("needs patch when missing deps", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
+		info := &spring.Info{
 			HasSpringdocDeps:   false,
 			HasSpringdocPlugin: false,
 		}
@@ -290,7 +290,7 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 	})
 
 	t.Run("needs patch when force is true", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
+		info := &spring.Info{
 			HasSpringdocDeps:   true,
 			HasSpringdocPlugin: true,
 		}
@@ -300,7 +300,7 @@ func TestPatcher_NeedsPatch(t *testing.T) {
 	})
 
 	t.Run("no patch needed when already configured", func(t *testing.T) {
-		info := &extractor.ProjectInfo{
+		info := &spring.Info{
 			HasSpringdocDeps:   true,
 			HasSpringdocPlugin: true,
 		}
@@ -1154,16 +1154,23 @@ func TestDetector_MultiModuleGradle(t *testing.T) {
 	}
 
 	// Verify multi-module detection
-	if !info.IsMultiModule {
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
+	}
+	springInfo, ok := info.FrameworkData.(*spring.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *spring.Info")
+	}
+	if !springInfo.IsMultiModule {
 		t.Error("Expected IsMultiModule to be true")
 	}
-	if len(info.Modules) != 2 {
-		t.Errorf("Expected 2 modules, got %d", len(info.Modules))
+	if len(springInfo.Modules) != 2 {
+		t.Errorf("Expected 2 modules, got %d", len(springInfo.Modules))
 	}
-	if info.MainModule != "user-service" {
-		t.Errorf("Expected MainModule to be 'user-service', got '%s'", info.MainModule)
+	if springInfo.MainModule != "user-service" {
+		t.Errorf("Expected MainModule to be 'user-service', got '%s'", springInfo.MainModule)
 	}
-	if info.MainModulePath == "" {
+	if springInfo.MainModulePath == "" {
 		t.Error("Expected MainModulePath to be set")
 	}
 }
@@ -1425,16 +1432,23 @@ func TestDetector_MultiModuleMaven(t *testing.T) {
 	}
 
 	// Verify multi-module detection
-	if !info.IsMultiModule {
+	if info.FrameworkData == nil {
+		t.Fatal("FrameworkData should not be nil")
+	}
+	springInfo, ok := info.FrameworkData.(*spring.Info)
+	if !ok {
+		t.Fatal("FrameworkData should be *spring.Info")
+	}
+	if !springInfo.IsMultiModule {
 		t.Error("Expected IsMultiModule to be true")
 	}
-	if len(info.Modules) != 2 {
-		t.Errorf("Expected 2 modules, got %d", len(info.Modules))
+	if len(springInfo.Modules) != 2 {
+		t.Errorf("Expected 2 modules, got %d", len(springInfo.Modules))
 	}
-	if info.MainModule != "user-service" {
-		t.Errorf("Expected MainModule to be 'user-service', got '%s'", info.MainModule)
+	if springInfo.MainModule != "user-service" {
+		t.Errorf("Expected MainModule to be 'user-service', got '%s'", springInfo.MainModule)
 	}
-	if info.MainModulePath == "" {
+	if springInfo.MainModulePath == "" {
 		t.Error("Expected MainModulePath to be set")
 	}
 }

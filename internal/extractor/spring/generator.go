@@ -13,10 +13,18 @@ import (
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
+// installHints maps commands to their installation instructions.
+var installHints = map[string]string{
+	"mvn":    "Install Maven from https://maven.apache.org/install.html or use your package manager",
+	"gradle": "Install Gradle from https://gradle.org/install/ or use your package manager",
+}
+
 // wrapCommandError wraps executor errors with helpful hints.
 func wrapCommandError(err error) error {
-	if cmdNotFound, ok := errors.AsType[*executor.CommandNotFoundError](err); ok && cmdNotFound.Hint != "" {
-		return fmt.Errorf("%w\nHint: %s", err, cmdNotFound.Hint)
+	if cmdNotFound, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
+		if hint, exists := installHints[cmdNotFound.Command]; exists {
+			return fmt.Errorf("%w\nHint: %s", err, hint)
+		}
 	}
 	return err
 }
@@ -54,6 +62,64 @@ const (
 	mavenCmd              = "mvn"
 	gradleCmd             = "gradle"
 )
+
+// ExtractorName is the name of this extractor.
+const ExtractorName = "springboot"
+
+// Extractor implements the extractor.Extractor interface for Spring Boot projects.
+type Extractor struct {
+	detector  *Detector
+	patcher   *Patcher
+	generator *Generator
+}
+
+// Name returns the extractor name.
+func (e *Extractor) Name() string {
+	return ExtractorName
+}
+
+// Detect analyzes a project and returns its information if it's a Spring Boot project.
+func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
+	if e.detector == nil {
+		e.detector = NewDetector()
+	}
+	return e.detector.Detect(projectPath)
+}
+
+// Patch prepares the Spring Boot project for OpenAPI spec generation.
+func (e *Extractor) Patch(projectPath string, opts *extractor.PatchOptions) (*extractor.PatchResult, error) {
+	if e.patcher == nil {
+		e.patcher = NewPatcher()
+	}
+	springResult, err := e.patcher.Patch(projectPath, opts)
+	if err != nil {
+		return nil, err
+	}
+	// Convert spring.PatchResult to extractor.PatchResult
+	return &extractor.PatchResult{
+		BuildFilePath:        springResult.BuildFilePath,
+		OriginalContent:      springResult.OriginalContent,
+		DependencyAdded:      springResult.DependencyAdded,
+		PluginAdded:          springResult.PluginAdded,
+		SpringBootConfigured: springResult.SpringBootConfigured,
+	}, nil
+}
+
+// Generate produces the OpenAPI spec from the Spring Boot project.
+func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+	if e.generator == nil {
+		e.generator = NewGenerator()
+	}
+	return e.generator.Generate(ctx, projectPath, info, opts)
+}
+
+// Restore restores the original project files after generation.
+func (e *Extractor) Restore(buildFilePath, originalContent string) error {
+	if e.patcher == nil {
+		e.patcher = NewPatcher()
+	}
+	return e.patcher.Restore(buildFilePath, originalContent)
+}
 
 // Generator generates OpenAPI specs from Spring projects.
 type Generator struct {
@@ -96,9 +162,11 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 
 	// Determine the working directory
 	workDir := projectPath
-	if info.IsMultiModule && info.MainModulePath != "" {
-		// For multi-module projects, run from the main module directory
-		workDir = filepath.Dir(info.MainModulePath)
+	if info.FrameworkData != nil {
+		if springInfo, ok := info.FrameworkData.(*Info); ok && springInfo.IsMultiModule && springInfo.MainModulePath != "" {
+			// For multi-module projects, run from the main module directory
+			workDir = filepath.Dir(springInfo.MainModulePath)
+		}
 	}
 
 	absWorkDir, err := filepath.Abs(workDir)

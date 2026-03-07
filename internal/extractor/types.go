@@ -1,25 +1,53 @@
 // Package extractor provides interfaces and types for extracting OpenAPI specs from projects.
 package extractor
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // BuildTool represents the build tool type for a project.
 type BuildTool string
 
-// ProjectInfo contains detected information about a Spring project.
-type ProjectInfo struct {
-	BuildTool          BuildTool // Maven or Gradle
-	BuildFilePath      string    // pom.xml or build.gradle path
-	SpringBootVersion  string    // Spring Boot version
-	HasSpringdocDeps   bool      // Whether springdoc dependencies exist
-	HasSpringdocPlugin bool      // Whether springdoc plugin is configured
-	SpringdocVersion   string    // Existing springdoc version if any
+// Extractor is the interface for framework-specific OpenAPI spec extraction.
+// Each framework (Spring Boot, go-zero, etc.) implements this interface.
+type Extractor interface {
+	// Name returns the extractor name (e.g., "springboot", "gozero")
+	Name() string
 
-	// Multi-module project support
-	IsMultiModule  bool     // Whether this is a multi-module project
-	Modules        []string // List of module names (for multi-module projects)
-	MainModule     string   // The main application module (if detected)
-	MainModulePath string   // Path to the main module's build file
+	// Detect analyzes a project and returns its information if the framework is detected.
+	// Returns an error if the project is not of this framework type.
+	Detect(projectPath string) (*ProjectInfo, error)
+
+	// Patch prepares the project for OpenAPI spec generation (e.g., add dependencies).
+	Patch(projectPath string, opts *PatchOptions) (*PatchResult, error)
+
+	// Generate produces the OpenAPI spec from the patched project.
+	Generate(ctx context.Context, projectPath string, info *ProjectInfo, opts *GenerateOptions) (*GenerateResult, error)
+
+	// Restore restores the original project files after generation.
+	Restore(buildFilePath, originalContent string) error
+}
+
+// PatchResult contains the result of patching a project.
+type PatchResult struct {
+	BuildFilePath        string // Path to the patched build file
+	OriginalContent      string // Original content for restoration
+	DependencyAdded      bool   // Whether a new dependency was added
+	PluginAdded          bool   // Whether a new plugin was added
+	SpringBootConfigured bool   // Whether spring-boot plugin was configured
+}
+
+// ProjectInfo contains common detected information about a project.
+// Framework-specific details are stored via type assertion by each framework package.
+type ProjectInfo struct {
+	Framework     string    // Framework type: "springboot" or "gozero"
+	BuildTool     BuildTool // Maven, Gradle, or GoModules
+	BuildFilePath string    // Path to build file (pom.xml, build.gradle, or go.mod)
+
+	// FrameworkData holds framework-specific info as interface{}.
+	// Each framework casts this to their own type (e.g., *spring.Info or *gozero.Info)
+	FrameworkData any
 }
 
 // PatchOptions configures the patch behavior.
