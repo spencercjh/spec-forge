@@ -139,10 +139,8 @@ func createUser(c *gin.Context) {
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
 
-	// Note: For variable binding (&req), we return the variable name.
-	// Full type resolution would require type checking.
-	if info.BodyType != "req" && info.BodyType != "CreateUserRequest" {
-		t.Errorf("expected BodyType 'req' or 'CreateUserRequest', got %s", info.BodyType)
+	if info.BodyType != "CreateUserRequest" {
+		t.Errorf("expected BodyType 'CreateUserRequest', got %s", info.BodyType)
 	}
 
 	// Check that we have both error and success responses

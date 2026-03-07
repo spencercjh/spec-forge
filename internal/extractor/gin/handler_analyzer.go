@@ -36,10 +36,13 @@ func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error)
 		return info, nil
 	}
 
+	// Build variable type map for type inference
+	varTypeMap := a.buildVarTypeMap(fn.Body)
+
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.CallExpr:
-			a.parseHandlerCall(node, info)
+			a.parseHandlerCall(node, info, varTypeMap)
 		}
 		return true
 	})
@@ -47,8 +50,60 @@ func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error)
 	return info, nil
 }
 
+// buildVarTypeMap builds a map of variable names to their types.
+func (a *HandlerAnalyzer) buildVarTypeMap(body *ast.BlockStmt) map[string]string {
+	varTypeMap := make(map[string]string)
+
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.DeclStmt:
+			// Handle: var req CreateUserRequest
+			if genDecl, ok := node.Decl.(*ast.GenDecl); ok && genDecl.Tok == token.VAR {
+				for _, spec := range genDecl.Specs {
+					if valueSpec, ok := spec.(*ast.ValueSpec); ok {
+						for i, name := range valueSpec.Names {
+							if i < len(valueSpec.Values) {
+								// Check if value is a composite literal with type
+								if comp, ok := valueSpec.Values[i].(*ast.CompositeLit); ok {
+									if ident, ok := comp.Type.(*ast.Ident); ok {
+										varTypeMap[name.Name] = ident.Name
+									}
+								}
+							}
+							// Also check explicit type
+							if valueSpec.Type != nil {
+								if ident, ok := valueSpec.Type.(*ast.Ident); ok {
+									varTypeMap[name.Name] = ident.Name
+								}
+							}
+						}
+					}
+				}
+			}
+		case *ast.AssignStmt:
+			// Handle: req := CreateUserRequest{}
+			if node.Tok == token.DEFINE {
+				for i, lhs := range node.Lhs {
+					if i < len(node.Rhs) {
+						if ident, ok := lhs.(*ast.Ident); ok {
+							if comp, ok := node.Rhs[i].(*ast.CompositeLit); ok {
+								if typeIdent, ok := comp.Type.(*ast.Ident); ok {
+									varTypeMap[ident.Name] = typeIdent.Name
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return true
+	})
+
+	return varTypeMap
+}
+
 // parseHandlerCall parses a call expression in a handler.
-func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo) {
+func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
 	// Check for c.Param, c.Query, c.GetHeader, c.ShouldBindJSON, c.JSON
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
@@ -106,25 +161,25 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 		}
 	case "ShouldBindJSON", "BindJSON", "ShouldBind", "Bind":
 		if len(call.Args) >= 1 {
-			if typeName := extractTypeFromArg(call.Args[0]); typeName != "" {
+			if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
 				info.BodyType = typeName
 			}
 		}
 	case "ShouldBindXML", "BindXML":
 		if len(call.Args) >= 1 {
-			if typeName := extractTypeFromArg(call.Args[0]); typeName != "" {
+			if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
 				info.BodyType = typeName
 			}
 		}
 	case "ShouldBindYAML", "BindYAML":
 		if len(call.Args) >= 1 {
-			if typeName := extractTypeFromArg(call.Args[0]); typeName != "" {
+			if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
 				info.BodyType = typeName
 			}
 		}
 	case "ShouldBindQuery", "BindQuery":
 		if len(call.Args) >= 1 {
-			if typeName := extractTypeFromArg(call.Args[0]); typeName != "" {
+			if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
 				info.BodyType = typeName
 			}
 		}
@@ -213,7 +268,7 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 }
 
 // extractTypeFromArg extracts type name from a binding argument.
-func extractTypeFromArg(expr ast.Expr) string {
+func extractTypeFromArg(expr ast.Expr, varTypeMap map[string]string) string {
 	// Pattern: &variable or &Struct{}
 	unary, ok := expr.(*ast.UnaryExpr)
 	if !ok || unary.Op != token.AND {
@@ -234,7 +289,12 @@ func extractTypeFromArg(expr ast.Expr) string {
 
 	// Check for variable: &variable
 	if ident, ok := unary.X.(*ast.Ident); ok {
-		return ident.Name // Return variable name, type would need type checking
+		// First check if we have type info from variable declaration
+		if varType, exists := varTypeMap[ident.Name]; exists {
+			return varType
+		}
+		// Fall back to variable name
+		return ident.Name
 	}
 
 	return ""

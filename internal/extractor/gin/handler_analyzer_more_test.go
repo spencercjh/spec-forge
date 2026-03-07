@@ -41,10 +41,8 @@ func createUser(c *gin.Context) {
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
 
-	// Note: BodyType may be variable name ('user') instead of type name ('User')
-	// This is a known limitation of the current implementation
-	if info.BodyType != "User" && info.BodyType != "user" {
-		t.Errorf("expected BodyType 'User' or 'user', got '%s'", info.BodyType)
+	if info.BodyType != "User" {
+		t.Errorf("expected BodyType 'User', got '%s'", info.BodyType)
 	}
 
 	// Check responses - should have XML responses
@@ -100,10 +98,8 @@ func listUsers(c *gin.Context) {
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
 
-	// Note: BodyType may be variable name ('req') instead of type name ('ListRequest')
-	// This is a known limitation of the current implementation
-	if info.BodyType != "ListRequest" && info.BodyType != "req" {
-		t.Errorf("expected BodyType 'ListRequest' or 'req', got '%s'", info.BodyType)
+	if info.BodyType != "ListRequest" {
+		t.Errorf("expected BodyType 'ListRequest', got '%s'", info.BodyType)
 	}
 }
 
