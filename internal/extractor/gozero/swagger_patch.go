@@ -57,23 +57,39 @@ func patchOperation(op *openapi2.Operation, validPathParams []string) {
 	}
 
 	// Patch parameters
-	if len(op.Parameters) > 0 {
-		patchedParams := make(openapi2.Parameters, 0, len(op.Parameters))
-		for _, p := range op.Parameters {
-			// Patch #5427: Skip parameters with name "-"
-			if p.Name == "-" {
-				continue
-			}
+	patchedParams := make(openapi2.Parameters, 0, len(op.Parameters))
+	existingPathParams := make(map[string]bool)
 
-			// Patch #5428: Remove path params not in URL
-			if p.In == "path" && !slices.Contains(validPathParams, p.Name) {
-				continue
-			}
-
-			patchedParams = append(patchedParams, p)
+	for _, p := range op.Parameters {
+		// Patch #5427: Skip parameters with name "-"
+		if p.Name == "-" {
+			continue
 		}
-		op.Parameters = patchedParams
+
+		// Patch #5428: Remove path params not in URL
+		if p.In == "path" {
+			if !slices.Contains(validPathParams, p.Name) {
+				continue
+			}
+			existingPathParams[p.Name] = true
+		}
+
+		patchedParams = append(patchedParams, p)
 	}
+
+	// Patch #5428: Add missing path params
+	for _, paramName := range validPathParams {
+		if !existingPathParams[paramName] {
+			patchedParams = append(patchedParams, &openapi2.Parameter{
+				Name:     paramName,
+				In:       "path",
+				Required: true,
+				Type:     &openapi3.Types{"string"},
+			})
+		}
+	}
+
+	op.Parameters = patchedParams
 
 	// Patch response schemas
 	for _, resp := range op.Responses {

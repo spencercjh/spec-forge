@@ -187,8 +187,7 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 	}
 
 	// Build goctl command arguments
-	// goctl api plugin -plugin goctl-swagger="swagger -filename openapi.json" -api <api_file> -dir <output_dir>
-	// For simplicity, we use: goctl api swagger -filename openapi.json -api <api_file>
+	// goctl api swagger -filename openapi.json -api <api_file> -dir <output_dir>
 	args := []string{
 		"api",
 		"swagger",
@@ -196,7 +195,8 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 
 	// Use a temporary filename for the swagger file to avoid conflicts with the output file
 	// goctl always generates .json files (Swagger 2.0), regardless of the requested format
-	swaggerFilename := opts.OutputFile + ".swagger.json"
+	// Note: goctl automatically appends .json to the filename, so we use .swagger without extension
+	swaggerFilename := opts.OutputFile + ".swagger"
 	args = append(args, "-filename", swaggerFilename)
 
 	// Find the main API file (usually in the api/ directory or the first one found)
@@ -207,6 +207,9 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 	}
 	slog.Debug("selected main API file", "file", apiFile)
 	args = append(args, "-api", apiFile)
+
+	// Add output directory (required by goctl)
+	args = append(args, "-dir", workDir)
 
 	// Execute goctl command
 	slog.Debug("executing goctl command", "command", goctlCmd, "args", args, "workDir", workDir)
@@ -233,7 +236,8 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 	slog.Debug("goctl swagger generation succeeded")
 
 	// Return the path to the generated swagger file
-	swaggerPath := filepath.Join(workDir, swaggerFilename)
+	// goctl automatically appends .json to the filename
+	swaggerPath := filepath.Join(workDir, swaggerFilename+".json")
 
 	return swaggerPath, nil
 }
