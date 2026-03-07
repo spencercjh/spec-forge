@@ -182,7 +182,8 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 		slog.Error("failed to patch API files", "error", err)
 		return "", fmt.Errorf("failed to patch API files: %w", err)
 	}
-	if len(patchedFiles) > 0 {
+	// Only log if files were actually modified (not just checked)
+	if apiPatcher.HasPatchedFiles() {
 		slog.Info("patched .api files for goctl compatibility", "count", len(patchedFiles))
 	}
 
@@ -256,7 +257,9 @@ func (g *Generator) findMainAPIFile(workDir string, info *Info, patchedFiles map
 		if err != nil {
 			continue
 		}
-		if strings.HasPrefix(relPath, "api") || strings.HasPrefix(relPath, "api/") {
+		// Use filepath.ToSlash for cross-platform consistency, then check for "api/" prefix
+		normalizedPath := filepath.ToSlash(relPath)
+		if strings.HasPrefix(normalizedPath, "api/") {
 			selectedFile = apiFile
 			break
 		}

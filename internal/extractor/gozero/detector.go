@@ -137,7 +137,6 @@ func (d *Detector) parseGoMod(goModPath string, info *Info) error {
 	}
 
 	// Check for go-zero dependency (exact match to avoid false positives)
-	const goZeroModulePath = "github.com/zeromicro/go-zero"
 	for _, req := range f.Require {
 		if req != nil && req.Mod.Path == goZeroModulePath {
 			info.HasGoZeroDeps = true
@@ -159,7 +158,7 @@ func (d *Detector) findAPIFiles(projectPath string) ([]string, error) {
 		}
 
 		// Skip vendor directories
-		if info.IsDir() && strings.Contains(path, "vendor") {
+		if info.IsDir() && info.Name() == "vendor" {
 			return filepath.SkipDir
 		}
 
@@ -184,12 +183,6 @@ func (d *Detector) findAPIFiles(projectPath string) ([]string, error) {
 
 // checkGoctl checks if goctl command is available in PATH.
 func (d *Detector) checkGoctl() bool {
-	_, err := os.Stat("goctl")
-	if err == nil {
-		return true
-	}
-
-	// Check in PATH
-	path, err := exec.LookPath("goctl")
-	return err == nil && path != ""
+	_, err := exec.LookPath("goctl")
+	return err == nil
 }

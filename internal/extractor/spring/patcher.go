@@ -224,8 +224,16 @@ func (p *Patcher) patchGradleDryRun(buildFilePath string, result *PatchResult) (
 func (p *Patcher) patchGradleApply(buildFilePath string, springInfo *Info, opts *extractor.PatchOptions, result *PatchResult) (*PatchResult, error) {
 	modified := result.OriginalContent
 
-	modified = p.addGradleDependencyIfNeeded(buildFilePath, modified, springInfo, opts, result)
-	modified = p.addGradlePluginIfNeeded(buildFilePath, modified, springInfo, opts, result)
+	var err error
+	modified, err = p.addGradleDependencyIfNeeded(buildFilePath, modified, springInfo, opts, result)
+	if err != nil {
+		return nil, err
+	}
+
+	modified, err = p.addGradlePluginIfNeeded(buildFilePath, modified, springInfo, opts, result)
+	if err != nil {
+		return nil, err
+	}
 
 	// Write changes if modified
 	if result.DependencyAdded || result.PluginAdded {
@@ -239,45 +247,47 @@ func (p *Patcher) patchGradleApply(buildFilePath string, springInfo *Info, opts 
 }
 
 // addGradleDependencyIfNeeded adds springdoc dependency if needed.
-func (p *Patcher) addGradleDependencyIfNeeded(buildFilePath, content string, springInfo *Info, opts *extractor.PatchOptions, result *PatchResult) string {
+// Returns an error if parsing fails to avoid silently skipping required patches.
+func (p *Patcher) addGradleDependencyIfNeeded(buildFilePath, content string, springInfo *Info, opts *extractor.PatchOptions, result *PatchResult) (string, error) {
 	if !opts.Force && springInfo.HasSpringdocDeps {
-		return content
+		return content, nil
 	}
 
 	build, err := p.gradleParser.Parse(buildFilePath)
 	if err != nil {
-		return content
+		return content, fmt.Errorf("failed to parse build.gradle: %w", err)
 	}
 
 	if !p.gradleParser.HasSpringdocDependency(build) {
 		newContent := p.gradleParser.AddDependencyText(content, opts.SpringdocVersion)
 		if newContent != content {
 			result.DependencyAdded = true
-			return newContent
+			return newContent, nil
 		}
 	}
 
-	return content
+	return content, nil
 }
 
 // addGradlePluginIfNeeded adds springdoc plugin if needed.
-func (p *Patcher) addGradlePluginIfNeeded(buildFilePath, content string, springInfo *Info, opts *extractor.PatchOptions, result *PatchResult) string {
+// Returns an error if parsing fails to avoid silently skipping required patches.
+func (p *Patcher) addGradlePluginIfNeeded(buildFilePath, content string, springInfo *Info, opts *extractor.PatchOptions, result *PatchResult) (string, error) {
 	if !opts.Force && springInfo.HasSpringdocPlugin {
-		return content
+		return content, nil
 	}
 
 	build, err := p.gradleParser.Parse(buildFilePath)
 	if err != nil {
-		return content
+		return content, fmt.Errorf("failed to parse build.gradle: %w", err)
 	}
 
 	if !p.gradleParser.HasSpringdocPlugin(build) {
 		newContent := p.gradleParser.AddPluginText(content, opts.GradlePluginVersion)
 		if newContent != content {
 			result.PluginAdded = true
-			return newContent
+			return newContent, nil
 		}
 	}
 
-	return content
+	return content, nil
 }

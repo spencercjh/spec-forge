@@ -146,7 +146,9 @@ func patchSchema(schema *openapi2.Schema) {
 // extractPathParams extracts path parameter names from a URL path using regex.
 // Example: "/users/{id}/posts/{postId}" -> ["id", "postId"]
 func extractPathParams(path string) []string {
-	re := regexp.MustCompile(`\{(\w+)\}`)
+	// Use [^\}]+ to capture path parameters with hyphens and other valid characters
+	// (e.g., {user-id}, {api-key})
+	re := regexp.MustCompile(`\{([^\}]+)\}`)
 	matches := re.FindAllStringSubmatch(path, -1)
 
 	params := make([]string, 0, len(matches))
