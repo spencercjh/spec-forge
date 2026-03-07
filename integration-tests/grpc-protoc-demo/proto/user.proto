@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package demo.user;
+
+import "common.proto";
+
+option go_package = "github.com/spencercjh/spec-forge/integration-tests/grpc-protoc-demo/gen/proto/user";
+
+// User entity representing a user in the system
+message User {
+  // Unique identifier for the user
+  int64 id = 1;
+  // Username for login
+  string username = 2;
+  // Email address
+  string email = 3;
+  // Full display name
+  string full_name = 4;
+  // Age in years
+  int32 age = 5;
+}
+
+// Request to get a user by ID
+message GetUserRequest {
+  // User ID to retrieve
+  int64 id = 1;
+}
+
+// Response containing a single user
+message GetUserResponse {
+  // The requested user
+  User user = 1;
+  // Response status
+  demo.common.ApiResponse status = 2;
+}
+
+// Request to list users with optional filtering
+message ListUsersRequest {
+  // Pagination parameters
+  demo.common.PageRequest page = 1;
+  // Optional username filter (partial match)
+  string username_filter = 2;
+}
+
+// Response containing a list of users
+message ListUsersResponse {
+  // List of users on the current page
+  repeated User users = 1;
+  // Pagination metadata
+  demo.common.PageMetadata page = 2;
+  // Response status
+  demo.common.ApiResponse status = 3;
+}
+
+// Request to create a new user
+message CreateUserRequest {
+  // Username for the new user
+  string username = 1;
+  // Email address
+  string email = 2;
+  // Full display name
+  string full_name = 3;
+  // Age in years
+  int32 age = 4;
+}
+
+// Response containing the created user
+message CreateUserResponse {
+  // The newly created user
+  User user = 1;
+  // Response status
+  demo.common.ApiResponse status = 2;
+}
+
+// Request to update user profile
+message UpdateProfileRequest {
+  // User ID to update
+  int64 id = 1;
+  // New full name (optional)
+  string full_name = 2;
+  // New email (optional)
+  string email = 3;
+  // New age (optional)
+  int32 age = 4;
+}
+
+// Response containing the updated user
+message UpdateProfileResponse {
+  // The updated user
+  User user = 1;
+  // Response status
+  demo.common.ApiResponse status = 2;
+}
+
+// Request to upload a file for a user
+message UploadFileRequest {
+  // User ID (optional)
+  int64 user_id = 1;
+  // File information
+  demo.common.FileInfo file_info = 2;
+  // File content (binary)
+  bytes content = 3;
+}
+
+// Response for file upload
+message UploadFileResponse {
+  // Upload result message
+  string message = 1;
+  // Response status
+  demo.common.ApiResponse status = 2;
+}
+
+// UserService provides user management operations
+service UserService {
+  // Get a user by their ID
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+  // List users with pagination and optional filtering
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+
+  // Create a new user
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+
+  // Update user profile information
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+
+  // Upload a file for a user
+  rpc UploadFile(UploadFileRequest) returns (UploadFileResponse);
+}
