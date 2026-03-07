@@ -3,6 +3,7 @@ package gozero
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,47 +33,71 @@ func NewDetector() *Detector {
 
 // Detect analyzes a go-zero project and returns its information.
 func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
+	slog.Debug("starting go-zero project detection", "path", projectPath)
+
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
+		slog.Error("failed to resolve project path", "path", projectPath, "error", err)
 		return nil, fmt.Errorf("failed to resolve path: %w", err)
 	}
+	slog.Debug("resolved absolute path", "path", absPath)
 
 	// Check for go.mod
 	goModPath := filepath.Join(absPath, "go.mod")
 	if _, statErr := os.Stat(goModPath); statErr != nil {
 		if os.IsNotExist(statErr) {
+			slog.Warn("no go.mod found", "path", absPath)
 			return nil, fmt.Errorf("no go.mod found in %s", absPath)
 		}
+		slog.Error("failed to check go.mod", "path", goModPath, "error", statErr)
 		return nil, fmt.Errorf("failed to check go.mod: %w", statErr)
 	}
+	slog.Debug("found go.mod", "path", goModPath)
 
 	goZeroInfo := &Info{}
 
 	// Parse go.mod
 	if parseErr := d.parseGoMod(goModPath, goZeroInfo); parseErr != nil {
+		slog.Error("failed to parse go.mod", "path", goModPath, "error", parseErr)
 		return nil, fmt.Errorf("failed to parse go.mod: %w", parseErr)
 	}
+	slog.Debug("parsed go.mod successfully",
+		"module", goZeroInfo.ModuleName,
+		"goVersion", goZeroInfo.GoVersion,
+		"hasGoZeroDeps", goZeroInfo.HasGoZeroDeps,
+		"goZeroVersion", goZeroInfo.GoZeroVersion)
 
 	// Reject if no go-zero dependency found
 	if !goZeroInfo.HasGoZeroDeps {
+		slog.Warn("no go-zero dependency found", "path", goModPath)
 		return nil, &ErrNotGoZeroProject{Reason: "no go-zero dependency found in go.mod"}
 	}
+	slog.Info("detected go-zero dependency", "version", goZeroInfo.GoZeroVersion)
 
 	// Find .api files
 	apiFiles, err := d.findAPIFiles(absPath)
 	if err != nil {
+		slog.Error("failed to find .api files", "path", absPath, "error", err)
 		return nil, fmt.Errorf("failed to find .api files: %w", err)
 	}
+	slog.Debug("found .api files", "count", len(apiFiles), "files", apiFiles)
 
 	// Reject if no .api files found
 	if len(apiFiles) == 0 {
+		slog.Warn("no .api files found in project", "path", absPath)
 		return nil, &ErrNotGoZeroProject{Reason: "no .api files found in project"}
 	}
+	slog.Info("found .api files", "count", len(apiFiles))
 
 	goZeroInfo.APIFiles = apiFiles
 
 	// Check if goctl is available
 	goZeroInfo.HasGoctl = d.checkGoctl()
+	if goZeroInfo.HasGoctl {
+		slog.Info("goctl is available")
+	} else {
+		slog.Warn("goctl not found in PATH", "hint", "install with: go install github.com/zeromicro/go-zero/tools/goctl@latest")
+	}
 
 	info := &extractor.ProjectInfo{
 		Framework:     FrameworkGoZero,
@@ -80,6 +105,11 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 		BuildFilePath: goModPath,
 		FrameworkData: goZeroInfo,
 	}
+
+	slog.Info("go-zero project detection completed successfully",
+		"module", goZeroInfo.ModuleName,
+		"apiFiles", len(apiFiles),
+		"goctlAvailable", goZeroInfo.HasGoctl)
 
 	return info, nil
 }

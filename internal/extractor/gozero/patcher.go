@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 
 	"github.com/spencercjh/spec-forge/internal/executor"
 )
@@ -39,6 +41,7 @@ type PatchResult struct {
 // For go-zero projects, patching primarily involves verifying that goctl
 // (the go-zero toolchain) is available for API processing.
 func (p *Patcher) Patch(_ string) (*PatchResult, error) {
+	slog.Debug("checking goctl availability")
 	ctx := context.Background()
 
 	opts := &executor.ExecuteOptions{
@@ -51,6 +54,7 @@ func (p *Patcher) Patch(_ string) (*PatchResult, error) {
 		// Check if the command was not found
 		var cmdNotFound *executor.CommandNotFoundError
 		if errors.As(err, &cmdNotFound) {
+			slog.Error("goctl not found", "error", err)
 			return nil, errors.New(
 				"goctl is not installed. goctl is required for processing go-zero API files.\n" +
 					"To install goctl, run:\n" +
@@ -59,13 +63,17 @@ func (p *Patcher) Patch(_ string) (*PatchResult, error) {
 		}
 
 		// Command failed (non-zero exit code)
+		slog.Error("goctl version check failed", "error", err)
 		return nil, fmt.Errorf("goctl version check failed: %w", err)
 	}
+
+	version := strings.TrimSpace(result.Stdout)
+	slog.Info("goctl is available", "version", version)
 
 	// goctl is available
 	return &PatchResult{
 		GoctlAvailable: true,
-		GoctlVersion:   result.Stdout,
+		GoctlVersion:   version,
 	}, nil
 }
 

@@ -1,6 +1,7 @@
 package gozero
 
 import (
+	"log/slog"
 	"regexp"
 	"slices"
 
@@ -12,8 +13,13 @@ import (
 // This addresses issues #5426, #5427, and #5428.
 func PatchSwagger(doc *openapi2.T) {
 	if doc == nil {
+		slog.Debug("PatchSwagger called with nil document")
 		return
 	}
+
+	pathCount := len(doc.Paths)
+	definitionCount := len(doc.Definitions)
+	slog.Debug("patching swagger document", "paths", pathCount, "definitions", definitionCount)
 
 	// Patch all paths
 	for path, pathItem := range doc.Paths {
@@ -40,6 +46,8 @@ func PatchSwagger(doc *openapi2.T) {
 			patchSchema(schemaRef.Value)
 		}
 	}
+
+	slog.Debug("finished patching swagger document")
 }
 
 // patchOperation patches a single operation's parameters and responses.

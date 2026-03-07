@@ -4,6 +4,7 @@ package gozero
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,11 +30,14 @@ func NewAPIFilePatcher() *APIFilePatcher {
 // - #5425: Multi-hyphen prefixes without quotes
 // Returns the path to the patched file (may be same as original if no patching needed).
 func (p *APIFilePatcher) PatchAPIFiles(apiFiles []string) (map[string]string, error) {
+	slog.Debug("checking .api files for patching", "count", len(apiFiles))
 	result := make(map[string]string)
+	patchedCount := 0
 
 	for _, apiFile := range apiFiles {
 		needsPatch, err := p.checkNeedsPatch(apiFile)
 		if err != nil {
+			slog.Error("failed to check API file", "file", apiFile, "error", err)
 			return nil, fmt.Errorf("failed to check %s: %w", apiFile, err)
 		}
 
@@ -42,14 +46,24 @@ func (p *APIFilePatcher) PatchAPIFiles(apiFiles []string) (map[string]string, er
 			continue
 		}
 
+		slog.Info("patching API file for goctl compatibility", "file", apiFile, "issue", "#5425")
+
 		// Create temporary patched file
 		patchedPath, err := p.createPatchedFile(apiFile)
 		if err != nil {
+			slog.Error("failed to patch API file", "file", apiFile, "error", err)
 			return nil, fmt.Errorf("failed to patch %s: %w", apiFile, err)
 		}
 
 		result[apiFile] = patchedPath
 		p.patchedFiles[apiFile] = patchedPath
+		patchedCount++
+	}
+
+	if patchedCount > 0 {
+		slog.Info("patched API files for goctl compatibility", "count", patchedCount)
+	} else {
+		slog.Debug("no API files needed patching")
 	}
 
 	return result, nil
@@ -57,6 +71,10 @@ func (p *APIFilePatcher) PatchAPIFiles(apiFiles []string) (map[string]string, er
 
 // Cleanup removes temporary patched files.
 func (p *APIFilePatcher) Cleanup() {
+	if len(p.patchedFiles) == 0 {
+		return
+	}
+	slog.Debug("cleaning up patched API files", "count", len(p.patchedFiles))
 	for _, patchedPath := range p.patchedFiles {
 		if patchedPath != "" {
 			_ = os.Remove(patchedPath)

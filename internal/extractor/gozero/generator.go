@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -98,6 +99,8 @@ func NewGeneratorWithExecutor(exec executor.Interface) *Generator {
 
 // Generate generates OpenAPI spec by invoking goctl command and converting Swagger 2.0 to OpenAPI 3.0.
 func (g *Generator) Generate(ctx context.Context, projectPath string, projectInfo *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+	slog.Info("starting OpenAPI spec generation", "project", projectPath)
+
 	if opts == nil {
 		opts = &extractor.GenerateOptions{}
 	}
@@ -112,56 +115,75 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, projectInf
 	if opts.OutputFile == "" {
 		opts.OutputFile = defaultOutputFileName
 	}
+	slog.Debug("generation options",
+		"timeout", opts.Timeout,
+		"format", opts.Format,
+		"outputFile", opts.OutputFile,
+		"outputDir", opts.OutputDir)
 
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
+		slog.Error("failed to resolve project path", "path", projectPath, "error", err)
 		return nil, fmt.Errorf("failed to resolve project path: %w", err)
 	}
 
 	// Get go-zero info from project info
 	info, ok := projectInfo.FrameworkData.(*Info)
 	if !ok || info == nil {
+		slog.Debug("framework data not set, detecting project")
 		// If FrameworkData is not set, detect it
 		detectedInfo, detectErr := g.detector.Detect(absPath)
 		if detectErr != nil {
+			slog.Error("failed to detect go-zero project", "path", absPath, "error", detectErr)
 			return nil, fmt.Errorf("failed to detect go-zero project: %w", detectErr)
 		}
 		var typeOk bool
 		info, typeOk = detectedInfo.FrameworkData.(*Info)
 		if !typeOk {
+			slog.Error("failed to get go-zero info from detected project")
 			return nil, errors.New("failed to get go-zero info from detected project")
 		}
 	}
 
 	// Check if goctl is available
 	if !info.HasGoctl {
+		slog.Error("goctl not found in PATH")
 		return nil, errors.New("goctl command not found in PATH. Please install goctl: go install github.com/zeromicro/go-zero/tools/goctl@latest")
 	}
 
 	// Generate Swagger 2.0 spec using goctl
+	slog.Info("generating Swagger 2.0 spec using goctl", "apiFiles", len(info.APIFiles))
 	swaggerPath, err := g.generateSwagger(ctx, absPath, info, opts)
 	if err != nil {
 		return nil, err
 	}
+	slog.Debug("generated Swagger 2.0 spec", "path", swaggerPath)
 
 	// Convert Swagger 2.0 to OpenAPI 3.0
+	slog.Info("converting Swagger 2.0 to OpenAPI 3.0")
 	result, err := g.convertSwaggerToOpenAPI(swaggerPath, opts)
 	if err != nil {
 		return nil, err
 	}
 
+	slog.Info("OpenAPI spec generation completed", "output", result.SpecFilePath, "format", result.Format)
 	return result, nil
 }
 
 // generateSwagger generates Swagger 2.0 spec using goctl command.
 func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *Info, opts *extractor.GenerateOptions) (string, error) {
+	slog.Debug("patching .api files to work around goctl bugs")
 	// Patch .api files to work around goctl parser bugs (#5425)
 	apiPatcher := NewAPIFilePatcher()
 	defer apiPatcher.Cleanup()
 
 	patchedFiles, err := apiPatcher.PatchAPIFiles(info.APIFiles)
 	if err != nil {
+		slog.Error("failed to patch API files", "error", err)
 		return "", fmt.Errorf("failed to patch API files: %w", err)
+	}
+	if len(patchedFiles) > 0 {
+		slog.Info("patched .api files for goctl compatibility", "count", len(patchedFiles))
 	}
 
 	// Build goctl command arguments
@@ -180,11 +202,14 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 	// Find the main API file (usually in the api/ directory or the first one found)
 	apiFile := g.findMainAPIFile(workDir, info, patchedFiles)
 	if apiFile == "" {
+		slog.Error("no .api files found in project")
 		return "", errors.New("no .api files found in project")
 	}
+	slog.Debug("selected main API file", "file", apiFile)
 	args = append(args, "-api", apiFile)
 
 	// Execute goctl command
+	slog.Debug("executing goctl command", "command", goctlCmd, "args", args, "workDir", workDir)
 	result, err := g.executor.Execute(ctx, &executor.ExecuteOptions{
 		Command:    goctlCmd,
 		Args:       args,
@@ -192,16 +217,20 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 		Timeout:    opts.Timeout,
 	})
 	if err != nil {
+		slog.Error("goctl swagger generation failed", "error", err)
 		return "", fmt.Errorf("goctl swagger generation failed: %w", err)
 	}
 
 	if result.ExitCode != 0 {
 		out := combineOutput(result.Stdout, result.Stderr)
+		slog.Error("goctl swagger generation failed", "exitCode", result.ExitCode, "output", out)
 		if out == "" {
 			return "", fmt.Errorf("goctl swagger generation failed with exit code %d (no output)", result.ExitCode)
 		}
 		return "", fmt.Errorf("goctl swagger generation failed with exit code %d:\n%s", result.ExitCode, out)
 	}
+
+	slog.Debug("goctl swagger generation succeeded")
 
 	// Return the path to the generated swagger file
 	swaggerPath := filepath.Join(workDir, swaggerFilename)
@@ -244,36 +273,48 @@ func (g *Generator) findMainAPIFile(workDir string, info *Info, patchedFiles map
 
 // convertSwaggerToOpenAPI converts Swagger 2.0 spec to OpenAPI 3.0 spec.
 func (g *Generator) convertSwaggerToOpenAPI(swaggerPath string, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+	slog.Debug("reading Swagger 2.0 spec", "path", swaggerPath)
+
 	// Load Swagger 2.0 document
 	data, err := os.ReadFile(swaggerPath)
 	if err != nil {
+		slog.Error("failed to read Swagger 2.0 spec", "path", swaggerPath, "error", err)
 		return nil, fmt.Errorf("failed to read Swagger 2.0 spec from %s: %w", swaggerPath, err)
 	}
 
 	swagger2Doc := &openapi2.T{}
 	if unmarshalErr := swagger2Doc.UnmarshalJSON(data); unmarshalErr != nil {
+		slog.Error("failed to parse Swagger 2.0 spec", "path", swaggerPath, "error", unmarshalErr)
 		return nil, fmt.Errorf("failed to parse Swagger 2.0 spec from %s: %w", swaggerPath, unmarshalErr)
 	}
+	slog.Debug("parsed Swagger 2.0 spec", "title", swagger2Doc.Info.Title, "version", swagger2Doc.Info.Version)
 
 	// Apply patches for known goctl swagger bugs (#5426-5428)
+	slog.Debug("applying patches for known goctl swagger bugs")
 	PatchSwagger(swagger2Doc)
 
 	// Convert to OpenAPI 3.0
+	slog.Debug("converting to OpenAPI 3.0")
 	openAPIDoc, err := openapi2conv.ToV3(swagger2Doc)
 	if err != nil {
+		slog.Error("failed to convert Swagger 2.0 to OpenAPI 3.0", "error", err)
 		return nil, fmt.Errorf("failed to convert Swagger 2.0 to OpenAPI 3.0: %w", err)
 	}
+	slog.Debug("converted to OpenAPI 3.0", "title", openAPIDoc.Info.Title, "version", openAPIDoc.Info.Version)
 
 	// Determine output directory (respect opts.OutputDir if provided)
 	var outputDir string
 	if opts.OutputDir != "" {
 		outputDir = opts.OutputDir
+		slog.Debug("using specified output directory", "dir", outputDir)
 		// Ensure output directory exists
 		if mkdirErr := os.MkdirAll(outputDir, 0o755); mkdirErr != nil {
+			slog.Error("failed to create output directory", "dir", outputDir, "error", mkdirErr)
 			return nil, fmt.Errorf("failed to create output directory %s: %w", outputDir, mkdirErr)
 		}
 	} else {
 		outputDir = filepath.Dir(swaggerPath)
+		slog.Debug("using default output directory", "dir", outputDir)
 	}
 
 	outputFile := opts.OutputFile
@@ -300,12 +341,16 @@ func (g *Generator) convertSwaggerToOpenAPI(swaggerPath string, opts *extractor.
 	}
 
 	// Write the converted spec to file
+	slog.Debug("writing OpenAPI 3.0 spec", "path", outputPath, "format", opts.Format)
 	if err := os.WriteFile(outputPath, outputData, 0o600); err != nil {
+		slog.Error("failed to write OpenAPI 3.0 spec", "path", outputPath, "error", err)
 		return nil, fmt.Errorf("failed to write OpenAPI 3.0 spec to %s: %w", outputPath, err)
 	}
+	slog.Info("written OpenAPI 3.0 spec", "path", outputPath, "size", len(outputData))
 
 	// Clean up the temporary Swagger 2.0 file (only if it's different from output)
 	if swaggerPath != outputPath {
+		slog.Debug("cleaning up temporary swagger file", "path", swaggerPath)
 		_ = os.Remove(swaggerPath)
 	}
 
