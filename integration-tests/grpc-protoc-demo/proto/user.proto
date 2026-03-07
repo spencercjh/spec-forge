@@ -3,6 +3,7 @@ syntax = "proto3";
 package demo.user;
 
 import "common.proto";
+import "google/api/annotations.proto";
 
 option go_package = "github.com/spencercjh/spec-forge/integration-tests/grpc-protoc-demo/gen/proto/user";
 
@@ -113,17 +114,40 @@ message UploadFileResponse {
 // UserService provides user management operations
 service UserService {
   // Get a user by their ID
-  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (google.api.http) = {
+      get: "/v1/users/{id}"
+    };
+  }
 
   // List users with pagination and optional filtering
-  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option (google.api.http) = {
+      get: "/v1/users"
+    };
+  }
 
   // Create a new user
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {
+    option (google.api.http) = {
+      post: "/v1/users"
+      body: "*"
+    };
+  }
 
   // Update user profile information
-  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
+    option (google.api.http) = {
+      put: "/v1/users/{id}"
+      body: "*"
+    };
+  }
 
   // Upload a file for a user
-  rpc UploadFile(UploadFileRequest) returns (UploadFileResponse);
+  rpc UploadFile(UploadFileRequest) returns (UploadFileResponse) {
+    option (google.api.http) = {
+      post: "/v1/users/{user_id}/files"
+      body: "*"
+    };
+  }
 }
