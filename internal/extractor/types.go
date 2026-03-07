@@ -62,11 +62,12 @@ type PatchOptions struct {
 
 // GenerateOptions configures OpenAPI spec generation.
 type GenerateOptions struct {
-	OutputDir  string        // Output directory for generated spec (default: project target/build dir)
-	OutputFile string        // Output file name without extension (default: "openapi")
-	Format     string        // Output format: "json" or "yaml" (default: "json")
-	Timeout    time.Duration // Command execution timeout (default: 5 minutes)
-	SkipTests  bool          // Skip tests during build (default: true)
+	OutputDir        string        // Output directory for generated spec (default: project target/build dir)
+	OutputFile       string        // Output file name without extension (default: "openapi")
+	Format           string        // Output format: "json" or "yaml" (default: "json")
+	Timeout          time.Duration // Command execution timeout (default: 5 minutes)
+	SkipTests        bool          // Skip tests during build (default: true)
+	ProtoImportPaths []string      // Additional import paths for protoc (-I flags)
 }
 
 // GenerateResult contains the result of OpenAPI spec generation.

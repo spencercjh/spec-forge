@@ -166,6 +166,8 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 
 	// Add import paths (-I flags)
 	seenPaths := make(map[string]bool)
+
+	// Add import paths detected from project
 	for _, path := range info.ImportPaths {
 		if !seenPaths[path] {
 			seenPaths[path] = true
@@ -173,9 +175,13 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 		}
 	}
 
-	// Add extra import paths from options (if ProtoImportPaths field exists)
-	// Note: This requires extending GenerateOptions with ProtoImportPaths field
-	// For now, additional paths must be configured via the Info.ImportPaths
+	// Add extra import paths from CLI flags (--proto-import-path)
+	for _, path := range opts.ProtoImportPaths {
+		if !seenPaths[path] {
+			seenPaths[path] = true
+			args = append(args, "-I"+path)
+		}
+	}
 
 	// Add connect-openapi output and options
 	args = append(args,
