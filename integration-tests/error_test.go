@@ -21,12 +21,6 @@ func TestE2E_ErrorHandling_CommandNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create target directory with a dummy spec (simulating pre-existing spec)
-	targetDir := filepath.Join(tmpDir, "target")
-	if err := os.Mkdir(targetDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
 	ctx := context.Background()
 	exec := executor.NewExecutor()
 
@@ -42,6 +36,6 @@ func TestE2E_ErrorHandling_CommandNotFound(t *testing.T) {
 
 	// Verify it's a CommandNotFoundError
 	if _, ok := errors.AsType[*executor.CommandNotFoundError](err); !ok {
-		t.Logf("Got error type %T: %v", err, err)
+		t.Fatalf("expected CommandNotFoundError, got %T: %v", err, err)
 	}
 }

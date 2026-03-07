@@ -22,7 +22,13 @@ go test ./...
 
 ### End-to-End Tests
 
-E2E tests require the build tools (Maven/Gradle) to be installed.
+E2E tests require the following tools to be installed:
+
+- **Java 25** - Required for Spring Boot projects (Maven/Gradle wrappers are included in demo projects)
+- **goctl** - Required for go-zero projects. Install with:
+  ```bash
+  go install github.com/zeromicro/go-zero/tools/goctl@latest
+  ```
 
 ```bash
 # Run all e2e tests
