@@ -212,6 +212,11 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 		args = append(args, "--connect-openapi_opt=format=yaml")
 	}
 
+	// Enable google.api.http annotations support if detected
+	if info.HasGoogleAPI {
+		args = append(args, "--connect-openapi_opt=features=google.api.http")
+	}
+
 	// Add only service proto files (those with service definitions)
 	// to avoid duplicate definition errors from importing common proto files
 	for _, protoFile := range info.ServiceProtoFiles {
