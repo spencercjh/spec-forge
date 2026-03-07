@@ -9,33 +9,53 @@ import (
 
 const FrameworkName = "gin"
 
-// GinExtractor implements extractor.Extractor for Gin projects.
-type GinExtractor struct {
+// ExtractorName is the name of the Gin extractor.
+const ExtractorName = "gin"
+
+// Extractor implements extractor.Extractor for Gin projects.
+type Extractor struct {
 	detector  *Detector
 	patcher   *Patcher
 	generator *Generator
 }
 
-// NewGinExtractor creates a new GinExtractor instance.
-func NewGinExtractor() *GinExtractor {
-	return &GinExtractor{
+// NewExtractor creates a new Extractor instance.
+func NewExtractor() *Extractor {
+	return &Extractor{
 		detector:  NewDetector(),
 		patcher:   NewPatcher(),
 		generator: NewGenerator(),
 	}
 }
 
+// Name returns the extractor name.
+func (e *Extractor) Name() string {
+	return ExtractorName
+}
+
 // Detect implements extractor.Extractor.Detect.
-func (e *GinExtractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
+func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	return e.detector.Detect(projectPath)
 }
 
 // Patch implements extractor.Extractor.Patch.
-func (e *GinExtractor) Patch(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*extractor.PatchResult, error) {
-	return e.patcher.Patch(ctx, projectPath, info, opts)
+func (e *Extractor) Patch(projectPath string, opts *extractor.PatchOptions) (*extractor.PatchResult, error) {
+	// Gin projects don't need patching
+	info := &extractor.ProjectInfo{
+		Framework:     ExtractorName,
+		BuildTool:     "gomodules",
+		FrameworkData: &Info{HasGin: true},
+	}
+	return e.patcher.Patch(context.Background(), projectPath, info, opts)
 }
 
 // Generate implements extractor.Extractor.Generate.
-func (e *GinExtractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
 	return e.generator.Generate(ctx, projectPath, info, opts)
+}
+
+// Restore implements extractor.Extractor.Restore.
+func (e *Extractor) Restore(buildFilePath, originalContent string) error {
+	// Gin projects don't need restore (no patching)
+	return nil
 }
