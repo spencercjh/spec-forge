@@ -203,48 +203,29 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 	result.OriginalContent = string(content)
 
 	if opts.DryRun {
-		// In dry-run mode, don't modify anything
-		build, err := p.gradleParser.Parse(buildFilePath)
-		if err != nil {
-			return nil, err
-		}
-		result.DependencyAdded = !p.gradleParser.HasSpringdocDependency(build)
-		result.PluginAdded = !p.gradleParser.HasSpringdocPlugin(build)
-		return result, nil
+		return p.patchGradleDryRun(buildFilePath, result)
 	}
 
-	// For Gradle, we use text manipulation since there's no reliable Gradle parser
+	return p.patchGradleApply(buildFilePath, springInfo, opts, result)
+}
+
+// patchGradleDryRun performs dry-run analysis for Gradle.
+func (p *Patcher) patchGradleDryRun(buildFilePath string, result *PatchResult) (*PatchResult, error) {
+	build, err := p.gradleParser.Parse(buildFilePath)
+	if err != nil {
+		return nil, err
+	}
+	result.DependencyAdded = !p.gradleParser.HasSpringdocDependency(build)
+	result.PluginAdded = !p.gradleParser.HasSpringdocPlugin(build)
+	return result, nil
+}
+
+// patchGradleApply applies patches to a Gradle project.
+func (p *Patcher) patchGradleApply(buildFilePath string, springInfo *Info, opts *extractor.PatchOptions, result *PatchResult) (*PatchResult, error) {
 	modified := result.OriginalContent
 
-	// Add dependency if needed
-	if opts.Force || !springInfo.HasSpringdocDeps {
-		build, err := p.gradleParser.Parse(buildFilePath)
-		if err != nil {
-			return nil, err
-		}
-		if !p.gradleParser.HasSpringdocDependency(build) {
-			newContent := p.gradleParser.AddDependencyText(modified, opts.SpringdocVersion)
-			if newContent != modified {
-				modified = newContent
-				result.DependencyAdded = true
-			}
-		}
-	}
-
-	// Add plugin if needed
-	if opts.Force || !springInfo.HasSpringdocPlugin {
-		build, err := p.gradleParser.Parse(buildFilePath)
-		if err != nil {
-			return nil, err
-		}
-		if !p.gradleParser.HasSpringdocPlugin(build) {
-			newContent := p.gradleParser.AddPluginText(modified, opts.GradlePluginVersion)
-			if newContent != modified {
-				modified = newContent
-				result.PluginAdded = true
-			}
-		}
-	}
+	modified = p.addGradleDependencyIfNeeded(buildFilePath, modified, springInfo, opts, result)
+	modified = p.addGradlePluginIfNeeded(buildFilePath, modified, springInfo, opts, result)
 
 	// Write changes if modified
 	if result.DependencyAdded || result.PluginAdded {
@@ -255,4 +236,48 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 	}
 
 	return result, nil
+}
+
+// addGradleDependencyIfNeeded adds springdoc dependency if needed.
+func (p *Patcher) addGradleDependencyIfNeeded(buildFilePath, content string, springInfo *Info, opts *extractor.PatchOptions, result *PatchResult) string {
+	if !opts.Force && springInfo.HasSpringdocDeps {
+		return content
+	}
+
+	build, err := p.gradleParser.Parse(buildFilePath)
+	if err != nil {
+		return content
+	}
+
+	if !p.gradleParser.HasSpringdocDependency(build) {
+		newContent := p.gradleParser.AddDependencyText(content, opts.SpringdocVersion)
+		if newContent != content {
+			result.DependencyAdded = true
+			return newContent
+		}
+	}
+
+	return content
+}
+
+// addGradlePluginIfNeeded adds springdoc plugin if needed.
+func (p *Patcher) addGradlePluginIfNeeded(buildFilePath, content string, springInfo *Info, opts *extractor.PatchOptions, result *PatchResult) string {
+	if !opts.Force && springInfo.HasSpringdocPlugin {
+		return content
+	}
+
+	build, err := p.gradleParser.Parse(buildFilePath)
+	if err != nil {
+		return content
+	}
+
+	if !p.gradleParser.HasSpringdocPlugin(build) {
+		newContent := p.gradleParser.AddPluginText(content, opts.GradlePluginVersion)
+		if newContent != content {
+			result.PluginAdded = true
+			return newContent
+		}
+	}
+
+	return content
 }

@@ -15,25 +15,12 @@ type User {
 	Age      int    `json:"age"`
 }
 
-// Generic API response wrapper
-type ApiResponse {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    any    `json:"data"`
-}
 
 // User response wrapper
 type UserResponse {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    *User  `json:"data"`
-}
-
-// User list response wrapper
-type UserListResponse {
-	Code    int      `json:"code"`
-	Message string   `json:"message"`
-	Data    UserList `json:"data"`
 }
 
 // User list data
@@ -45,37 +32,11 @@ type UserList {
 	TotalPages int    `json:"totalPages"`
 }
 
-// Pagination request
-type ListUsersRequest {
-	Page     int    `form:"page,default=0"`
-	Size     int    `form:"size,default=10"`
-	Username string `form:"username,optional"`
-}
-
-// Get user by ID request
-type GetUserRequest {
-	Id int64 `path:"id"`
-}
-
-// Create user request
-type CreateUserRequest {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	FullName string `json:"fullName"`
-	Age      int    `json:"age"`
-}
-
-// Update profile request (form data)
-type UpdateProfileRequest {
-	Id       int64  `path:"id"`
-	FullName string `form:"fullName,optional"`
-	Email    string `form:"email,optional"`
-	Age      int    `form:"age,optional"`
-}
-
-// File upload request
-type UploadFileRequest {
-	UserId int64 `form:"userId,optional"`
+// User list response wrapper
+type UserListResponse {
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
+	Data    UserList `json:"data"`
 }
 
 // File upload result
@@ -93,14 +54,35 @@ type FileUploadResponse {
 	Data    FileUploadResult `json:"data"`
 }
 
+// List users request (query params)
+type ListUsersRequest {
+	Page     int    `form:"page,default=0"`
+	Size     int    `form:"size,default=10"`
+	Username string `form:"username,optional"`
+}
+
+// Create user request
+type CreateUserRequest {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	FullName string `json:"fullName"`
+	Age      int    `json:"age"`
+}
+
+// Update profile request (form data)
+type UpdateProfileRequest {
+	FullName string `form:"fullName,optional"`
+	Email    string `form:"email,optional"`
+	Age      int    `form:"age,optional"`
+}
+
 @server (
-	prefix: "/api/v1"
-	group: users
+	prefix: /api/v1
 )
 service user-api {
 	// Get user by ID
 	@handler GetUserHandler
-	get /users/:id (GetUserRequest) returns (UserResponse)
+	get /users/:id returns (UserResponse)
 
 	// List users with pagination
 	@handler ListUsersHandler
@@ -110,9 +92,9 @@ service user-api {
 	@handler CreateUserHandler
 	post /users (CreateUserRequest) returns (UserResponse)
 
-	// Upload a file for a user
+	// Upload a file
 	@handler UploadFileHandler
-	post /users/upload (UploadFileRequest) returns (FileUploadResponse)
+	post /users/upload returns (FileUploadResponse)
 
 	// Update user profile using form data
 	@handler UpdateProfileHandler
