@@ -24,6 +24,9 @@ const (
 // ErrNoProtoFiles indicates no proto files were found in the project.
 var ErrNoProtoFiles = errors.New("no proto files found in project")
 
+// ErrNoServiceProtoFiles indicates no proto files with service definitions were found.
+var ErrNoServiceProtoFiles = errors.New("no proto files with service definitions found in project")
+
 // ErrOutputFileNotFound indicates the generated OpenAPI file was not found after protoc execution.
 var ErrOutputFileNotFound = errors.New("output file not found after protoc execution")
 
@@ -104,10 +107,27 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, projectInf
 	}
 	slog.Debug("proto files found", "count", len(info.ProtoFiles), "files", info.ProtoFiles)
 
+	// Check if there are service proto files
+	if len(info.ServiceProtoFiles) == 0 {
+		slog.Error("no service proto files found in project", "path", absPath)
+		return nil, ErrNoServiceProtoFiles
+	}
+	slog.Debug("service proto files found", "count", len(info.ServiceProtoFiles), "files", info.ServiceProtoFiles)
+
 	// Determine output directory
 	outputDir := opts.OutputDir
 	if outputDir == "" {
 		outputDir = absPath
+	}
+
+	// Convert outputDir to absolute path if it's not already
+	if !filepath.IsAbs(outputDir) {
+		var absErr error
+		outputDir, absErr = filepath.Abs(filepath.Join(absPath, outputDir))
+		if absErr != nil {
+			slog.Error("failed to resolve output directory", "dir", outputDir, "error", absErr)
+			return nil, fmt.Errorf("failed to resolve output directory: %w", absErr)
+		}
 	}
 
 	// Ensure output directory exists
@@ -167,11 +187,12 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 	// Add import paths (-I flags)
 	seenPaths := make(map[string]bool)
 
-	// Add import paths detected from project
+	// Add import paths detected from project (convert to relative paths if needed)
 	for _, path := range info.ImportPaths {
-		if !seenPaths[path] {
-			seenPaths[path] = true
-			args = append(args, "-I"+path)
+		relPath := g.toRelativePath(path, info.ProtoRoot)
+		if !seenPaths[relPath] {
+			seenPaths[relPath] = true
+			args = append(args, "-I"+relPath)
 		}
 	}
 
@@ -183,50 +204,97 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 		}
 	}
 
-	// Add connect-openapi output and options
-	args = append(args,
-		"--connect-openapi_out="+outputDir,
-		"--connect-openapi_opt=features=google.api.http",
-	)
+	// Add connect-openapi output
+	args = append(args, "--connect-openapi_out="+outputDir)
 
 	// Add format option for YAML
 	if opts.Format == "yaml" || opts.Format == "yml" {
 		args = append(args, "--connect-openapi_opt=format=yaml")
 	}
 
-	// Add proto files
-	args = append(args, info.ProtoFiles...)
+	// Add only service proto files (those with service definitions)
+	// to avoid duplicate definition errors from importing common proto files
+	for _, protoFile := range info.ServiceProtoFiles {
+		relPath := g.toRelativePath(protoFile, info.ProtoRoot)
+		args = append(args, relPath)
+	}
 
 	return args
 }
 
-// findOutputFile locates the generated OpenAPI file.
-func (g *Generator) findOutputFile(_ *Info, outputDir, format string) (string, error) {
-	// protoc-gen-connect-openapi generates files like: <proto_filename>.openapi.json or .yaml
-	entries, readErr := os.ReadDir(outputDir)
-	if readErr != nil {
-		return "", fmt.Errorf("failed to read output directory: %w", readErr)
+// toRelativePath converts an absolute path to a relative path from the base directory.
+// If the path is not under the base directory, it returns the original path.
+func (g *Generator) toRelativePath(path, base string) string {
+	if filepath.IsAbs(path) && filepath.IsAbs(base) {
+		rel, err := filepath.Rel(base, path)
+		if err == nil {
+			return rel
+		}
 	}
+	return path
+}
 
+// findOutputFile locates the generated OpenAPI file.
+// protoc-gen-connect-openapi generates files in the same directory as the input proto files.
+func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string, error) {
 	// Determine expected extension
 	expectedExt := ".openapi.json"
 	if format == "yaml" || format == "yml" {
 		expectedExt = ".openapi.yaml"
 	}
 
-	// Look for the generated file
-	for _, entry := range entries {
-		name := entry.Name()
-		if strings.HasSuffix(name, expectedExt) {
-			return filepath.Join(outputDir, name), nil
+	// First, check the output directory itself
+	if outputPath, err := g.findFileWithExt(outputDir, expectedExt); err == nil {
+		return outputPath, nil
+	}
+
+	// Then check directories containing service proto files
+	for _, serviceFile := range info.ServiceProtoFiles {
+		protoDir := filepath.Dir(serviceFile)
+		// Convert to relative path if needed
+		relDir := g.toRelativePath(protoDir, info.ProtoRoot)
+		// Make it absolute for searching
+		searchDir := filepath.Join(info.ProtoRoot, relDir)
+		if outputPath, err := g.findFileWithExt(searchDir, expectedExt); err == nil {
+			return outputPath, nil
 		}
 	}
 
-	// Also check for any .openapi.json or .openapi.yaml files
+	// Finally, search recursively from the project root
+	var foundPath string
+	err := filepath.Walk(info.ProtoRoot, func(path string, file os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !file.IsDir() && strings.HasSuffix(path, expectedExt) {
+			foundPath = path
+			return filepath.SkipAll
+		}
+		// Also check for any .openapi.json or .openapi.yaml files
+		if !file.IsDir() && (strings.HasSuffix(path, ".openapi.json") || strings.HasSuffix(path, ".openapi.yaml")) {
+			foundPath = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if err == nil && foundPath != "" {
+		return foundPath, nil
+	}
+
+	return "", ErrOutputFileNotFound
+}
+
+// findFileWithExt searches for a file with the given extension in the directory.
+func (g *Generator) findFileWithExt(dir, ext string) (string, error) {
+	entries, readErr := os.ReadDir(dir)
+	if readErr != nil {
+		return "", fmt.Errorf("failed to read directory: %w", readErr)
+	}
+
 	for _, entry := range entries {
 		name := entry.Name()
-		if strings.HasSuffix(name, ".openapi.json") || strings.HasSuffix(name, ".openapi.yaml") {
-			return filepath.Join(outputDir, name), nil
+		if !entry.IsDir() && strings.HasSuffix(name, ext) {
+			return filepath.Join(dir, name), nil
 		}
 	}
 

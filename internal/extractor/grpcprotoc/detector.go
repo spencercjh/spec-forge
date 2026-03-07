@@ -91,13 +91,18 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 		slog.Info("detected google.api.http annotations in project")
 	}
 
+	// Find proto files with service definitions (main entry points)
+	serviceProtoFiles := d.findServiceProtoFiles(protoFiles)
+	slog.Debug("found service proto files", "count", len(serviceProtoFiles), "files", serviceProtoFiles)
+
 	// Build info
 	grpcInfo := &Info{
-		ProtoFiles:   protoFiles,
-		ProtoRoot:    absPath,
-		HasGoogleAPI: hasGoogleAPI,
-		HasBuf:       false,
-		ImportPaths:  importPaths,
+		ProtoFiles:        protoFiles,
+		ServiceProtoFiles: serviceProtoFiles,
+		ProtoRoot:         absPath,
+		HasGoogleAPI:      hasGoogleAPI,
+		HasBuf:            false,
+		ImportPaths:       importPaths,
 	}
 
 	info := &extractor.ProjectInfo{
@@ -206,6 +211,38 @@ func (d *Detector) hasGoogleAPIImport(protoFile string) bool {
 		}
 		// Also check for import 'google/api/annotations.proto' (single quotes)
 		if strings.Contains(line, "google/api/annotations.proto") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// findServiceProtoFiles identifies proto files that contain service definitions.
+// These are the main entry points that should be passed to protoc.
+func (d *Detector) findServiceProtoFiles(protoFiles []string) []string {
+	var serviceFiles []string
+	for _, protoFile := range protoFiles {
+		if d.hasServiceDefinition(protoFile) {
+			serviceFiles = append(serviceFiles, protoFile)
+		}
+	}
+	return serviceFiles
+}
+
+// hasServiceDefinition checks if a proto file contains a service definition.
+func (d *Detector) hasServiceDefinition(protoFile string) bool {
+	file, err := os.Open(protoFile)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// Check for service keyword (not inside a comment)
+		if strings.HasPrefix(line, "service ") || strings.HasPrefix(line, "service\t") {
 			return true
 		}
 	}
