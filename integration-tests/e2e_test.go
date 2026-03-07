@@ -50,7 +50,12 @@ func TestE2E_MavenSpringBoot_Generate(t *testing.T) {
 		t.Errorf("Expected Maven build tool, got %s", info.BuildTool)
 	}
 
-	if !info.HasSpringdocDeps {
+	springInfo, ok := info.FrameworkData.(*spring.Info)
+	if !ok {
+		t.Fatal("Expected FrameworkData to be *spring.Info")
+	}
+
+	if !springInfo.HasSpringdocDeps {
 		t.Error("Expected springdoc dependencies to be present")
 	}
 
