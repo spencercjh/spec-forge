@@ -99,9 +99,33 @@ LLM_API_KEY="sk-xxx" spec-forge enrich ./openapi.json \
 |----------------------------------------------------------------------------------------------------------------------------------------------|----------------|----------------|
 | [Spring Boot](https://springdoc.org/#plugins)                                                                                                | Java           | ✅ Supported    |
 | [go-zero](https://go-zero.dev/reference/cli-guide/swagger/)                                                                                  | Go             | ✅ Supported    |
+| [gRPC (protoc)](https://github.com/sudorandom/protoc-gen-connect-openapi)                                                                    | Multi-language | ✅ Supported    |
 | [Hertz](https://github.com/hertz-contrib/swagger-generate/tree/main/protoc-gen-http-swagger)                                                 | Go             | 🚧 Coming soon |
 | [Kitex](https://github.com/hertz-contrib/swagger-generate/tree/main/protoc-gen-rpc-swagger)                                                  | Go             | 🚧 Coming soon |
-| [gRPC](https://github.com/grpc-ecosystem/grpc-gateway?tab=readme-ov-file#6-optional-generate-openapi-definitions-using-protoc-gen-openapiv2) | Multi-language | 🚧 Coming soon |
+
+### gRPC Projects (Native protoc)
+
+For gRPC projects using native protoc (not buf-managed):
+
+```bash
+# Generate OpenAPI spec from proto files
+spec-forge generate ./my-grpc-project
+
+# With additional import paths
+spec-forge generate ./my-grpc-project --proto-import-path ./third_party --proto-import-path ./vendor
+
+# Generate with AI enrichment
+LLM_API_KEY="your-key" spec-forge generate ./my-grpc-project --enrich --language zh
+```
+
+**Requirements:**
+- `protoc` installed ([install guide](https://github.com/protocolbuffers/protobuf/releases))
+- `protoc-gen-connect-openapi` installed:
+  ```bash
+  go install github.com/sudorandom/protoc-gen-connect-openapi@latest
+  ```
+
+**Note:** buf-managed projects are not supported in this mode. Use `buf generate` with the plugin, then use `spec-forge enrich` on the generated OpenAPI spec.
 
 ## Supported Publishers
 
