@@ -233,6 +233,7 @@ func (d *Detector) findServiceProtoFiles(protoFiles []string) []string {
 }
 
 // hasServiceDefinition checks if a proto file contains a service definition.
+// It skips comments (single-line // and multi-line /* */) when searching.
 func (d *Detector) hasServiceDefinition(protoFile string) bool {
 	file, err := os.Open(protoFile)
 	if err != nil {
@@ -241,9 +242,49 @@ func (d *Detector) hasServiceDefinition(protoFile string) bool {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	inBlockComment := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		// Check for service keyword (not inside a comment)
+
+		// Handle being inside a block comment that started on a previous line.
+		if inBlockComment {
+			if end := strings.Index(line, "*/"); end >= 0 {
+				line = strings.TrimSpace(line[end+2:])
+				inBlockComment = false
+			} else {
+				// Entire line is still within a block comment.
+				continue
+			}
+		}
+
+		// Skip full-line line comments.
+		if strings.HasPrefix(line, "//") || line == "" {
+			continue
+		}
+
+		// Remove inline block comments. If a block comment starts and does not
+		// end on this line, treat the rest of the line as commented out.
+		for {
+			start := strings.Index(line, "/*")
+			if start < 0 {
+				break
+			}
+			end := strings.Index(line[start+2:], "*/")
+			if end >= 0 {
+				endIdx := start + 2 + end
+				line = strings.TrimSpace(line[:start] + line[endIdx+2:])
+				continue
+			}
+			line = strings.TrimSpace(line[:start])
+			inBlockComment = true
+			break
+		}
+
+		if line == "" {
+			continue
+		}
+
+		// Check for service keyword at line start
 		if strings.HasPrefix(line, "service ") || strings.HasPrefix(line, "service\t") {
 			return true
 		}

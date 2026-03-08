@@ -259,13 +259,21 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 	}
 
 	// Then check directories containing service proto files
+	// Use a set to avoid searching the same directory multiple times
+	searchedDirs := make(map[string]bool)
+	searchedDirs[filepath.Clean(outputDir)] = true
+
 	for _, serviceFile := range info.ServiceProtoFiles {
 		protoDir := filepath.Dir(serviceFile)
-		// Convert to relative path if needed
-		relDir := g.toRelativePath(protoDir, info.ProtoRoot)
-		// Make it absolute for searching
-		searchDir := filepath.Join(info.ProtoRoot, relDir)
-		if outputPath, err := g.findFileWithExt(searchDir, expectedExt); err == nil {
+		cleanDir := filepath.Clean(protoDir)
+
+		// Skip if we've already searched this directory
+		if searchedDirs[cleanDir] {
+			continue
+		}
+		searchedDirs[cleanDir] = true
+
+		if outputPath, err := g.findFileWithExt(protoDir, expectedExt); err == nil {
 			return outputPath, nil
 		}
 	}
