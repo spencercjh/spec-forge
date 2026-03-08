@@ -456,6 +456,13 @@ func copySpecToOutput(srcPath, outputDir string) error {
 	filename := filepath.Base(srcPath)
 	dstPath := filepath.Join(outputDir, filename)
 
+	// Check if destination file already exists
+	if _, err := os.Stat(dstPath); err == nil {
+		return fmt.Errorf("destination file already exists: %s", dstPath)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to check destination file: %w", err)
+	}
+
 	// Create destination file
 	dstFile, err := os.Create(dstPath)
 	if err != nil {
