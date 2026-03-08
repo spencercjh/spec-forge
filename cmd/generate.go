@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -139,6 +140,8 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	if outputFormat == "" {
 		outputFormat = "yaml"
 	}
+	// Normalize format value for consistent handling across extractors
+	outputFormat = normalizeOutputFormat(outputFormat)
 
 	genOpts := &extractor.GenerateOptions{
 		OutputDir:        outputDir,
@@ -436,6 +439,19 @@ func getAPIKeyFromConfig(cfg config.EnrichConfig) string { //nolint:gocritic // 
 // errWrap wraps an error with a message.
 func errWrap(msg string, err error) error {
 	return errors.New(msg + ": " + err.Error())
+}
+
+// normalizeOutputFormat normalizes the output format value for consistent handling.
+// Accepts: "yaml", "yml", "YAML", "json", "JSON" -> returns "yaml" or "json"
+func normalizeOutputFormat(format string) string {
+	switch strings.ToLower(format) {
+	case "yaml", "yml":
+		return "yaml"
+	case "json":
+		return "json"
+	default:
+		return format // Return as-is for unknown values, extractors will handle error
+	}
 }
 
 // copySpecToOutput copies the generated spec to the specified output directory
