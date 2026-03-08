@@ -15,6 +15,11 @@ Spec Forge uses [springdoc-openapi](https://springdoc.org/) to generate OpenAPI 
 | Maven | `mvn verify` |
 | Gradle | `gradle generateOpenApiDocs` |
 
+**Wrapper Priority:** spec-forge prefers project wrappers over system binaries:
+1. `./mvnw` / `./gradlew` in project root
+2. Wrapper in parent directory (for multi-module projects)
+3. System `mvn` / `gradle` (fallback)
+
 ## Multi-module Projects
 
 For Maven multi-module projects, spec-forge automatically configures the `spring-boot-maven-plugin` with start/stop goals to handle module dependencies.
