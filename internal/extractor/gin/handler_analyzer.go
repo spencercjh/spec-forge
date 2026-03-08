@@ -226,15 +226,17 @@ func (a *HandlerAnalyzer) extractParam(call *ast.CallExpr, info *HandlerInfo) {
 }
 
 // extractQueryParam extracts query parameter from c.Query() or c.DefaultQuery() call.
-func (a *HandlerAnalyzer) extractQueryParam(call *ast.CallExpr, info *HandlerInfo, required bool) {
+func (a *HandlerAnalyzer) extractQueryParam(call *ast.CallExpr, info *HandlerInfo, _ bool) {
 	if len(call.Args) < 1 {
 		return
 	}
 	if name := extractStringLiteral(call.Args[0]); name != "" {
+		// In Gin, Query returns empty string when missing and does not enforce presence
+		// Mark query params as optional (required=false) unless explicit validation exists
 		info.QueryParams = append(info.QueryParams, ParamInfo{
 			Name:     name,
 			GoType:   "string",
-			Required: required,
+			Required: false,
 		})
 	}
 }

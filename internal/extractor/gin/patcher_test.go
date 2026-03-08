@@ -36,7 +36,7 @@ func TestPatcher_Patch_SetsFrameworkData(t *testing.T) {
 	ctx := context.Background()
 	ginInfo := &Info{HasGin: false}
 	info := &extractor.ProjectInfo{
-		Framework:     FrameworkName,
+		Framework:     ExtractorName,
 		FrameworkData: ginInfo,
 	}
 	opts := &extractor.PatchOptions{}

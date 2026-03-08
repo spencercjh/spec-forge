@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
@@ -173,9 +174,18 @@ func (g *Generator) buildOpenAPIDoc(info *Info, routes []Route, handlerInfos map
 
 // buildOperation builds an OpenAPI operation from a route.
 func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schemas openapi3.Schemas) *openapi3.Operation {
+	// Generate deterministic OperationID/Summary for anonymous handlers
+	operationID := route.HandlerName
+	summary := route.HandlerName
+	if operationID == "" {
+		// Fallback: use METHOD + path pattern (e.g., "GET_users_id")
+		operationID = route.Method + "_" + strings.ReplaceAll(strings.Trim(route.FullPath, "/"), "/", "_")
+		summary = route.Method + " " + route.FullPath
+	}
+
 	operation := &openapi3.Operation{
-		OperationID: route.HandlerName,
-		Summary:     route.HandlerName,
+		OperationID: operationID,
+		Summary:     summary,
 	}
 
 	if handlerInfo == nil {

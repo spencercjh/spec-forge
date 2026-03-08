@@ -86,7 +86,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	}
 
 	return &extractor.ProjectInfo{
-		Framework:     FrameworkName,
+		Framework:     ExtractorName,
 		BuildTool:     "gomodules",
 		BuildFilePath: goModPath,
 		FrameworkData: ginInfo,

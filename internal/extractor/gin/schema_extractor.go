@@ -103,13 +103,10 @@ func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec) (*openapi3
 		propertyName := fieldName
 		fieldSchemaRef := e.fieldToSchemaRef(field.Type)
 
-		// Parse struct tags
+		// Parse struct tags - apply regardless of whether field is inline or $ref
 		if field.Tag != nil {
 			tag := strings.Trim(field.Tag.Value, "`")
-			// Guard against nil Value when field is a $ref to custom type
-			if fieldSchemaRef.Value != nil {
-				propertyName = e.applyTags(fieldSchemaRef.Value, tag, fieldName, schema)
-			}
+			propertyName = e.applyTags(fieldSchemaRef, tag, fieldName, schema)
 		}
 
 		// Skip fields with json:"-"
@@ -238,7 +235,7 @@ func goTypeToSchema(goType string) *openapi3.Schema {
 // applyTags processes struct tags and updates schema.
 // Returns the final property name (may be different from fieldName due to json tag).
 // Returns empty string if the field should be skipped (json:"-").
-func (e *SchemaExtractor) applyTags(schema *openapi3.Schema, tag, fieldName string, parentSchema *openapi3.Schema) string {
+func (e *SchemaExtractor) applyTags(schemaRef *openapi3.SchemaRef, tag, fieldName string, parentSchema *openapi3.Schema) string {
 	propertyName := fieldName
 	isOmitEmpty := false
 
@@ -258,21 +255,19 @@ func (e *SchemaExtractor) applyTags(schema *openapi3.Schema, tag, fieldName stri
 		}
 	}
 
-	// Skip required check if omitempty
-	if isOmitEmpty {
-		return propertyName
-	}
-
 	// Parse binding tag (handle multiple comma-separated rules like "required,email")
 	if bindingTag := extractTagValue(tag, "binding"); bindingTag != "" {
-		if strings.Contains(bindingTag, "required") {
+		if strings.Contains(bindingTag, "required") && !isOmitEmpty {
 			parentSchema.Required = append(parentSchema.Required, propertyName)
 		}
 	}
 
-	// Parse validate tag
+	// Parse validate tag - always apply validation even with omitempty
 	if validateTag := extractTagValue(tag, "validate"); validateTag != "" {
-		e.applyValidation(schema, validateTag, propertyName, parentSchema)
+		// Only apply validation if we have a non-nil schema value
+		if schemaRef.Value != nil {
+			e.applyValidation(schemaRef.Value, validateTag, propertyName, parentSchema)
+		}
 	}
 
 	return propertyName

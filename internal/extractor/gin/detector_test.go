@@ -195,8 +195,8 @@ require github.com/gin-gonic/gin v1.9.1
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if info.Framework != FrameworkName {
-				t.Errorf("expected framework %q, got %q", FrameworkName, info.Framework)
+			if info.Framework != ExtractorName {
+				t.Errorf("expected framework %q, got %q", ExtractorName, info.Framework)
 			}
 			ginInfo, ok := info.FrameworkData.(*Info)
 			if !ok {
