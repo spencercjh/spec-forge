@@ -40,7 +40,7 @@ func TestE2E_GrpcProtoc_Generate(t *testing.T) {
 		t.Fatalf("Failed to detect project: %v", err)
 	}
 
-	if info.Framework != grpcprotoc.FrameworkName {
+	if info.Framework != grpcprotoc.ExtractorName {
 		t.Errorf("Expected grpc-protoc framework, got %s", info.Framework)
 	}
 
