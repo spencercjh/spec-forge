@@ -111,7 +111,7 @@ func init() {
 	rootCmd.AddCommand(publishCmd)
 
 	publishCmd.Flags().StringVarP(&publishFormat, "format", "f", "yaml", "output format (yaml or json)")
-	publishCmd.Flags().StringVarP(&publishOutput, "output", "o", "", "output file path (only used by some publishers)")
+	publishCmd.Flags().StringVarP(&publishOutput, "output", "o", "", "output file path (currently unused, reserved for future publishers)")
 	publishCmd.Flags().StringVarP(&publishTarget, "to", "t", "", "publish target (required: readme)")
 	publishCmd.Flags().BoolVar(&publishOverwrite, "overwrite", false, "overwrite existing spec")
 
