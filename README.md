@@ -107,11 +107,11 @@ spec-forge generate ./path/to/grpc-project
 spec-forge generate ./path/to/go-zero-project
 
 # Generate with AI enrichment (any framework)
-LLM_API_KEY="your-api-key" spec-forge generate ./path/to/project \
+OPENAI_API_KEY="your-api-key" spec-forge generate ./path/to/project \
     --enrich --provider openai --model gpt-4o --language en
 
 # Enrich an existing OpenAPI spec
-LLM_API_KEY="your-api-key" spec-forge enrich ./openapi.json \
+OPENAI_API_KEY="your-api-key" spec-forge enrich ./openapi.json \
     --provider openai --model gpt-4o --language zh
 ```
 
