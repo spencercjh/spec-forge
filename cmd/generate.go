@@ -26,6 +26,11 @@ import (
 	"github.com/spencercjh/spec-forge/internal/validator"
 )
 
+const (
+	outputFormatYAML = "yaml"
+	outputFormatJSON = "json"
+)
+
 var (
 	// generateKeepPatched controls whether to keep the patched pom/build file
 	// Default is false (restore original) for generate command
@@ -138,7 +143,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		outputFormat = config.Get().Output.Format
 	}
 	if outputFormat == "" {
-		outputFormat = "yaml"
+		outputFormat = outputFormatYAML
 	}
 	// Normalize format value for consistent handling across extractors
 	outputFormat = normalizeOutputFormat(outputFormat)
@@ -164,9 +169,9 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 5: Validate the generated spec
 	if !generateSkipValidate {
 		v := validator.NewValidator()
-		valResult, err := v.Validate(ctx, genResult.SpecFilePath)
-		if err != nil {
-			return errWrap("validation error", err)
+		valResult, valErr := v.Validate(ctx, genResult.SpecFilePath)
+		if valErr != nil {
+			return errWrap("validation error", valErr)
 		}
 
 		if !valResult.Valid {
@@ -185,9 +190,9 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 6: Enrich with AI (optional)
 	cfg := config.Get()
 	if !generateSkipEnrich && cfg.Enrich.Enabled && cfg.Enrich.Provider != "" && cfg.Enrich.Model != "" {
-		if err := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg); err != nil {
+		if enrichErr := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg); enrichErr != nil {
 			// Log warning but don't fail - enrichment is optional
-			slog.WarnContext(ctx, "Enrichment failed (non-fatal)", "error", err)
+			slog.WarnContext(ctx, "Enrichment failed (non-fatal)", "error", enrichErr)
 		}
 	} else {
 		slog.InfoContext(ctx, "Enrichment skipped", "status", "⏭️")
@@ -446,9 +451,9 @@ func errWrap(msg string, err error) error {
 func normalizeOutputFormat(format string) string {
 	switch strings.ToLower(format) {
 	case "yaml", "yml":
-		return "yaml"
+		return outputFormatYAML
 	case "json":
-		return "json"
+		return outputFormatJSON
 	default:
 		return format // Return as-is for unknown values, extractors will handle error
 	}
@@ -473,22 +478,22 @@ func copySpecToOutput(srcPath, outputDir string) error {
 	dstPath := filepath.Join(outputDir, filename)
 
 	// Check if destination file already exists
-	if _, err := os.Stat(dstPath); err == nil {
+	if _, statErr := os.Stat(dstPath); statErr == nil {
 		return fmt.Errorf("destination file already exists: %s", dstPath)
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to check destination file: %w", err)
+	} else if !os.IsNotExist(statErr) {
+		return fmt.Errorf("failed to check destination file: %w", statErr)
 	}
 
 	// Create destination file
-	dstFile, err := os.Create(dstPath)
-	if err != nil {
-		return fmt.Errorf("failed to create destination file: %w", err)
+	dstFile, createErr := os.Create(dstPath)
+	if createErr != nil {
+		return fmt.Errorf("failed to create destination file: %w", createErr)
 	}
 	defer dstFile.Close()
 
 	// Copy content
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+	if _, copyErr := io.Copy(dstFile, srcFile); copyErr != nil {
+		return fmt.Errorf("failed to copy file: %w", copyErr)
 	}
 
 	return nil

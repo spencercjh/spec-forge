@@ -56,6 +56,7 @@ Examples:
 	RunE: runEnrich,
 }
 
+//nolint:gocyclo // CLI command runner with many branches
 func runEnrich(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	specFile := args[0]
