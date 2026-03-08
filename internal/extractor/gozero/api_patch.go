@@ -6,33 +6,79 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 )
+
+// minGoctlVersionForPatch is the minimum goctl version that fixes issue #5425.
+// goctl 1.9.2+ has fixed the multi-hyphen prefix parsing issue.
+const minGoctlVersionForPatch = "1.9.2"
 
 // APIFilePatcher patches .api files to work around goctl parser bugs.
 // See: https://github.com/zeromicro/go-zero/issues/5425
 type APIFilePatcher struct {
 	// patchedFiles maps original file paths to temporary patched file paths
 	patchedFiles map[string]string
+	// skipPatch indicates whether patching should be skipped (goctl version >= 1.9.2)
+	skipPatch bool
 }
 
 // NewAPIFilePatcher creates a new APIFilePatcher.
 func NewAPIFilePatcher() *APIFilePatcher {
-	return &APIFilePatcher{
+	patcher := &APIFilePatcher{
 		patchedFiles: make(map[string]string),
+		skipPatch:    false,
 	}
+
+	// Check goctl version to determine if patching is needed
+	if version, err := getGoctlVersion(); err == nil {
+		patcher.skipPatch = version >= minGoctlVersionForPatch
+		if patcher.skipPatch {
+			slog.Debug("goctl version >= 1.9.2, skipping API file patching (issue #5425 fixed upstream)")
+		}
+	}
+
+	return patcher
+}
+
+// getGoctlVersion returns the goctl version string (e.g., "1.9.2").
+func getGoctlVersion() (string, error) {
+	// goctl version output: "goctl version 1.9.2 darwin/arm64"
+	cmd := exec.Command("goctl", "version")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get goctl version: %w", err)
+	}
+
+	// Parse version from output
+	fields := strings.Fields(string(output))
+	if len(fields) < 3 {
+		return "", fmt.Errorf("unexpected goctl version output: %s", string(output))
+	}
+
+	// fields[0] = "goctl", fields[1] = "version", fields[2] = "1.9.2"
+	return fields[2], nil
 }
 
 // PatchAPIFiles scans and patches .api files to fix known issues.
-// Currently handles:
-// - #5425: Multi-hyphen prefixes without quotes
+// Only patches files if goctl version < 1.9.2 (issue #5425 fixed in goctl 1.9.2+).
 // Returns the path to the patched file (may be same as original if no patching needed).
 func (p *APIFilePatcher) PatchAPIFiles(apiFiles []string) (map[string]string, error) {
 	slog.Debug("checking .api files for patching", "count", len(apiFiles))
 	result := make(map[string]string)
+
 	patchedCount := 0
+
+	// Skip patching entirely if goctl version >= 1.9.2
+	if p.skipPatch {
+		slog.Debug("skipping API file patching (goctl version >= 1.9.2)")
+		for _, apiFile := range apiFiles {
+			result[apiFile] = apiFile
+		}
+		return result, nil
+	}
 
 	for _, apiFile := range apiFiles {
 		needsPatch, err := p.checkNeedsPatch(apiFile)
@@ -183,7 +229,7 @@ func ValidateAPIFile(apiFile string) error {
 
 		// Check for unquoted prefix with multiple hyphens
 		if strings.Contains(line, "prefix:") && strings.Contains(line, "-") {
-			// Extract the value after prefix:
+			// Extract the value after prefix
 			_, after, found := strings.Cut(line, "prefix:")
 			if !found {
 				continue
