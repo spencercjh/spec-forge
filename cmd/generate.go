@@ -190,7 +190,34 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		slog.InfoContext(ctx, "Enrichment skipped", "status", "⏭️")
 	}
 
-	// Step 7: Publish the spec to remote platforms (optional)
+	// Step 7: Ensure spec is in the output directory
+	// Some extractors (Spring) generate to target/build and need copying
+	// Others (Gin, go-zero, gRPC) may already have written to outputDir
+	genDir := filepath.Dir(genResult.SpecFilePath)
+	targetPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
+
+	// Clean paths for comparison
+	absGenDir, err := filepath.Abs(genDir)
+	if err != nil {
+		absGenDir = genDir // Fallback to relative path
+	}
+	absOutputDir, err := filepath.Abs(outputDir)
+	if err != nil {
+		absOutputDir = outputDir // Fallback to relative path
+	}
+
+	if absGenDir != absOutputDir {
+		if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
+			return errWrap("failed to copy spec to output directory", err)
+		}
+		slog.InfoContext(ctx, "Spec saved", "path", targetPath)
+		// Update genResult.SpecFilePath to point to the copied file for publishing
+		genResult.SpecFilePath = targetPath
+	} else {
+		slog.InfoContext(ctx, "Spec saved", "path", genResult.SpecFilePath)
+	}
+
+	// Step 8: Publish the spec to remote platforms (optional)
 	if !generateSkipPublish && generatePublishTarget != "" {
 		// Create publisher using factory
 		pub, err := publisher.NewPublisher(generatePublishTarget)
@@ -200,7 +227,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 
 		// Build publish options
 		pubOpts := &publisher.PublishOptions{
-			OutputPath: filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath)),
+			OutputPath: genResult.SpecFilePath,
 			Format:     outputFormat,
 			Overwrite:  generatePublishOverwrite,
 		}
@@ -237,31 +264,6 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		)
 		if pubResult.Message != "" {
 			slog.InfoContext(ctx, "Publisher output", "message", pubResult.Message)
-		}
-	} else {
-		// Ensure spec is in the output directory
-		// Some extractors (Spring) generate to target/build and need copying
-		// Others (Gin, go-zero, gRPC) may already have written to outputDir
-		genDir := filepath.Dir(genResult.SpecFilePath)
-		targetPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
-
-		// Clean paths for comparison
-		absGenDir, err := filepath.Abs(genDir)
-		if err != nil {
-			absGenDir = genDir // Fallback to relative path
-		}
-		absOutputDir, err := filepath.Abs(outputDir)
-		if err != nil {
-			absOutputDir = outputDir // Fallback to relative path
-		}
-
-		if absGenDir != absOutputDir {
-			if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
-				return errWrap("failed to copy spec to output directory", err)
-			}
-			slog.InfoContext(ctx, "Spec saved", "path", targetPath)
-		} else {
-			slog.InfoContext(ctx, "Spec saved", "path", genResult.SpecFilePath)
 		}
 	}
 
