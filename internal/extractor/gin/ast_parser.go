@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"log/slog"
 	"maps"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -223,7 +224,8 @@ func (p *ASTParser) parseRouteCall(file string, call *ast.CallExpr) *Route {
 // isHTTPMethod checks if a string is an HTTP method.
 func isHTTPMethod(s string) bool {
 	switch s {
-	case "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS":
+	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete,
+		http.MethodPatch, http.MethodHead, http.MethodOptions:
 		return true
 	}
 	return false
