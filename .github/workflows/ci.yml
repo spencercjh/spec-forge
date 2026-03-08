@@ -34,11 +34,11 @@ jobs:
         run: git diff --exit-code -- go.mod go.sum
 
       - name: Setup golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.10
-          args: --help
-          verify: false
+          version: latest
+          verify: true
+          install-only: true
 
       - name: Format check
         run: make fmt

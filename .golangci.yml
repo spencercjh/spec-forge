@@ -131,8 +131,6 @@ linters:
           msg: use log/slog for logging
         - pattern: fmt\.Fprint(os\.(Stdout|Stderr),.*)$
           msg: use log/slog for logging
-      # Exclude test files from this check
-      exclude_godoc_examples: true
 
   exclusions:
     generated: lax
@@ -179,7 +177,8 @@ formatters:
       extra-rules: true
 
     goimports:
-      local-prefixes: github.com/spencercjh/spec-forge
+      local-prefixes:
+        - github.com/spencercjh/spec-forge
 
   exclusions:
     generated: lax

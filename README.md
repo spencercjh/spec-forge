@@ -93,11 +93,41 @@ LLM_API_KEY="sk-xxx" spec-forge enrich ./openapi.json \
     --model deepseek-chat
 ```
 
+### Framework-Specific Usage
+
+#### Gin Framework
+
+For Gin projects, spec-forge uses static AST analysis (no runtime required):
+
+```bash
+# Basic generation from a Gin project
+cd my-gin-project
+spec-forge generate . -o ./openapi
+
+# Generate with AI enrichment
+LLM_API_KEY="sk-xxx" spec-forge generate . \
+    --enrich \
+    --provider custom \
+    --model deepseek-chat \
+    --language zh
+
+# Verbose mode to see extraction details
+spec-forge generate . -v
+```
+
+Supported Gin patterns:
+- Direct route registration: `r.GET("/users", handler)`
+- Route groups: `api := r.Group("/api")`
+- Middleware chains: `r.Use(auth).GET("/protected", handler)`
+- Parameter binding: `c.Param()`, `c.Query()`, `c.ShouldBindJSON()`
+- Response types: extracted from `c.JSON()` calls with type inference
+
 ## Supported Frameworks
 
 | Framework                                                                                                                                    | Language       | Status         |
 |----------------------------------------------------------------------------------------------------------------------------------------------|----------------|----------------|
 | [Spring Boot](https://springdoc.org/#plugins)                                                                                                | Java           | ✅ Supported    |
+| [Gin](https://gin-gonic.com/)                                                                                                                | Go             | ✅ Supported    |
 | [go-zero](https://go-zero.dev/reference/cli-guide/swagger/)                                                                                  | Go             | ✅ Supported    |
 | [gRPC (protoc)](https://github.com/sudorandom/protoc-gen-connect-openapi)                                                                    | Multi-language | ✅ Supported    |
 | [Hertz](https://github.com/hertz-contrib/swagger-generate/tree/main/protoc-gen-http-swagger)                                                 | Go             | 🚧 Coming soon |

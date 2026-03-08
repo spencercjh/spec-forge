@@ -230,12 +230,17 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 			slog.InfoContext(ctx, "Publisher output", "message", pubResult.Message)
 		}
 	} else if outputDir != "" {
-		// Skip publish: just copy to output directory
-		if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
-			return errWrap("failed to copy spec to output directory", err)
+		// Skip publish: just copy to output directory if needed
+		genDir := filepath.Dir(genResult.SpecFilePath)
+		if genDir != outputDir {
+			if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
+				return errWrap("failed to copy spec to output directory", err)
+			}
+			finalSpecPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
+			slog.InfoContext(ctx, "Spec copied to output directory (publish skipped)", "path", finalSpecPath)
+		} else {
+			slog.InfoContext(ctx, "Spec already in output directory", "path", genResult.SpecFilePath)
 		}
-		finalSpecPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
-		slog.InfoContext(ctx, "Spec copied to output directory (publish skipped)", "path", finalSpecPath)
 	}
 
 	// Step 8: Output final result
