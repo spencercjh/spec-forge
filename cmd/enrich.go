@@ -173,6 +173,13 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal enriched spec: %w", err)
 	}
 
+	// Ensure output directory exists
+	if dir := filepath.Dir(outputFile); dir != "" && dir != "." {
+		if mkdirErr := os.MkdirAll(dir, 0o755); mkdirErr != nil {
+			return fmt.Errorf("failed to create output directory %q: %w", dir, mkdirErr)
+		}
+	}
+
 	if writeErr := os.WriteFile(outputFile, data, 0o600); writeErr != nil {
 		return fmt.Errorf("failed to write enriched spec: %w", writeErr)
 	}
