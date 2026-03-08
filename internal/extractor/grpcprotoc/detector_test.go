@@ -219,7 +219,17 @@ func TestDetector_Detect_MultipleProtoFiles(t *testing.T) {
 
 	// Create proto files
 	proto1 := filepath.Join(protoDir, "service.proto")
-	if err := os.WriteFile(proto1, []byte(`syntax = "proto3"; package test;`), 0o644); err != nil {
+	proto1Content := `syntax = "proto3";
+package test;
+
+service TestService {
+  rpc Get(GetRequest) returns (GetResponse);
+}
+
+message GetRequest {}
+message GetResponse {}
+`
+		if err := os.WriteFile(proto1, []byte(proto1Content), 0o644); err != nil {
 		t.Fatalf("Failed to create proto1: %v", err)
 	}
 
@@ -269,8 +279,12 @@ func TestDetector_Detect_ImportPaths(t *testing.T) {
 		t.Fatalf("Failed to create protos dir: %v", err)
 	}
 
-	// Create proto files in each directory
-	if err := os.WriteFile(filepath.Join(protoDir, "a.proto"), []byte(`syntax = "proto3";`), 0o644); err != nil {
+	// Create proto files in each directory (with service definition in first one)
+	aProtoContent := `syntax = "proto3";
+
+service TestService {}
+`
+		if err := os.WriteFile(filepath.Join(protoDir, "a.proto"), []byte(aProtoContent), 0o644); err != nil {
 		t.Fatalf("Failed to create a.proto: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(thirdPartyDir, "b.proto"), []byte(`syntax = "proto3";`), 0o644); err != nil {
@@ -304,9 +318,13 @@ func TestDetector_Detect_SkipVendor(t *testing.T) {
 	// Create temp dir with vendor directory
 	tmpDir := t.TempDir()
 
-	// Create proto file in main directory
+	// Create proto file in main directory with service definition
 	protoFile := filepath.Join(tmpDir, "main.proto")
-	if err := os.WriteFile(protoFile, []byte(`syntax = "proto3";`), 0o644); err != nil {
+	if err := os.WriteFile(protoFile, []byte(`syntax = "proto3";
+package main;
+service MainService { rpc GetData(GetRequest) returns (GetResponse); }
+message GetRequest {}
+message GetResponse {}`), 0o644); err != nil {
 		t.Fatalf("Failed to create main.proto: %v", err)
 	}
 
@@ -346,9 +364,13 @@ func TestDetector_Detect_SkipHiddenDirs(t *testing.T) {
 	// Create temp dir with hidden directory
 	tmpDir := t.TempDir()
 
-	// Create proto file in main directory
+	// Create proto file in main directory with service definition
 	protoFile := filepath.Join(tmpDir, "main.proto")
-	if err := os.WriteFile(protoFile, []byte(`syntax = "proto3";`), 0o644); err != nil {
+	if err := os.WriteFile(protoFile, []byte(`syntax = "proto3";
+package main;
+service MainService { rpc GetData(GetRequest) returns (GetResponse); }
+message GetRequest {}
+message GetResponse {}`), 0o644); err != nil {
 		t.Fatalf("Failed to create main.proto: %v", err)
 	}
 

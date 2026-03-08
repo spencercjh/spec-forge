@@ -95,6 +95,12 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	serviceProtoFiles := d.findServiceProtoFiles(protoFiles)
 	slog.Debug("found service proto files", "count", len(serviceProtoFiles), "files", serviceProtoFiles)
 
+	// Reject if no service definitions found - this is not a gRPC service project
+	if len(serviceProtoFiles) == 0 {
+		slog.Warn("no service definitions found in proto files", "path", absPath)
+		return nil, &ErrNotProtocProject{Reason: "no service definitions found in .proto files - this may not be a gRPC service project"}
+	}
+
 	// Build info
 	grpcInfo := &Info{
 		ProtoFiles:        protoFiles,
