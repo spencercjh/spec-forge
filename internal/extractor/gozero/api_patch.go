@@ -70,7 +70,7 @@ func (p *APIFilePatcher) getGoctlVersion() (string, error) {
 
 	opts := &executor.ExecuteOptions{
 		Command: "goctl",
-		Args:    []string{"version"},
+		Args:    []string{"--version"},
 	}
 
 	result, err := p.exec.Execute(ctx, opts)
@@ -79,7 +79,7 @@ func (p *APIFilePatcher) getGoctlVersion() (string, error) {
 	}
 
 	// Parse version from output
-	// goctl version output: "goctl version 1.9.2 darwin/arm64"
+	// goctl --version output: "goctl version 1.9.2 darwin/arm64"
 	fields := strings.Fields(result.Stdout)
 	if len(fields) < 3 {
 		return "", fmt.Errorf("unexpected goctl version output: %s", result.Stdout)
