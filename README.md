@@ -16,7 +16,7 @@ Generating OpenAPI specs from backend code is harder than it should be. Every ec
 
 The tooling landscape is fragmented and poorly documented:
 
-- **`google/gnostic` (`protoc-gen-openapi`)** — abandoned/unmaintained, yet still the top result in most tutorials
+- **`google/gnostic` (`protoc-gen-openapi`)** — inactive/unmaintained, yet still the top result in most tutorials
 - **`grpc-gateway`'s `protoc-gen-openapiv2`** — only outputs Swagger 2.0, not OpenAPI 3.x
 - **`buf`** — no official documentation for OpenAPI generation; developers rely entirely on third-party blog posts
 
@@ -40,11 +40,11 @@ These annotations are **not validated by the Go compiler** — typos and stale r
 
 ### Hertz / Kitex (CloudWeGo)
 
-OpenAPI generation tools exist for both frameworks but are scattered across GitHub with no official documentation. The official CloudWeGo docs don't mention how to generate OpenAPI specs at all. spec-forge aims to wrap this complexity into a single command (support coming soon).
+The official CloudWeGo documentation for OpenAPI generation is outdated. The recommended tools are in [`hertz-contrib/swagger-generate`](https://github.com/hertz-contrib/swagger-generate) — specifically `protoc-gen-http-swagger` for Hertz and `protoc-gen-rpc-swagger` for Kitex. spec-forge aims to wrap this complexity into a single command (support coming soon).
 
 ### go-zero
 
-`goctl swagger` has known bugs. spec-forge patches them internally before running generation, so you get a valid spec without manual workarounds.
+Support for go-zero projects is available. spec-forge wraps `goctl swagger` to generate OpenAPI specs from `.api` definition files.
 
 ---
 
@@ -117,76 +117,25 @@ LLM_API_KEY="your-api-key" spec-forge enrich ./openapi.json \
 
 ## Supported Frameworks
 
-| Framework                                                                                                                                    | Language       | Status         |
-|----------------------------------------------------------------------------------------------------------------------------------------------|----------------|----------------|
-| [Spring Boot](https://springdoc.org/#plugins)                                                                                                | Java           | ✅ Supported    |
-| [Gin](https://gin-gonic.com/)                                                                                                                | Go             | ✅ Supported    |
-| [go-zero](https://go-zero.dev/reference/cli-guide/swagger/)                                                                                  | Go             | ✅ Supported    |
-| [gRPC (protoc)](https://github.com/sudorandom/protoc-gen-connect-openapi)                                                                    | Multi-language | ✅ Supported    |
-| [Hertz](https://github.com/hertz-contrib/swagger-generate/tree/main/protoc-gen-http-swagger)                                                 | Go             | 🚧 Coming soon |
-| [Kitex](https://github.com/hertz-contrib/swagger-generate/tree/main/protoc-gen-rpc-swagger)                                                  | Go             | 🚧 Coming soon |
+| Framework                                                                                                                | Language       | Status         | Details                                     |
+|--------------------------------------------------------------------------------------------------------------------------|----------------|----------------|---------------------------------------------|
+| [Spring Boot](https://springdoc.org/#plugins)                                                                           | Java           | ✅ Supported   | [docs](./docs/spring-boot.md)               |
+| [Gin](https://gin-gonic.com/)                                                                                           | Go             | ✅ Supported   | [docs](./docs/gin.md)                       |
+| [go-zero](https://go-zero.dev/)                                                                                         | Go             | ✅ Supported   | [docs](./docs/go-zero.md)                   |
+| [gRPC (protoc)](https://github.com/sudorandom/protoc-gen-connect-openapi)                                               | Multi-language | ✅ Supported   | [docs](./docs/grpc-protoc.md)               |
+| [Hertz](https://github.com/cloudwego/hertz)                                                                             | Go             | 🚧 Coming soon | [docs](./docs/hertz.md)                     |
+| [Kitex](https://github.com/cloudwego/kitex)                                                                             | Go             | 🚧 Coming soon | [docs](./docs/kitex.md)                     |
 
 ## Framework-Specific Usage
 
-### Gin Framework
+See the detailed documentation for each framework:
 
-> **No annotations required.** Unlike `swaggo/swag`, which forces you to write and maintain `// @Summary`, `// @Param`, `// @Success` comments for every handler, spec-forge uses Go AST analysis to extract routes, parameters, and response types directly from your source code. There is nothing to annotate and nothing to keep in sync.
-
-spec-forge uses static AST analysis (no runtime required):
-
-```bash
-# Basic generation from a Gin project
-cd my-gin-project
-spec-forge generate . -o ./openapi
-
-# Generate with AI enrichment
-LLM_API_KEY="sk-xxx" spec-forge generate . \
-    --enrich \
-    --provider custom \
-    --model deepseek-chat \
-    --language zh
-
-# Verbose mode to see extraction details
-spec-forge generate . -v
-```
-
-Supported Gin patterns:
-- Direct route registration: `r.GET("/users", handler)`
-- Route groups: `api := r.Group("/api")`
-- Middleware chains: `r.Use(auth).GET("/protected", handler)`
-- Parameter binding: `c.Param()`, `c.Query()`, `c.ShouldBindJSON()`
-- Response types: extracted from `c.JSON()` calls with type inference
-
-### gRPC Projects (Native protoc)
-
-> **Why not `google/gnostic`, `grpc-gateway`, or `buf`?**
-> - `google/gnostic`'s `protoc-gen-openapi` is abandoned and unmaintained.
-> - `grpc-gateway`'s `protoc-gen-openapiv2` only outputs Swagger 2.0, not OpenAPI 3.x.
-> - `buf` has no official documentation for OpenAPI generation — developers rely on scattered third-party blog posts.
->
-> spec-forge uses [`protoc-gen-connect-openapi`](https://github.com/sudorandom/protoc-gen-connect-openapi), which is actively maintained and outputs OpenAPI 3.x natively.
-
-For gRPC projects using native protoc (not buf-managed):
-
-```bash
-# Generate OpenAPI spec from proto files
-spec-forge generate ./my-grpc-project
-
-# With additional import paths
-spec-forge generate ./my-grpc-project --proto-import-path ./third_party --proto-import-path ./vendor
-
-# Generate with AI enrichment
-LLM_API_KEY="your-key" spec-forge generate ./my-grpc-project --enrich --language zh
-```
-
-**Requirements:**
-- `protoc` installed ([install guide](https://github.com/protocolbuffers/protobuf/releases))
-- `protoc-gen-connect-openapi` installed:
-  ```bash
-  go install github.com/sudorandom/protoc-gen-connect-openapi@latest
-  ```
-
-**Note:** buf-managed projects are not supported in this mode. Use `buf generate` with the plugin, then use `spec-forge enrich` on the generated OpenAPI spec.
+- [Spring Boot](./docs/spring-boot.md)
+- [Gin](./docs/gin.md) — Zero annotations required, AST-based analysis
+- [go-zero](./docs/go-zero.md)
+- [gRPC (protoc)](./docs/grpc-protoc.md) — Native protoc with `protoc-gen-connect-openapi`
+- [Hertz](./docs/hertz.md) — Coming soon
+- [Kitex](./docs/kitex.md) — Coming soon
 
 ## Configuration
 
