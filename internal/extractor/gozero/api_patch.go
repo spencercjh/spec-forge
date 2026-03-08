@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"golang.org/x/mod/semver"
 )
 
 // minGoctlVersionForPatch is the minimum goctl version that fixes issue #5425.
@@ -34,7 +36,8 @@ func NewAPIFilePatcher() *APIFilePatcher {
 
 	// Check goctl version to determine if patching is needed
 	if version, err := getGoctlVersion(); err == nil {
-		patcher.skipPatch = version >= minGoctlVersionForPatch
+		// Use semantic version comparison (add "v" prefix for semver.Compare)
+		patcher.skipPatch = semver.Compare("v"+version, "v"+minGoctlVersionForPatch) >= 0
 		if patcher.skipPatch {
 			slog.Debug("goctl version >= 1.9.2, skipping API file patching (issue #5425 fixed upstream)")
 		}
