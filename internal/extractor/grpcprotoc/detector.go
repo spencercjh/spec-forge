@@ -209,10 +209,6 @@ func (d *Detector) hasGoogleAPIImport(protoFile string) bool {
 		if strings.Contains(line, "google/api/annotations.proto") {
 			return true
 		}
-		// Also check for import 'google/api/annotations.proto' (single quotes)
-		if strings.Contains(line, "google/api/annotations.proto") {
-			return true
-		}
 	}
 
 	return false
