@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"golang.org/x/mod/semver"
 
@@ -19,6 +20,9 @@ import (
 // minGoctlVersionForPatch is the minimum goctl version that fixes issue #5425.
 // goctl 1.9.2+ has fixed the multi-hyphen prefix parsing issue.
 const minGoctlVersionForPatch = "1.9.2"
+
+// versionCheckTimeout is the timeout for goctl version check.
+const versionCheckTimeout = 5 * time.Second
 
 // APIFilePatcher patches .api files to work around goctl parser bugs.
 // See: https://github.com/zeromicro/go-zero/issues/5425
@@ -61,7 +65,9 @@ func NewAPIFilePatcherWithExecutor(exec executor.Interface) *APIFilePatcher {
 
 // getGoctlVersion returns the goctl version string (e.g., "1.9.2").
 func (p *APIFilePatcher) getGoctlVersion() (string, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), versionCheckTimeout)
+	defer cancel()
+
 	opts := &executor.ExecuteOptions{
 		Command: "goctl",
 		Args:    []string{"version"},
