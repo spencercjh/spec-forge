@@ -211,6 +211,19 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 		})
 	}
 
+	// Header parameters
+	for _, param := range handlerInfo.HeaderParams {
+		operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{
+			Value: &openapi3.Parameter{
+				Name:        param.Name,
+				In:          "header",
+				Required:    param.Required,
+				Description: "Header parameter",
+				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+			},
+		})
+	}
+
 	// Request body
 	if handlerInfo.BodyType != "" && handlerInfo.BodyType != ginHType {
 		var schemaRef *openapi3.SchemaRef

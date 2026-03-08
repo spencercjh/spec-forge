@@ -333,8 +333,8 @@ func extractTypeFromArg(expr ast.Expr, varTypeMap map[string]string) string {
 		if varType, exists := varTypeMap[ident.Name]; exists {
 			return varType
 		}
-		// Fall back to variable name
-		return ident.Name
+		// If we don't know the variable's type, treat it as unknown
+		return ""
 	}
 
 	return ""

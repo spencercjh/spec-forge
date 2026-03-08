@@ -109,6 +109,11 @@ func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec) (*openapi3
 			propertyName = e.applyTags(fieldSchemaRef.Value, tag, fieldName, schema)
 		}
 
+		// Skip fields with json:"-"
+		if propertyName == "" {
+			continue
+		}
+
 		schema.Properties[propertyName] = fieldSchemaRef
 	}
 
@@ -229,6 +234,7 @@ func goTypeToSchema(goType string) *openapi3.Schema {
 
 // applyTags processes struct tags and updates schema.
 // Returns the final property name (may be different from fieldName due to json tag).
+// Returns empty string if the field should be skipped (json:"-").
 func (e *SchemaExtractor) applyTags(schema *openapi3.Schema, tag, fieldName string, parentSchema *openapi3.Schema) string {
 	propertyName := fieldName
 	isOmitEmpty := false
@@ -236,7 +242,11 @@ func (e *SchemaExtractor) applyTags(schema *openapi3.Schema, tag, fieldName stri
 	// Parse json tag
 	if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
 		parts := strings.Split(jsonTag, ",")
-		if parts[0] != "" && parts[0] != "-" {
+		// Handle json:"-" - skip field entirely
+		if parts[0] == "-" {
+			return ""
+		}
+		if parts[0] != "" {
 			propertyName = parts[0]
 		}
 		// Check for omitempty

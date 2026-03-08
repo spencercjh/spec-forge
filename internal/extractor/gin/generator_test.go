@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -144,7 +145,7 @@ func main() {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !contains(result.SpecFilePath, ".json") {
+	if !strings.HasSuffix(result.SpecFilePath, ".json") {
 		t.Errorf("expected json file extension, got %s", result.SpecFilePath)
 	}
 
@@ -202,8 +203,4 @@ func TestSetOperationForMethod(t *testing.T) {
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr || len(s) > len(substr) && contains(s[:len(s)-1], substr)
 }
