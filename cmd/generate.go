@@ -122,10 +122,13 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 4: Generate OpenAPI spec
 
 	// Determine output directory
-	// Default to project root directory if not specified
+	// Precedence: flag > config > default (project root)
 	outputDir := generateOutputDir
 	if outputDir == "" {
-		outputDir = path // Use project path as default output location
+		outputDir = config.Get().Output.Dir
+	}
+	if outputDir == "" {
+		outputDir = path // Default to project root
 	}
 
 	// Determine output format
