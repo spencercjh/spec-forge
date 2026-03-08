@@ -37,7 +37,9 @@ jobs:
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.10
-          verify: false
+          verify: true
+          install-only: true
+          skip-cache: true
 
       - name: Format check
         run: make fmt
