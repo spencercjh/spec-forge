@@ -229,7 +229,7 @@ service TestService {
 message GetRequest {}
 message GetResponse {}
 `
-		if err := os.WriteFile(proto1, []byte(proto1Content), 0o644); err != nil {
+	if err := os.WriteFile(proto1, []byte(proto1Content), 0o644); err != nil {
 		t.Fatalf("Failed to create proto1: %v", err)
 	}
 
@@ -284,7 +284,7 @@ func TestDetector_Detect_ImportPaths(t *testing.T) {
 
 service TestService {}
 `
-		if err := os.WriteFile(filepath.Join(protoDir, "a.proto"), []byte(aProtoContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(protoDir, "a.proto"), []byte(aProtoContent), 0o644); err != nil {
 		t.Fatalf("Failed to create a.proto: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(thirdPartyDir, "b.proto"), []byte(`syntax = "proto3";`), 0o644); err != nil {

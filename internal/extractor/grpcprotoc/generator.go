@@ -212,6 +212,11 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 		args = append(args, "--connect-openapi_opt=format=yaml")
 	}
 
+	// Add output name option if specified (controls the base filename)
+	if opts.OutputFile != "" && opts.OutputFile != defaultOutputFileName {
+		args = append(args, "--connect-openapi_opt=output_name="+opts.OutputFile)
+	}
+
 	// Enable google.api.http annotations support if detected
 	if info.HasGoogleAPI {
 		args = append(args, "--connect-openapi_opt=features=google.api.http")
@@ -263,22 +268,6 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 		if outputPath, err := g.findFileWithExt(searchDir, expectedExt); err == nil {
 			return outputPath, nil
 		}
-	}
-
-	// Finally, search recursively from the project root
-	var foundPath string
-	err := filepath.Walk(info.ProtoRoot, func(path string, file os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !file.IsDir() && strings.HasSuffix(path, expectedExt) {
-			foundPath = path
-			return filepath.SkipAll
-		}
-		return nil
-	})
-	if err == nil && foundPath != "" {
-		return foundPath, nil
 	}
 
 	return "", ErrOutputFileNotFound
