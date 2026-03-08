@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +39,7 @@ func NewASTParser(projectPath string) *ASTParser {
 
 // ParseFiles parses all Go files in the project.
 func (p *ASTParser) ParseFiles() error {
+	slog.Debug("Parsing Go files", "path", p.projectPath)
 	return filepath.Walk(p.projectPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -81,15 +84,17 @@ func (p *ASTParser) ParseFiles() error {
 
 // ExtractRoutes extracts all Gin routes from parsed files.
 func (p *ASTParser) ExtractRoutes() ([]Route, error) {
+	slog.Debug("Extracting routes", "files", len(p.files))
+
 	var routes []Route
 
 	// First pass: extract group definitions
-	for path, file := range p.files {
+	for _, file := range p.files {
 		groups := p.extractGroups(file)
-		for name, group := range groups {
-			p.groups[name] = group
-			_ = path // use path
-		}
+		maps.Copy(p.groups, groups)
+	}
+	if len(p.groups) > 0 {
+		slog.Debug("Extracted router groups", "count", len(p.groups))
 	}
 
 	// Second pass: extract routes
@@ -98,6 +103,7 @@ func (p *ASTParser) ExtractRoutes() ([]Route, error) {
 		routes = append(routes, fileRoutes...)
 	}
 
+	slog.Info("Extracted routes", "count", len(routes))
 	return routes, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,25 +28,31 @@ func NewSchemaExtractor(files map[string]*ast.File) *SchemaExtractor {
 
 // ExtractSchema extracts an OpenAPI schema from a Go type.
 func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, error) {
+	slog.Debug("Extracting schema", "type", typeName)
+
 	// Check cache
 	if cached, ok := e.typeCache[typeName]; ok {
+		slog.Debug("Using cached schema", "type", typeName)
 		return cached, nil
 	}
 
 	// Find the type definition
 	typeSpec := e.findTypeSpec(typeName)
 	if typeSpec == nil {
+		slog.Warn("Type not found", "type", typeName)
 		return nil, fmt.Errorf("type %s not found", typeName)
 	}
 
 	// Extract schema from struct
 	schema, err := e.extractStructSchema(typeSpec)
 	if err != nil {
+		slog.Error("Failed to extract struct schema", "type", typeName, "error", err)
 		return nil, err
 	}
 
 	ref := &openapi3.SchemaRef{Value: schema}
 	e.typeCache[typeName] = ref
+	slog.Debug("Extracted schema", "type", typeName, "properties", len(schema.Properties))
 	return ref, nil
 }
 

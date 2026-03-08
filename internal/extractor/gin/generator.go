@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -28,24 +29,33 @@ func NewGenerator() *Generator {
 
 // Generate generates OpenAPI spec from Gin project.
 func (g *Generator) Generate(_ context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+	slog.Info("Generating OpenAPI spec from Gin project", "path", projectPath)
+
 	ginInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
+		slog.Error("Invalid framework data type")
 		return nil, errors.New("invalid framework data type")
 	}
 
 	// Step 1: Parse AST files
+	slog.Debug("Parsing AST files", "path", projectPath)
 	parser := NewASTParser(projectPath)
 	if err := parser.ParseFiles(); err != nil {
+		slog.Error("Failed to parse files", "error", err)
 		return nil, fmt.Errorf("failed to parse files: %w", err)
 	}
+	slog.Debug("Parsed AST files", "count", len(parser.files))
 
 	// Step 2: Extract routes
 	routes, err := parser.ExtractRoutes()
 	if err != nil {
+		slog.Error("Failed to extract routes", "error", err)
 		return nil, fmt.Errorf("failed to extract routes: %w", err)
 	}
+	slog.Info("Extracted routes", "count", len(routes))
 
 	// Step 3: Analyze handlers
+	slog.Debug("Analyzing handlers")
 	analyzer := NewHandlerAnalyzer(parser.fset, parser.files)
 	handlerInfos := make(map[string]*HandlerInfo)
 	for _, route := range routes {
@@ -54,38 +64,54 @@ func (g *Generator) Generate(_ context.Context, projectPath string, info *extrac
 		if handlerDecl != nil {
 			handlerInfo, analyzeErr := analyzer.AnalyzeHandler(handlerDecl)
 			if analyzeErr != nil {
-				continue // Log but continue
+				slog.Warn("Failed to analyze handler", "handler", route.HandlerName, "error", analyzeErr)
+				continue
 			}
 			handlerInfos[route.HandlerName] = handlerInfo
+			slog.Debug("Analyzed handler", "handler", route.HandlerName, "bodyType", handlerInfo.BodyType, "responses", len(handlerInfo.Responses))
+		} else {
+			slog.Warn("Handler function not found", "handler", route.HandlerName)
 		}
 	}
 
 	// Step 4: Extract schemas
+	slog.Debug("Extracting schemas")
 	schemaExtractor := NewSchemaExtractor(parser.files)
 	schemas := make(openapi3.Schemas)
 	for _, handlerInfo := range handlerInfos {
 		if handlerInfo.BodyType != "" && handlerInfo.BodyType != ginHType {
 			if schema, extractErr := schemaExtractor.ExtractSchema(handlerInfo.BodyType); extractErr == nil {
 				schemas[handlerInfo.BodyType] = schema
+				slog.Debug("Extracted request body schema", "type", handlerInfo.BodyType)
+			} else {
+				slog.Warn("Failed to extract schema", "type", handlerInfo.BodyType, "error", extractErr)
 			}
 		}
 		for _, resp := range handlerInfo.Responses {
 			if resp.GoType != "" && resp.GoType != ginHType {
 				if schema, extractErr := schemaExtractor.ExtractSchema(resp.GoType); extractErr == nil {
 					schemas[resp.GoType] = schema
+					slog.Debug("Extracted response schema", "type", resp.GoType)
+				} else {
+					slog.Warn("Failed to extract schema", "type", resp.GoType, "error", extractErr)
 				}
 			}
 		}
 	}
+	slog.Info("Extracted schemas", "count", len(schemas))
 
 	// Step 5: Build OpenAPI document
+	slog.Debug("Building OpenAPI document")
 	doc := g.buildOpenAPIDoc(ginInfo, routes, handlerInfos, schemas)
 
 	// Step 6: Write output
 	outputPath, err := g.writeOutput(doc, opts)
 	if err != nil {
+		slog.Error("Failed to write output", "error", err)
 		return nil, fmt.Errorf("failed to write output: %w", err)
 	}
+
+	slog.Info("Generated OpenAPI spec", "path", outputPath, "format", opts.Format)
 
 	return &extractor.GenerateResult{
 		SpecFilePath: outputPath,

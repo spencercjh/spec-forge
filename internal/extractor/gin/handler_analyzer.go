@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"log/slog"
 )
 
 // HandlerAnalyzer analyzes Gin handler functions.
@@ -24,6 +25,8 @@ func NewHandlerAnalyzer(fset *token.FileSet, files map[string]*ast.File) *Handle
 
 // AnalyzeHandler analyzes a handler function and extracts information.
 func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error) {
+	slog.Debug("Analyzing handler", "name", fn.Name.Name)
+
 	info := &HandlerInfo{
 		PathParams:   []ParamInfo{},
 		QueryParams:  []ParamInfo{},
@@ -33,6 +36,7 @@ func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error)
 
 	// Inspect the function body
 	if fn.Body == nil {
+		slog.Debug("Handler has no body", "name", fn.Name.Name)
 		return info, nil
 	}
 
@@ -56,56 +60,74 @@ func (a *HandlerAnalyzer) buildVarTypeMap(body *ast.BlockStmt) map[string]string
 	ast.Inspect(body, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.DeclStmt:
-			// Extract type from var declarations like: var req CreateUserRequest
-			if genDecl, ok := node.Decl.(*ast.GenDecl); ok && genDecl.Tok == token.VAR {
-				for _, spec := range genDecl.Specs {
-					if valueSpec, ok := spec.(*ast.ValueSpec); ok {
-						for i, name := range valueSpec.Names {
-							if i < len(valueSpec.Values) {
-								// Check if value is a composite literal with type
-								if comp, ok := valueSpec.Values[i].(*ast.CompositeLit); ok {
-									if ident, ok := comp.Type.(*ast.Ident); ok {
-										varTypeMap[name.Name] = ident.Name
-									}
-								}
-							}
-							// Also check explicit type
-							if valueSpec.Type != nil {
-								if ident, ok := valueSpec.Type.(*ast.Ident); ok {
-									varTypeMap[name.Name] = ident.Name
-								}
-							}
-						}
-					}
-				}
-			}
+			a.extractVarDeclTypes(node, varTypeMap)
 		case *ast.AssignStmt:
-			// Extract type from short declarations like: req := CreateUserRequest{}
-			if node.Tok == token.DEFINE {
-				for i, lhs := range node.Lhs {
-					if i < len(node.Rhs) {
-						if ident, ok := lhs.(*ast.Ident); ok {
-							// Check if RHS is a composite literal with type
-							if comp, ok := node.Rhs[i].(*ast.CompositeLit); ok {
-								if typeIdent, ok := comp.Type.(*ast.Ident); ok {
-									varTypeMap[ident.Name] = typeIdent.Name
-								}
-							} else {
-								// Try to infer type from variable name using heuristic
-								// e.g., "user" -> "User", "result" -> "Result"
-								if inferredType := inferTypeFromVarName(ident.Name); inferredType != "" {
-									varTypeMap[ident.Name] = inferredType
-								}
-							}
-						}
-					}
-				}
-			}
+			a.extractAssignTypes(node, varTypeMap)
 		}
 		return true
 	})
 
+	if len(varTypeMap) > 0 {
+		slog.Debug("Built variable type map", "entries", len(varTypeMap))
+	}
 	return varTypeMap
+}
+
+// extractVarDeclTypes extracts types from var declarations.
+func (a *HandlerAnalyzer) extractVarDeclTypes(node *ast.DeclStmt, varTypeMap map[string]string) {
+	genDecl, ok := node.Decl.(*ast.GenDecl)
+	if !ok || genDecl.Tok != token.VAR {
+		return
+	}
+	for _, spec := range genDecl.Specs {
+		valueSpec, ok := spec.(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+		for i, name := range valueSpec.Names {
+			if i < len(valueSpec.Values) {
+				// Check if value is a composite literal with type
+				if comp, ok := valueSpec.Values[i].(*ast.CompositeLit); ok {
+					if ident, ok := comp.Type.(*ast.Ident); ok {
+						varTypeMap[name.Name] = ident.Name
+					}
+				}
+			}
+			// Also check explicit type
+			if valueSpec.Type != nil {
+				if ident, ok := valueSpec.Type.(*ast.Ident); ok {
+					varTypeMap[name.Name] = ident.Name
+				}
+			}
+		}
+	}
+}
+
+// extractAssignTypes extracts types from short variable declarations.
+func (a *HandlerAnalyzer) extractAssignTypes(node *ast.AssignStmt, varTypeMap map[string]string) {
+	if node.Tok != token.DEFINE {
+		return
+	}
+	for i, lhs := range node.Lhs {
+		if i >= len(node.Rhs) {
+			continue
+		}
+		ident, ok := lhs.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		// Check if RHS is a composite literal with type
+		if comp, ok := node.Rhs[i].(*ast.CompositeLit); ok {
+			if typeIdent, ok := comp.Type.(*ast.Ident); ok {
+				varTypeMap[ident.Name] = typeIdent.Name
+			}
+		} else {
+			// Try to infer type from variable name using heuristic
+			if inferredType := inferTypeFromVarName(ident.Name); inferredType != "" {
+				varTypeMap[ident.Name] = inferredType
+			}
+		}
+	}
 }
 
 // inferTypeFromVarName tries to infer type from variable name using common patterns.
@@ -235,6 +257,7 @@ func (a *HandlerAnalyzer) extractBodyType(call *ast.CallExpr, info *HandlerInfo,
 	}
 	if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
 		info.BodyType = typeName
+		slog.Debug("Extracted body type", "type", typeName)
 	}
 }
 
@@ -274,6 +297,9 @@ func (a *HandlerAnalyzer) extractResponse(call *ast.CallExpr, info *HandlerInfo,
 	statusCode := extractStatusCode(call.Args[0])
 	if goType == "" {
 		goType = extractTypeFromResponse(call.Args[1], varTypeMap)
+	}
+	if goType != "" {
+		slog.Debug("Extracted response type", "status", statusCode, "type", goType)
 	}
 	info.Responses = append(info.Responses, ResponseInfo{
 		StatusCode: statusCode,

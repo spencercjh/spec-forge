@@ -3,6 +3,7 @@ package gin
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,23 +28,29 @@ func NewDetector() *Detector {
 
 // Detect analyzes a project and returns info if it's a Gin project.
 func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
+	slog.Debug("Detecting Gin project", "path", projectPath)
+
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
+		slog.Error("Failed to resolve path", "path", projectPath, "error", err)
 		return nil, fmt.Errorf("failed to resolve path: %w", err)
 	}
 
 	// Check for go.mod
 	goModPath := filepath.Join(absPath, GoModFile)
 	if _, statErr := os.Stat(goModPath); statErr != nil {
+		slog.Warn("No go.mod found", "path", absPath)
 		return nil, fmt.Errorf("no go.mod found in %s", absPath)
 	}
 
 	// Parse go.mod for Gin dependency
 	ginVersion, err := d.parseGinVersion(goModPath)
 	if err != nil {
+		slog.Error("Failed to parse go.mod", "path", goModPath, "error", err)
 		return nil, fmt.Errorf("failed to parse go.mod: %w", err)
 	}
 	if ginVersion == "" {
+		slog.Warn("No gin dependency found in go.mod", "path", goModPath)
 		return nil, errors.New("no gin dependency found in go.mod")
 	}
 
@@ -66,6 +73,8 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	if len(mainFiles) == 0 {
 		return nil, fmt.Errorf("no .go files found in %s", absPath)
 	}
+
+	slog.Info("Detected Gin project", "module", moduleName, "version", ginVersion, "files", len(mainFiles))
 
 	// Create Gin-specific info
 	ginInfo := &Info{
