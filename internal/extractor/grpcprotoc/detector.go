@@ -106,7 +106,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	}
 
 	info := &extractor.ProjectInfo{
-		Framework:     FrameworkName,
+		Framework:     ExtractorName,
 		BuildTool:     BuildToolProtoc,
 		BuildFilePath: absPath,
 		FrameworkData: grpcInfo,

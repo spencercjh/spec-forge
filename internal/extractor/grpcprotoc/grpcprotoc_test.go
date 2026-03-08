@@ -4,9 +4,9 @@ import (
 	"testing"
 )
 
-func TestFrameworkName(t *testing.T) {
-	if FrameworkName != "grpc-protoc" {
-		t.Errorf("FrameworkName = %q, want %q", FrameworkName, "grpc-protoc")
+func TestExtractorName(t *testing.T) {
+	if ExtractorName != "grpc-protoc" {
+		t.Errorf("ExtractorName = %q, want %q", ExtractorName, "grpc-protoc")
 	}
 }
 

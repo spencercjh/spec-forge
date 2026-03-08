@@ -3,9 +3,6 @@ package grpcprotoc
 
 import "github.com/spencercjh/spec-forge/internal/extractor"
 
-// FrameworkName is the identifier for this extractor.
-const FrameworkName = "grpc-protoc"
-
 // BuildToolProtoc represents protoc as the build tool.
 const BuildToolProtoc extractor.BuildTool = "protoc"
 

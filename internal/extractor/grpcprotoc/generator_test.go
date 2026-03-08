@@ -73,7 +73,7 @@ service HelloService {
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -162,7 +162,7 @@ info:
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -231,7 +231,7 @@ message Response {}
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -306,7 +306,7 @@ message Response {}
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -368,7 +368,7 @@ message Response {}
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -436,7 +436,7 @@ message Response {}
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -471,7 +471,7 @@ func TestGenerator_Generate_Error_NoProtoFiles(t *testing.T) {
 	g := grpcprotoc.NewGenerator()
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -511,7 +511,7 @@ func TestGenerator_Generate_Error_NoServiceProtoFiles(t *testing.T) {
 	g := grpcprotoc.NewGenerator()
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -573,7 +573,7 @@ message Response {}
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -625,7 +625,7 @@ message Response {}
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{
@@ -682,7 +682,7 @@ message Response {}
 	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
 
 	info := &extractor.ProjectInfo{
-		Framework:     grpcprotoc.FrameworkName,
+		Framework:     grpcprotoc.ExtractorName,
 		BuildTool:     grpcprotoc.BuildToolProtoc,
 		BuildFilePath: tmpDir,
 		FrameworkData: &grpcprotoc.Info{

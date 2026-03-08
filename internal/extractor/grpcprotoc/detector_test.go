@@ -108,8 +108,8 @@ service HelloService {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.Framework != grpcprotoc.FrameworkName {
-		t.Errorf("Framework = %s, want %s", info.Framework, grpcprotoc.FrameworkName)
+	if info.Framework != grpcprotoc.ExtractorName {
+		t.Errorf("Framework = %s, want %s", info.Framework, grpcprotoc.ExtractorName)
 	}
 
 	if info.BuildTool != grpcprotoc.BuildToolProtoc {
