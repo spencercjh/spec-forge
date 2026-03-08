@@ -16,14 +16,14 @@ func NewPatcher() *Patcher {
 }
 
 // Patch performs no-op patching for Gin projects.
-func (p *Patcher) Patch(_ context.Context, _ string, info *extractor.ProjectInfo, _ *extractor.PatchOptions) (*extractor.PatchResult, error) {
-	slog.Debug("Patching Gin project (no-op)")
+func (p *Patcher) Patch(ctx context.Context, _ string, info *extractor.ProjectInfo, _ *extractor.PatchOptions) (*extractor.PatchResult, error) {
+	slog.DebugContext(ctx, "Patching Gin project (no-op)")
 
 	// Gin projects don't need patching, just mark as ready
 	if ginInfo, ok := info.FrameworkData.(*Info); ok {
 		ginInfo.HasGin = true
 	}
 
-	slog.Info("Gin project patched successfully (no changes needed)")
+	slog.InfoContext(ctx, "Gin project patched successfully (no changes needed)")
 	return &extractor.PatchResult{}, nil
 }
