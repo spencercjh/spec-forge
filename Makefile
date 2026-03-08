@@ -66,6 +66,7 @@ lint:
 fmt:
 	@echo "Formatting code..."
 	$(GOLINT) fmt ./...
+	$(GOCMD) fix ./...
 	@echo "Format complete"
 
 install:
