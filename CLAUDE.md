@@ -90,6 +90,7 @@ internal/
 
 ```
 Spring Project → springdoc plugin → openapi.json → Enricher (LLM) → openapi.yaml
+Gin Project → AST Parser → OpenAPI Generator → Enricher (LLM) → openapi.yaml
 ```
 
 ## Critical Constraints
