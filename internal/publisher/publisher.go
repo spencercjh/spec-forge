@@ -65,20 +65,19 @@ type Publisher interface {
 const (
 	formatJSON      = "json"
 	formatYAML      = "yaml"
-	publisherLocal  = "local"
 	publisherReadme = "readme"
 )
 
 // NewPublisher creates a Publisher based on the destination type.
-// Supported types: "local" (default), "readme"
-// For unknown types, returns error.
+// Supported types: "readme"
+// For unknown types or empty string, returns error.
 func NewPublisher(destType string) (Publisher, error) {
 	normalizedType := strings.ToLower(strings.TrimSpace(destType))
 	switch normalizedType {
-	case publisherLocal, "":
-		return NewLocalPublisher(), nil
 	case publisherReadme:
 		return NewReadMePublisher(), nil
+	case "":
+		return nil, errors.New("publish target is required (e.g., readme)")
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnknownPublisher, destType)
 	}

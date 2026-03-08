@@ -13,6 +13,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/spencercjh/spec-forge/internal/config"
 	"github.com/spencercjh/spec-forge/internal/enricher"
@@ -174,22 +175,15 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		slog.InfoContext(ctx, "Enrichment skipped", "status", "⏭️")
 	}
 
-	// Step 7: Publish the spec (default: local publisher)
-	if !generateSkipPublish {
-		// Determine publish target
-		target := generatePublishTarget
-		if target == "" {
-			target = "local" // Default to local
-		}
-
+	// Step 7: Publish the spec to remote platforms (optional)
+	if !generateSkipPublish && generatePublishTarget != "" {
 		// Create publisher using factory
-		pub, err := publisher.NewPublisher(target)
+		pub, err := publisher.NewPublisher(generatePublishTarget)
 		if err != nil {
 			return errWrap("failed to create publisher", err)
 		}
 
 		// Build publish options
-		// Default to overwrite for all publishers (convenient for CI), user can disable with --publish-overwrite=false
 		pubOpts := &publisher.PublishOptions{
 			OutputPath: filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath)),
 			Format:     config.Get().Output.Format,
@@ -230,16 +224,16 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 			slog.InfoContext(ctx, "Publisher output", "message", pubResult.Message)
 		}
 	} else if outputDir != "" {
-		// Skip publish: just copy to output directory if needed
+		// No remote publish target: just copy to output directory if needed
 		genDir := filepath.Dir(genResult.SpecFilePath)
 		if genDir != outputDir {
 			if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
 				return errWrap("failed to copy spec to output directory", err)
 			}
 			finalSpecPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
-			slog.InfoContext(ctx, "Spec copied to output directory (publish skipped)", "path", finalSpecPath)
+			slog.InfoContext(ctx, "Spec copied to output directory", "path", finalSpecPath)
 		} else {
-			slog.InfoContext(ctx, "Spec already in output directory", "path", genResult.SpecFilePath)
+			slog.InfoContext(ctx, "Spec saved", "path", genResult.SpecFilePath)
 		}
 	}
 
@@ -266,10 +260,10 @@ func init() {
 		"output directory for generated spec (default: project's target/build dir)")
 	generateCmd.Flags().BoolVar(&generateSkipPublish, "skip-publish", false,
 		"skip publishing the generated spec (just copy to output directory)")
-	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "local",
-		"publish target (local, readme)")
+	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "",
+		"publish target (readme). If empty, spec is only saved locally")
 	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
-		"overwrite existing spec (applies to both local and remote publishers)")
+		"overwrite existing spec on remote platform")
 	generateCmd.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
 }
@@ -340,17 +334,26 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 		}
 	}
 
-	// Publish result using Publisher
-	pub := publisher.NewLocalPublisher()
-	pubResult, err := pub.Publish(ctx, result, &publisher.PublishOptions{
-		OutputPath: specFilePath,
-		Overwrite:  true,
-	})
+	// Save enriched spec to file
+	var data []byte
+	if filepath.Ext(specFilePath) == ".json" {
+		data, err = result.MarshalJSON()
+	} else {
+		var yamlData any
+		yamlData, err = result.MarshalYAML()
+		if err == nil {
+			data, err = yaml.Marshal(yamlData)
+		}
+	}
 	if err != nil {
-		return fmt.Errorf("failed to save enriched spec: %w", err)
+		return fmt.Errorf("failed to marshal enriched spec: %w", err)
 	}
 
-	slog.InfoContext(ctx, "OpenAPI spec enriched", "output", pubResult.Path)
+	if writeErr := os.WriteFile(specFilePath, data, 0o600); writeErr != nil {
+		return fmt.Errorf("failed to write enriched spec: %w", writeErr)
+	}
+
+	slog.InfoContext(ctx, "OpenAPI spec enriched", "output", specFilePath)
 	return nil
 }
 
