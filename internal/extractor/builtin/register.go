@@ -9,8 +9,8 @@ import (
 
 func init() {
 	// Register all built-in extractors
-	Register(spring.ExtractorName, &spring.Extractor{})
-	Register(gozero.ExtractorName, &gozero.Extractor{})
-	Register(grpcprotoc.ExtractorName, &grpcprotoc.Extractor{})
+	Register(spring.ExtractorName, spring.NewExtractor())
+	Register(gozero.ExtractorName, gozero.NewExtractor())
+	Register(grpcprotoc.ExtractorName, grpcprotoc.NewExtractor())
 	Register(gin.ExtractorName, gin.NewExtractor())
 }
