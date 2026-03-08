@@ -122,15 +122,19 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 4: Generate OpenAPI spec
 
 	// Determine output directory
+	// Default to project root directory if not specified
 	outputDir := generateOutputDir
 	if outputDir == "" {
-		outputDir = config.Get().Output.Dir
+		outputDir = path // Use project path as default output location
 	}
 
 	// Determine output format
 	outputFormat := generateOutputFormat
 	if outputFormat == "" {
 		outputFormat = config.Get().Output.Format
+	}
+	if outputFormat == "" {
+		outputFormat = "yaml"
 	}
 
 	genOpts := &extractor.GenerateOptions{
@@ -231,15 +235,28 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		if pubResult.Message != "" {
 			slog.InfoContext(ctx, "Publisher output", "message", pubResult.Message)
 		}
-	} else if outputDir != "" {
-		// No remote publish target: just copy to output directory if needed
+	} else {
+		// Ensure spec is in the output directory
+		// Some extractors (Spring) generate to target/build and need copying
+		// Others (Gin, go-zero, gRPC) may already have written to outputDir
 		genDir := filepath.Dir(genResult.SpecFilePath)
-		if genDir != outputDir {
+		targetPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
+
+		// Clean paths for comparison
+		absGenDir, err := filepath.Abs(genDir)
+		if err != nil {
+			absGenDir = genDir // Fallback to relative path
+		}
+		absOutputDir, err := filepath.Abs(outputDir)
+		if err != nil {
+			absOutputDir = outputDir // Fallback to relative path
+		}
+
+		if absGenDir != absOutputDir {
 			if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
 				return errWrap("failed to copy spec to output directory", err)
 			}
-			finalSpecPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
-			slog.InfoContext(ctx, "Spec copied to output directory", "path", finalSpecPath)
+			slog.InfoContext(ctx, "Spec saved", "path", targetPath)
 		} else {
 			slog.InfoContext(ctx, "Spec saved", "path", genResult.SpecFilePath)
 		}
@@ -265,11 +282,11 @@ func init() {
 	generateCmd.Flags().StringVar(&generateLanguage, "language", "en",
 		"language for AI-generated descriptions (e.g., en, zh)")
 	generateCmd.Flags().StringVarP(&generateOutputFormat, "output", "o", "",
-		"output format (yaml or json)")
+		"output format (yaml or json, default: yaml)")
 	generateCmd.Flags().StringVarP(&generateOutputDir, "output-dir", "d", "",
-		"output directory for generated spec (default: project's target/build dir)")
+		"output directory for generated spec (default: project root)")
 	generateCmd.Flags().BoolVar(&generateSkipPublish, "skip-publish", false,
-		"skip publishing the generated spec (just copy to output directory)")
+		"skip publishing to remote platforms")
 	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "",
 		"publish target (readme). If empty, spec is only saved locally")
 	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,

@@ -59,7 +59,7 @@ func Default() *Config {
 			Enabled: true,
 		},
 		Output: OutputConfig{
-			Dir:    "./openapi",
+			Dir:    "", // Empty means use framework-specific default
 			Format: "yaml",
 		},
 		Extract: ExtractConfig{
