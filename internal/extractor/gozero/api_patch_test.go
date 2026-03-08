@@ -255,59 +255,59 @@ func TestAPIFilePatcher_HasPatchedFiles(t *testing.T) {
 
 func TestGoctlVersionCompare(t *testing.T) {
 	tests := []struct {
-		name      string
-		version   string
+		name       string
+		version    string
 		shouldSkip bool
 	}{
 		{
-			name:      "exactly 1.9.2",
-			version:   "1.9.2",
+			name:       "exactly 1.9.2",
+			version:    "1.9.2",
 			shouldSkip: true,
 		},
 		{
-			name:      "greater than 1.9.2",
-			version:   "1.9.3",
+			name:       "greater than 1.9.2",
+			version:    "1.9.3",
 			shouldSkip: true,
 		},
 		{
-			name:      "much greater",
-			version:   "1.10.0",
+			name:       "much greater",
+			version:    "1.10.0",
 			shouldSkip: true,
 		},
 		{
-			name:      "version 1.9.10 (multi-digit component)",
-			version:   "1.9.10",
+			name:       "version 1.9.10 (multi-digit component)",
+			version:    "1.9.10",
 			shouldSkip: true,
 		},
 		{
-			name:      "version 2.0.0",
-			version:   "2.0.0",
+			name:       "version 2.0.0",
+			version:    "2.0.0",
 			shouldSkip: true,
 		},
 		{
-			name:      "less than 1.9.2",
-			version:   "1.9.1",
+			name:       "less than 1.9.2",
+			version:    "1.9.1",
 			shouldSkip: false,
 		},
 		{
-			name:      "much less than 1.9.2",
-			version:   "1.8.0",
+			name:       "much less than 1.9.2",
+			version:    "1.8.0",
 			shouldSkip: false,
 		},
 		{
-			name:      "version 1.8.10 (multi-digit, but less)",
-			version:   "1.8.10",
+			name:       "version 1.8.10 (multi-digit, but less)",
+			version:    "1.8.10",
 			shouldSkip: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				patcher := NewAPIFilePatcher()
-				patcher.skipPatch = shouldSkipPatch(tt.version)
-				if patcher.skipPatch != tt.shouldSkip {
-					t.Errorf("version %s: expected skipPatch=%v, got %v", tt.version, tt.shouldSkip, patcher.skipPatch)
-				}
+			patcher := NewAPIFilePatcher()
+			patcher.skipPatch = shouldSkipPatch(tt.version)
+			if patcher.skipPatch != tt.shouldSkip {
+				t.Errorf("version %s: expected skipPatch=%v, got %v", tt.version, tt.shouldSkip, patcher.skipPatch)
+			}
 		})
 	}
 }

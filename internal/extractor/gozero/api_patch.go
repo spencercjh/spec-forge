@@ -3,15 +3,17 @@ package gozero
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"golang.org/x/mod/semver"
+
+	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
 // minGoctlVersionForPatch is the minimum goctl version that fixes issue #5425.
@@ -25,40 +27,56 @@ type APIFilePatcher struct {
 	patchedFiles map[string]string
 	// skipPatch indicates whether patching should be skipped (goctl version >= 1.9.2)
 	skipPatch bool
+	// exec is the command executor
+	exec executor.Interface
 }
 
 // NewAPIFilePatcher creates a new APIFilePatcher.
 func NewAPIFilePatcher() *APIFilePatcher {
+	return NewAPIFilePatcherWithExecutor(executor.NewExecutor())
+}
+
+// NewAPIFilePatcherWithExecutor creates a new APIFilePatcher with a custom executor.
+// This is primarily used for testing.
+func NewAPIFilePatcherWithExecutor(exec executor.Interface) *APIFilePatcher {
 	patcher := &APIFilePatcher{
 		patchedFiles: make(map[string]string),
 		skipPatch:    false,
+		exec:         exec,
 	}
 
 	// Check goctl version to determine if patching is needed
-	if version, err := getGoctlVersion(); err == nil {
+	if version, err := patcher.getGoctlVersion(); err == nil {
 		// Use semantic version comparison (add "v" prefix for semver.Compare)
 		patcher.skipPatch = semver.Compare("v"+version, "v"+minGoctlVersionForPatch) >= 0
 		if patcher.skipPatch {
 			slog.Debug("goctl version >= 1.9.2, skipping API file patching (issue #5425 fixed upstream)")
 		}
+	} else {
+		slog.Debug("failed to get goctl version, will apply patching", "error", err)
 	}
 
 	return patcher
 }
 
 // getGoctlVersion returns the goctl version string (e.g., "1.9.2").
-func getGoctlVersion() (string, error) {
-	// goctl version output: "goctl version 1.9.2 darwin/arm64"
-	cmd := exec.Command("goctl", "version")
-	output, err := cmd.Output()
+func (p *APIFilePatcher) getGoctlVersion() (string, error) {
+	ctx := context.Background()
+	opts := &executor.ExecuteOptions{
+		Command: "goctl",
+		Args:    []string{"version"},
+	}
+
+	result, err := p.exec.Execute(ctx, opts)
 	if err != nil {
 		return "", fmt.Errorf("failed to get goctl version: %w", err)
 	}
 
 	// Parse version from output
-	fields := strings.Fields(string(output))
+	// goctl version output: "goctl version 1.9.2 darwin/arm64"
+	fields := strings.Fields(result.Stdout)
 	if len(fields) < 3 {
-		return "", fmt.Errorf("unexpected goctl version output: %s", string(output))
+		return "", fmt.Errorf("unexpected goctl version output: %s", result.Stdout)
 	}
 
 	// fields[0] = "goctl", fields[1] = "version", fields[2] = "1.9.2"
