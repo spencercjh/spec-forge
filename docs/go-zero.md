@@ -24,7 +24,7 @@ Spec Forge supports generating OpenAPI specs from [go-zero](https://go-zero.dev/
 
 ## Prerequisites
 
-The `goctl` tool installed (v1.8.0+, recommended v1.9.2+)
+The `goctl` tool must be installed (v1.8.0+, recommended v1.9.2+)
 
 ```bash
 # Install goctl
