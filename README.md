@@ -40,7 +40,7 @@ These annotations are **not validated by the Go compiler** — typos and stale r
 
 ### Hertz / Kitex (CloudWeGo)
 
-OpenAPI generation tools exist for both frameworks but are scattered across GitHub with no official documentation. The official CloudWeGo docs don't mention how to generate OpenAPI specs at all. spec-forge wraps this complexity into a single command (support coming soon).
+OpenAPI generation tools exist for both frameworks but are scattered across GitHub with no official documentation. The official CloudWeGo docs don't mention how to generate OpenAPI specs at all. spec-forge aims to wrap this complexity into a single command (support coming soon).
 
 ### go-zero
 
