@@ -11,6 +11,7 @@ This directory contains end-to-end tests for the spec-forge CLI tool.
 | `maven-multi-module-demo` | Maven | Multi-module Spring Boot project |
 | `gradle-multi-module-demo` | Gradle | Multi-module Spring Boot project |
 | `gozero-demo` | Go Modules | go-zero framework project |
+| `grpc-protoc-demo` | protoc | gRPC project with native protoc (not buf) |
 
 ## Running Tests
 
@@ -28,6 +29,14 @@ E2E tests require the following tools to be installed:
 - **goctl** - Required for go-zero projects. Install with:
   ```bash
   go install github.com/zeromicro/go-zero/tools/goctl@latest
+  ```
+- **protoc** & **protoc-gen-connect-openapi** - Required for gRPC projects:
+  ```bash
+  # Install protoc (macOS)
+  brew install protobuf
+
+  # Install protoc-gen-connect-openapi
+  go install github.com/sudorandom/protoc-gen-connect-openapi@latest
   ```
 
 ```bash
@@ -63,5 +72,14 @@ go test -tags=e2e ./...
 | `gozero_test.go` | `TestE2E_GoZero_Generate` | Tests generate flow for go-zero project |
 | `gozero_test.go` | `TestE2E_GoZero_Detect` | Tests detection of go-zero project info |
 | `gozero_test.go` | `TestE2E_GoZero_NoGoctl` | Tests graceful handling when goctl missing |
+| `grpc_protoc_test.go` | `TestE2E_GrpcProtoc_Generate` | Tests generate flow for gRPC-protoc project |
 | `error_test.go` | `TestE2E_ErrorHandling_CommandNotFound` | Tests error handling for missing commands |
 | `mock_provider_test.go` | `countingMockProvider` | Shared mock provider for enrichment tests |
+
+### gRPC-protoc Test Details
+
+The `TestE2E_GrpcProtoc_Generate` test verifies:
+- Project detection (grpc-protoc framework)
+- HTTP annotations detection (`HasGoogleAPI`)
+- OpenAPI spec generation with REST endpoints
+- Expected REST paths from `google.api.http` annotations

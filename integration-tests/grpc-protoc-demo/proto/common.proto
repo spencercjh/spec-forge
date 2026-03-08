@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package demo.common;
+
+option go_package = "github.com/spencercjh/spec-forge/integration-tests/grpc-protoc-demo/gen/proto/common";
+
+// Pagination parameters for list requests
+message PageRequest {
+  // Page number (0-indexed)
+  int32 page = 1;
+  // Number of items per page
+  int32 size = 2;
+}
+
+// Pagination metadata for list responses
+message PageMetadata {
+  // Current page number
+  int32 page = 1;
+  // Number of items per page
+  int32 size = 2;
+  // Total number of items
+  int32 total = 3;
+  // Total number of pages
+  int32 total_pages = 4;
+}
+
+// Generic API response wrapper
+message ApiResponse {
+  // Response status code
+  int32 code = 1;
+  // Response message
+  string message = 2;
+  // Whether the request was successful
+  bool success = 3;
+}
+
+// File upload information
+message FileInfo {
+  // Original filename
+  string filename = 1;
+  // File size in bytes
+  int64 size = 2;
+  // MIME content type
+  string content_type = 3;
+}

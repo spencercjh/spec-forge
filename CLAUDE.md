@@ -29,11 +29,11 @@ make verify
 
 ## Architecture Overview
 
-Spec Forge is a CLI tool that generates enriched OpenAPI specifications from Spring Boot projects.
+Spec Forge is a CLI tool that generates enriched OpenAPI specifications from various frameworks (Spring Boot, go-zero, gRPC-protoc).
 
 **Core workflow:**
 ```
-Source Code → Detect → Patch → Generate → Validate → Enrich → Restore
+Source Code → Detect → Patch → Generate → Validate → Enrich → Publish
 ```
 
 ### Package Structure
@@ -43,27 +43,41 @@ cmd/                      # Cobra CLI commands
 ├── root.go               # Entry point, config initialization
 ├── generate.go           # `spec-forge generate` - full pipeline
 ├── enrich.go             # `spec-forge enrich` - standalone enrichment
-├── spring.go             # `spec-forge spring` - patch/detect subcommands
+├── publish.go            # `spec-forge publish` - publish to platforms
 
 internal/
 ├── config/               # Viper configuration loading
 ├── executor/             # Shell command execution with timeout
 ├── extractor/            # OpenAPI spec extraction
 │   ├── types.go          # GenerateOptions, GenerateResult, etc.
-│   └── spring/           # Spring Boot specific implementation
-│       ├── detector.go   # Project type detection (Maven/Gradle)
-│       ├── patcher.go    # springdoc dependency injection
-│       ├── generator.go  # Maven/Gradle command execution
-│       ├── maven.go      # POM parsing, spring-boot plugin config
-│       └── gradle.go     # build.gradle parsing
+│   ├── builtin/          # Built-in extractor registry
+│   ├── spring/           # Spring Boot implementation
+│   │   ├── detector.go   # Project type detection (Maven/Gradle)
+│   │   ├── patcher.go    # springdoc dependency injection
+│   │   ├── generator.go  # Maven/Gradle command execution
+│   │   ├── maven.go      # POM parsing, spring-boot plugin config
+│   │   └── gradle.go     # build.gradle parsing
+│   ├── gozero/           # go-zero implementation
+│   │   ├── detector.go   # go.mod parsing, dependency detection
+│   │   ├── patcher.go    # go-swagger installation check
+│   │   └── generator.go  # goctl command execution
+│   └── grpcprotoc/       # gRPC-protoc implementation
+│       ├── detector.go   # .proto file detection, buf.yaml rejection
+│       ├── patcher.go    # protoc tools check
+│       ├── generator.go  # protoc command execution
+│       └── grpcprotoc.go # Info struct with ProtoFiles, ServiceProtoFiles
 ├── validator/            # kin-openapi validation
-└── enricher/             # LLM-based description enrichment
-    ├── enricher.go       # Main enricher interface
-    ├── config.go         # Enricher configuration
-    ├── prompt/           # Prompt templates
-    ├── processor/        # Batching and concurrent processing
-    └── provider/         # LLM providers (factory pattern)
-        └── factory.go    # Use NewProvider(cfg Config) to create providers
+├── enricher/             # LLM-based description enrichment
+│   ├── enricher.go       # Main enricher interface
+│   ├── config.go         # Enricher configuration
+│   ├── prompt/           # Prompt templates
+│   ├── processor/        # Batching and concurrent processing
+│   ├── specctx/          # Spec context extraction (reserved for future)
+│   └── provider/         # LLM providers (factory pattern)
+│       └── factory.go    # Use NewProvider(cfg Config) to create providers
+└── publisher/            # OpenAPI spec publishing
+    ├── local.go          # Local file publishing
+    └── readme.go         # ReadMe.com publishing via rdme CLI
 ```
 
 ### Data Flow

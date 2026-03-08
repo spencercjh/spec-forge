@@ -99,5 +99,11 @@ jobs:
           java-version: "25"
           distribution: "temurin"
 
+      - name: Set up Protoc
+        uses: arduino/setup-protoc@v3
+
+      - name: Set up protoc-gen-connect-openapi
+        run: go install github.com/sudorandom/protoc-gen-connect-openapi@latest
+
       - name: Run E2E tests
         run: make test-e2e

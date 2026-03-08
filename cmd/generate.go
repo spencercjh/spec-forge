@@ -44,6 +44,8 @@ var (
 	generatePublishTarget string
 	// generatePublishOverwrite controls whether to overwrite existing remote spec
 	generatePublishOverwrite bool
+	// generateProtoImportPaths are additional import paths for protoc (-I flags)
+	generateProtoImportPaths []string
 )
 
 // generateCmd represents the generate command
@@ -123,10 +125,11 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	}
 
 	genOpts := &extractor.GenerateOptions{
-		OutputDir: outputDir,
-		Format:    config.Get().Output.Format,
-		Timeout:   generateTimeout,
-		SkipTests: true,
+		OutputDir:        outputDir,
+		Format:           config.Get().Output.Format,
+		Timeout:          generateTimeout,
+		SkipTests:        true,
+		ProtoImportPaths: generateProtoImportPaths,
 	}
 
 	genResult, err := extractorImpl.Generate(ctx, path, info, genOpts)
@@ -262,6 +265,8 @@ func init() {
 		"publish target (local, readme)")
 	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
 		"overwrite existing spec (applies to both local and remote publishers)")
+	generateCmd.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
+		"additional import paths for protoc (-I flags), can be specified multiple times")
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
