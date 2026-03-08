@@ -43,6 +43,10 @@ func NewAPIFilePatcher() *APIFilePatcher {
 // NewAPIFilePatcherWithExecutor creates a new APIFilePatcher with a custom executor.
 // This is primarily used for testing.
 func NewAPIFilePatcherWithExecutor(exec executor.Interface) *APIFilePatcher {
+	if exec == nil {
+		exec = executor.NewExecutor()
+	}
+
 	patcher := &APIFilePatcher{
 		patchedFiles: make(map[string]string),
 		skipPatch:    false,
