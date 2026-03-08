@@ -1,12 +1,61 @@
 # gRPC-Protoc Support Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **Status:** ✅ Completed (2026-03-08)
 
 **Goal:** Add gRPC-protoc framework extractor to generate OpenAPI specs from native protoc projects.
 
 **Architecture:** Implement Detector → Patcher → Generator pattern following existing Spring/go-zero extractors. Use protoc-gen-connect-openapi to generate OpenAPI from .proto files.
 
 **Tech Stack:** Go, protoc, protoc-gen-connect-openapi
+
+---
+
+## Implementation Summary
+
+This feature has been successfully implemented. Key implementation details:
+
+### Core Types (`grpcprotoc.go`)
+
+```go
+// Info holds gRPC-protoc specific project information.
+type Info struct {
+    ProtoFiles        []string // All .proto files found
+    ServiceProtoFiles []string // Proto files with service definitions (main entry points)
+    ProtoRoot         string   // Root directory containing proto files
+    HasGoogleAPI      bool     // Whether google/api/annotations.proto is imported
+    HasBuf            bool     // Whether buf.yaml exists (should be false)
+    ImportPaths       []string // Detected import paths
+}
+```
+
+### Key Design Decisions
+
+1. **ServiceProtoFiles**: Only proto files containing `service` definitions are passed to protoc. This avoids duplicate definition errors when common.proto files are imported by multiple service files.
+
+2. **Conditional HTTP Annotations**: The `--connect-openapi_opt=features=google.api.http` flag is only added when `HasGoogleAPI` is true.
+
+3. **Import Path Detection**: Automatically detects `proto/`, `third_party/`, and `protos/` directories as import paths.
+
+### File Structure
+
+```
+internal/extractor/grpcprotoc/
+├── grpcprotoc.go       # Package types, constants, Info struct
+├── extractor.go        # Extractor interface implementation
+├── detector.go         # Project detection, service file discovery
+├── detector_test.go
+├── patcher.go          # protoc + plugin installation check
+├── patcher_test.go
+├── generator.go        # protoc command execution
+├── generator_test.go
+└── grpcprotoc_test.go  # Integration tests
+```
+
+### E2E Test
+
+Test location: `integration-tests/grpc_protoc_test.go`
+
+Demo project: `integration-tests/grpc-protoc-demo/`
 
 ---
 
@@ -31,11 +80,12 @@ const (
 
 // Info holds gRPC-protoc specific project information.
 type Info struct {
-	ProtoFiles   []string // All .proto files found
-	ProtoRoot    string   // Root directory containing proto files
-	HasGoogleAPI bool     // Whether google/api/annotations.proto is imported
-	HasBuf       bool     // Whether buf.yaml exists (should be false)
-	ImportPaths  []string // Detected import paths
+	ProtoFiles        []string // All .proto files found
+	ServiceProtoFiles []string // Proto files with service definitions (main entry points)
+	ProtoRoot         string   // Root directory containing proto files
+	HasGoogleAPI      bool     // Whether google/api/annotations.proto is imported
+	HasBuf            bool     // Whether buf.yaml exists (should be false)
+	ImportPaths       []string // Detected import paths
 }
 
 // Ensure Info implements the FrameworkData interface marker.
@@ -212,16 +262,20 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	// Check for google.api.http usage
 	hasGoogleAPI := d.hasGoogleAPIAnnotations(protoFiles)
 
+	// Find service proto files (main entry points)
+	serviceProtoFiles := d.findServiceProtoFiles(protoFiles)
+
 	return &extractor.ProjectInfo{
 		Framework:     FrameworkName,
 		BuildTool:     extractor.BuildTool("protoc"),
 		BuildFilePath: protoFiles[0], // Use first proto file as reference
 		FrameworkData: &Info{
-			ProtoFiles:   protoFiles,
-			ProtoRoot:    absPath,
-			HasGoogleAPI: hasGoogleAPI,
-			HasBuf:       false,
-			ImportPaths:  importPaths,
+			ProtoFiles:        protoFiles,
+			ServiceProtoFiles: serviceProtoFiles,
+			ProtoRoot:         absPath,
+			HasGoogleAPI:      hasGoogleAPI,
+			HasBuf:            false,
+			ImportPaths:       importPaths,
 		},
 	}, nil
 }
@@ -707,17 +761,21 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 	outputArg := fmt.Sprintf("--connect-openapi_out=%s", outputDir)
 	args = append(args, outputArg)
 
-	// Add connect-openapi options
-	optArg := "--connect-openapi_opt=features=google.api.http"
-	args = append(args, optArg)
-
-	// Add format option
+	// Add format option (if YAML requested)
 	if opts.Format == "yaml" || opts.Format == "yml" {
 		args = append(args, "--connect-openapi_opt=format=yaml")
 	}
 
-	// Add proto file
-	args = append(args, protoFile)
+	// CONDITIONAL: Only enable google.api.http if detected in project
+	if info.HasGoogleAPI {
+		args = append(args, "--connect-openapi_opt=features=google.api.http")
+	}
+
+	// Add only service proto files (those with service definitions)
+	// to avoid duplicate definition errors from importing common proto files
+	for _, protoFile := range info.ServiceProtoFiles {
+		args = append(args, protoFile)
+	}
 
 	return args
 }
@@ -875,11 +933,12 @@ const (
 
 // Info holds gRPC-protoc specific project information.
 type Info struct {
-	ProtoFiles   []string // All .proto files found
-	ProtoRoot    string   // Root directory containing proto files
-	HasGoogleAPI bool     // Whether google/api/annotations.proto is imported
-	HasBuf       bool     // Whether buf.yaml exists (should be false)
-	ImportPaths  []string // Detected import paths
+	ProtoFiles        []string // All .proto files found
+	ServiceProtoFiles []string // Proto files with service definitions (main entry points)
+	ProtoRoot         string   // Root directory containing proto files
+	HasGoogleAPI      bool     // Whether google/api/annotations.proto is imported
+	HasBuf            bool     // Whether buf.yaml exists (should be false)
+	ImportPaths       []string // Detected import paths
 }
 
 // extractorImpl implements extractor.Extractor for grpcprotoc.
@@ -1121,18 +1180,30 @@ Signed-off-by: Claude <claude@anthropic.com>"
 
 ## Summary
 
-After completing all tasks:
+### Implementation Completed (2026-03-08)
+
+All tasks have been successfully implemented:
 
 1. ✅ grpcprotoc package created with Detector, Patcher, Generator
 2. ✅ Registered in builtin extractor registry
-3. ✅ CLI flag added for proto import paths
-4. ✅ All tests passing
-5. ✅ Documentation updated
-6. ✅ Integration test with demo project working
+3. ✅ CLI flag added for proto import paths (`--proto-import-path`)
+4. ✅ All unit tests passing
+5. ✅ E2E test added (`integration-tests/grpc_protoc_test.go`)
+6. ✅ Documentation updated
+7. ✅ Integration test with demo project working
 
-**Verification commands:**
+### Key Implementation Differences from Original Plan
+
+1. **ServiceProtoFiles**: Added to only process proto files with service definitions, avoiding duplicate definition errors.
+
+2. **Conditional HTTP Annotations**: `--connect-openapi_opt=features=google.api.http` is only added when `HasGoogleAPI` is true.
+
+3. **Import Path Detection**: Enhanced to automatically detect `third_party/` directories.
+
+### Verification Commands
+
 ```bash
 make verify              # Run all checks
-make test-e2e           # Run E2E tests (if applicable)
+make test-e2e           # Run E2E tests
 ./build/spec-forge generate ./integration-tests/grpc-protoc-demo -v
 ```

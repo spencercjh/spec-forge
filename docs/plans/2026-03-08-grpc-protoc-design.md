@@ -1,5 +1,7 @@
 # gRPC-Protoc Framework Support Design
 
+> **Status:** ✅ Implemented (2026-03-08)
+>
 > **Goal:** Add gRPC/protobuf support for native protoc projects (not buf-managed) to generate OpenAPI specs using `protoc-gen-connect-openapi`.
 
 **Architecture:** Implement grpc-protoc extractor following the Spring Boot/go-zero pattern: Detector → Patcher → Generator.
@@ -134,11 +136,12 @@ const (
 
 // Info holds gRPC-protoc specific project information
 type Info struct {
-    ProtoFiles   []string // All .proto files found
-    ProtoRoot    string   // Root directory containing proto files
-    HasGoogleAPI bool     // Whether google/api/annotations.proto is imported
-    HasBuf       bool     // Whether buf.yaml exists (should be false)
-    ImportPaths  []string // Detected import paths
+    ProtoFiles        []string // All .proto files found
+    ServiceProtoFiles []string // Proto files with service definitions (main entry points)
+    ProtoRoot         string   // Root directory containing proto files
+    HasGoogleAPI      bool     // Whether google/api/annotations.proto is imported
+    HasBuf            bool     // Whether buf.yaml exists (should be false)
+    ImportPaths       []string // Detected import paths
 }
 
 // Detector detects native protoc gRPC projects
@@ -215,18 +218,47 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
     // Check for google.api.http usage
     hasGoogleAPI := d.hasGoogleAPIAnnotations(protoFiles)
 
+    // Find proto files with service definitions (main entry points)
+    serviceProtoFiles := d.findServiceProtoFiles(protoFiles)
+
     return &extractor.ProjectInfo{
         Framework:     FrameworkName,
         BuildTool:     "protoc",
         BuildFilePath: protoFiles[0], // Use first proto file as reference
         FrameworkData: &Info{
-            ProtoFiles:   protoFiles,
-            ProtoRoot:    absPath,
-            HasGoogleAPI: hasGoogleAPI,
-            HasBuf:       false,
-            ImportPaths:  importPaths,
+            ProtoFiles:        protoFiles,
+            ServiceProtoFiles: serviceProtoFiles,
+            ProtoRoot:         absPath,
+            HasGoogleAPI:      hasGoogleAPI,
+            HasBuf:            false,
+            ImportPaths:       importPaths,
         },
     }, nil
+}
+
+func (d *Detector) findServiceProtoFiles(protoFiles []string) []string {
+    var serviceFiles []string
+    for _, protoFile := range protoFiles {
+        if d.hasServiceDefinition(protoFile) {
+            serviceFiles = append(serviceFiles, protoFile)
+        }
+    }
+    return serviceFiles
+}
+
+func (d *Detector) hasServiceDefinition(protoFile string) bool {
+    content, err := os.ReadFile(protoFile)
+    if err != nil {
+        return false
+    }
+    // Check for service keyword at the beginning of a line
+    for _, line := range strings.Split(string(content), "\n") {
+        line = strings.TrimSpace(line)
+        if strings.HasPrefix(line, "service ") || strings.HasPrefix(line, "service\t") {
+            return true
+        }
+    }
+    return false
 }
 
 func (d *Detector) findProtoFiles(projectPath string) ([]string, []string, error) {
@@ -403,8 +435,9 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
         return nil, fmt.Errorf("invalid FrameworkData type: expected *grpcprotoc.Info")
     }
 
-    if len(grpcInfo.ProtoFiles) == 0 {
-        return nil, fmt.Errorf("no proto files found")
+    // Only process service proto files (those with service definitions)
+    if len(grpcInfo.ServiceProtoFiles) == 0 {
+        return nil, fmt.Errorf("no proto files with service definitions found")
     }
 
     // Create output directory
@@ -450,12 +483,8 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
     // Add import paths
     importPaths := info.ImportPaths
 
-    // Check if gRPC specific options exist and merge import paths
-    if grpcOpts, ok := opts.FrameworkData.(map[string]any); ok {
-        if extraPaths, ok := grpcOpts["proto_import_paths"].([]string); ok {
-            importPaths = append(importPaths, extraPaths...)
-        }
-    }
+    // Merge extra import paths from CLI flags
+    importPaths = append(importPaths, opts.ProtoImportPaths...)
 
     // Add -I flags (deduplicated)
     seen := make(map[string]bool)
@@ -470,18 +499,19 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
     outputArg := fmt.Sprintf("--connect-openapi_out=%s", outputDir)
     args = append(args, outputArg)
 
-    // Add connect-openapi options
-    optArg := "--connect-openapi_opt=features=google.api.http"
-    args = append(args, optArg)
-
-    // Add format option
+    // Add format option (if YAML requested)
     if opts.Format == "yaml" || opts.Format == "yml" {
         args = append(args, "--connect-openapi_opt=format=yaml")
     }
 
-    // Add proto files (relative to project root)
-    for _, protoFile := range info.ProtoFiles {
-        // Use relative path from project root
+    // CONDITIONAL: Only enable google.api.http if detected in project
+    if info.HasGoogleAPI {
+        args = append(args, "--connect-openapi_opt=features=google.api.http")
+    }
+
+    // Add only service proto files (those with service definitions)
+    // to avoid duplicate definition errors from importing common proto files
+    for _, protoFile := range info.ServiceProtoFiles {
         args = append(args, protoFile)
     }
 
@@ -490,7 +520,6 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 
 func (g *Generator) findOutputFile(outputDir string) string {
     // protoc-gen-connect-openapi generates files like: <proto_filename>.openapi.json
-    // We look for any .openapi.json or .openapi.yaml files
     entries, err := os.ReadDir(outputDir)
     if err != nil {
         return ""
@@ -611,6 +640,10 @@ grpc-protoc-demo/
 ├── proto/
 │   ├── common.proto      # Common messages (pagination, response)
 │   └── user.proto        # User service (CRUD operations)
+├── third_party/
+│   └── google/api/       # Google API HTTP annotations
+│       ├── annotations.proto
+│       └── http.proto
 ├── Makefile             # protoc commands
 ├── go.mod               # Go module
 └── README.md            # Documentation
