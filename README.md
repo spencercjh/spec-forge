@@ -44,7 +44,7 @@ The official CloudWeGo documentation for OpenAPI generation is outdated. The rec
 
 ### go-zero
 
-Support for go-zero projects is available. spec-forge wraps `goctl swagger` to generate OpenAPI specs from `.api` definition files.
+Support for go-zero projects is available. spec-forge uses `goctl api swagger` command to generate OpenAPI specs from `.api` definition files.
 
 ---
 

@@ -5,8 +5,8 @@ Spec Forge supports generating OpenAPI specs from [go-zero](https://go-zero.dev/
 ## How It Works
 
 1. **Detection**: Parses `go.mod` to detect go-zero dependency and locate API definition files (`.api` files)
-2. **Patching**: Checks for `goctl-swagger` installation
-3. **Generation**: Uses `goctl swagger` command to generate the OpenAPI spec
+2. **Patching**: Checks for `goctl` installation
+3. **Generation**: Uses `goctl api swagger` command to generate the OpenAPI spec
 
 ## Prerequisites
 
