@@ -87,6 +87,8 @@ func (p *ASTParser) ParseFiles() error {
 func (p *ASTParser) ExtractRoutes() ([]Route, error) {
 	slog.Debug("Extracting routes", "files", len(p.files))
 
+	// Routes count is unpredictable as it depends on AST analysis
+	// #nosec prealloc - cannot preallocate without knowing route count upfront
 	var routes []Route
 
 	// First pass: extract group definitions
