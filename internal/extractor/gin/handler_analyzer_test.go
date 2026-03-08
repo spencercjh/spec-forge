@@ -1,11 +1,10 @@
 package gin
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"testing"
-
-	"go/ast"
 )
 
 func TestNewHandlerAnalyzer(t *testing.T) {

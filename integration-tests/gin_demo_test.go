@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/spencercjh/spec-forge/internal/extractor/gin"
 	"github.com/spencercjh/spec-forge/internal/validator"
@@ -108,10 +109,10 @@ func TestGinDemo(t *testing.T) {
 	}
 
 	expectedPaths := map[string][]string{
-		"/api/v1/users":           {"GET", "POST"},
-		"/api/v1/users/{id}":      {"GET"},
+		"/api/v1/users":              {"GET", "POST"},
+		"/api/v1/users/{id}":         {"GET"},
 		"/api/v1/users/{id}/profile": {"POST"},
-		"/api/v1/users/upload":    {"POST"},
+		"/api/v1/users/upload":       {"POST"},
 	}
 
 	for expectedPath, methods := range expectedPaths {

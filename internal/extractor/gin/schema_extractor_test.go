@@ -1,13 +1,11 @@
 package gin
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
+	"slices"
 	"testing"
-
-	"go/ast"
-
-	
 )
 
 func TestNewSchemaExtractor(t *testing.T) {
@@ -196,14 +194,7 @@ type ValidatedUser struct {
 	}
 
 	// Check required fields (both name and email should be required)
-	foundEmail := false
-	for _, r := range schema.Value.Required {
-		if r == "email" {
-			foundEmail = true
-			break
-		}
-	}
-	if !foundEmail {
+	if !slices.Contains(schema.Value.Required, "email") {
 		t.Error("expected 'email' to be in required list")
 	}
 

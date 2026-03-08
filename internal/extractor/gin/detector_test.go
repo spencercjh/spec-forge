@@ -55,7 +55,7 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			goModPath := filepath.Join(dir, "go.mod")
-			os.WriteFile(goModPath, []byte(tt.goMod), 0644)
+			os.WriteFile(goModPath, []byte(tt.goMod), 0o644)
 
 			d := NewDetector()
 			version, err := d.parseGinVersion(goModPath)
@@ -73,17 +73,17 @@ func TestDetector_findMainFiles(t *testing.T) {
 	dir := t.TempDir()
 
 	// Create main.go
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}"), 0644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}"), 0o644)
 
 	// Create router.go with route registration
-	os.WriteFile(filepath.Join(dir, "router.go"), []byte("package main\n\nfunc setupRouter() {}"), 0644)
+	os.WriteFile(filepath.Join(dir, "router.go"), []byte("package main\n\nfunc setupRouter() {}"), 0o644)
 
 	// Create non-main file
-	os.WriteFile(filepath.Join(dir, "utils.go"), []byte("package main\n\nfunc helper() {}"), 0644)
+	os.WriteFile(filepath.Join(dir, "utils.go"), []byte("package main\n\nfunc helper() {}"), 0o644)
 
 	// Create vendor directory (should be excluded)
-	os.MkdirAll(filepath.Join(dir, "vendor", "test"), 0755)
-	os.WriteFile(filepath.Join(dir, "vendor", "test", "main.go"), []byte("package main"), 0644)
+	os.MkdirAll(filepath.Join(dir, "vendor", "test"), 0o755)
+	os.WriteFile(filepath.Join(dir, "vendor", "test", "main.go"), []byte("package main"), 0o644)
 
 	d := NewDetector()
 	files, err := d.findMainFiles(dir)
@@ -120,6 +120,7 @@ func TestDetector_Detect(t *testing.T) {
 		{
 			name: "valid gin project",
 			setup: func(t *testing.T) string {
+				t.Helper()
 				dir := t.TempDir()
 				goMod := `module test
 
@@ -127,8 +128,8 @@ go 1.21
 
 require github.com/gin-gonic/gin v1.9.1
 `
-				os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
-				os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}"), 0644)
+				os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644)
+				os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}"), 0o644)
 				return dir
 			},
 			wantErr:     false,
@@ -138,6 +139,7 @@ require github.com/gin-gonic/gin v1.9.1
 		{
 			name: "missing go.mod",
 			setup: func(t *testing.T) string {
+				t.Helper()
 				return t.TempDir()
 			},
 			wantErr: true,
@@ -145,6 +147,7 @@ require github.com/gin-gonic/gin v1.9.1
 		{
 			name: "no gin dependency",
 			setup: func(t *testing.T) string {
+				t.Helper()
 				dir := t.TempDir()
 				goMod := `module test
 
@@ -152,7 +155,7 @@ go 1.21
 
 require github.com/zeromicro/go-zero v1.6.0
 `
-				os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
+				os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644)
 				return dir
 			},
 			wantErr: true,
@@ -160,6 +163,7 @@ require github.com/zeromicro/go-zero v1.6.0
 		{
 			name: "no go files",
 			setup: func(t *testing.T) string {
+				t.Helper()
 				dir := t.TempDir()
 				goMod := `module test
 
@@ -167,7 +171,7 @@ go 1.21
 
 require github.com/gin-gonic/gin v1.9.1
 `
-				os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
+				os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644)
 				return dir
 			},
 			wantErr: true,

@@ -15,7 +15,7 @@ func NewPatcher() *Patcher {
 }
 
 // Patch performs no-op patching for Gin projects.
-func (p *Patcher) Patch(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.PatchOptions) (*extractor.PatchResult, error) {
+func (p *Patcher) Patch(_ context.Context, _ string, info *extractor.ProjectInfo, _ *extractor.PatchOptions) (*extractor.PatchResult, error) {
 	// Gin projects don't need patching, just mark as ready
 	if ginInfo, ok := info.FrameworkData.(*Info); ok {
 		ginInfo.HasGin = true

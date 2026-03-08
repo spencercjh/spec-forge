@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -112,7 +113,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 		}
 		// It's a custom type - create a reference
 		if e.findTypeSpec(t.Name) != nil {
-			ref := fmt.Sprintf("#/components/schemas/%s", t.Name)
+			ref := "#/components/schemas/" + t.Name
 			return &openapi3.SchemaRef{Ref: ref}
 		}
 		return &openapi3.SchemaRef{Value: schema}
@@ -225,11 +226,8 @@ func (e *SchemaExtractor) applyTags(schema *openapi3.Schema, tag, fieldName stri
 			propertyName = parts[0]
 		}
 		// Check for omitempty
-		for _, part := range parts[1:] {
-			if part == "omitempty" {
-				isOmitEmpty = true
-				break
-			}
+		if slices.Contains(parts[1:], "omitempty") {
+			isOmitEmpty = true
 		}
 	}
 
@@ -270,36 +268,31 @@ func extractTagValue(tag, key string) string {
 
 // applyValidation applies validation rules to schema.
 func (e *SchemaExtractor) applyValidation(schema *openapi3.Schema, validateTag, fieldName string, parentSchema *openapi3.Schema) {
-	rules := strings.Split(validateTag, ",")
-	for _, rule := range rules {
+	for rule := range strings.SplitSeq(validateTag, ",") {
 		if rule == "required" {
 			parentSchema.Required = append(parentSchema.Required, fieldName)
 			continue
 		}
 
 		// Parse min/max for numeric types
-		if strings.HasPrefix(rule, "min=") {
-			valStr := strings.TrimPrefix(rule, "min=")
+		if valStr, ok := strings.CutPrefix(rule, "min="); ok {
 			if val, err := strconv.ParseFloat(valStr, 64); err == nil {
 				schema.Min = &val
 			}
 		}
-		if strings.HasPrefix(rule, "max=") {
-			valStr := strings.TrimPrefix(rule, "max=")
+		if valStr, ok := strings.CutPrefix(rule, "max="); ok {
 			if val, err := strconv.ParseFloat(valStr, 64); err == nil {
 				schema.Max = &val
 			}
 		}
 
 		// Parse minLength/maxLength for strings
-		if strings.HasPrefix(rule, "minLength=") {
-			valStr := strings.TrimPrefix(rule, "minLength=")
+		if valStr, ok := strings.CutPrefix(rule, "minLength="); ok {
 			if val, err := strconv.ParseUint(valStr, 10, 64); err == nil {
 				schema.MinLength = val
 			}
 		}
-		if strings.HasPrefix(rule, "maxLength=") {
-			valStr := strings.TrimPrefix(rule, "maxLength=")
+		if valStr, ok := strings.CutPrefix(rule, "maxLength="); ok {
 			if val, err := strconv.ParseUint(valStr, 10, 64); err == nil {
 				ui := uint64(val)
 				schema.MaxLength = &ui
@@ -317,9 +310,8 @@ func (e *SchemaExtractor) applyValidation(schema *openapi3.Schema, validateTag, 
 		}
 
 		// Parse oneof enum
-		if strings.HasPrefix(rule, "oneof=") {
-			values := strings.Split(rule[6:], " ")
-			for _, v := range values {
+		if valStr, ok := strings.CutPrefix(rule, "oneof="); ok {
+			for v := range strings.SplitSeq(valStr, " ") {
 				schema.Enum = append(schema.Enum, v)
 			}
 		}

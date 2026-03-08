@@ -28,7 +28,7 @@ func main() {
 	})
 }
 `
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o644)
 
 	parser := NewASTParser(dir)
 	err := parser.ParseFiles()
@@ -58,7 +58,7 @@ func main() {
 func getUsers(c *gin.Context) {}
 func createUser(c *gin.Context) {}
 `
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o644)
 
 	parser := NewASTParser(dir)
 	parser.ParseFiles()
@@ -109,7 +109,7 @@ func main() {
 func getUsers(c *gin.Context) {}
 func createUser(c *gin.Context) {}
 `
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o644)
 
 	parser := NewASTParser(dir)
 	parser.ParseFiles()

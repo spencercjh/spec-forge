@@ -40,8 +40,7 @@ func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error)
 	varTypeMap := a.buildVarTypeMap(fn.Body)
 
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.CallExpr:
+		if node, ok := n.(*ast.CallExpr); ok {
 			a.parseHandlerCall(node, info, varTypeMap)
 		}
 		return true
@@ -57,7 +56,7 @@ func (a *HandlerAnalyzer) buildVarTypeMap(body *ast.BlockStmt) map[string]string
 	ast.Inspect(body, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.DeclStmt:
-			// Handle: var req CreateUserRequest
+			// Extract type from var declarations like: var req CreateUserRequest
 			if genDecl, ok := node.Decl.(*ast.GenDecl); ok && genDecl.Tok == token.VAR {
 				for _, spec := range genDecl.Specs {
 					if valueSpec, ok := spec.(*ast.ValueSpec); ok {
@@ -81,7 +80,7 @@ func (a *HandlerAnalyzer) buildVarTypeMap(body *ast.BlockStmt) map[string]string
 				}
 			}
 		case *ast.AssignStmt:
-			// Handle: req := CreateUserRequest{}
+			// Extract type from short declarations like: req := CreateUserRequest{}
 			if node.Tok == token.DEFINE {
 				for i, lhs := range node.Lhs {
 					if i < len(node.Rhs) {
@@ -133,7 +132,7 @@ func inferTypeFromVarName(varName string) string {
 
 	// Try to capitalize first letter (heuristic)
 	// e.g., "pageResult" -> "PageResult"
-	if len(varName) > 0 && varName[0] >= 'a' && varName[0] <= 'z' {
+	if varName != "" && varName[0] >= 'a' && varName[0] <= 'z' {
 		return string(varName[0]-'a'+'A') + varName[1:]
 	}
 
@@ -142,167 +141,144 @@ func inferTypeFromVarName(varName string) string {
 
 // parseHandlerCall parses a call expression in a handler.
 func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
-	// Check for c.Param, c.Query, c.GetHeader, c.ShouldBindJSON, c.JSON
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return
 	}
 
 	// Check if receiver is a context variable
-	_, ok = sel.X.(*ast.Ident)
-	if !ok {
+	if _, ok = sel.X.(*ast.Ident); !ok {
 		return
 	}
 
 	method := sel.Sel.Name
 
+	// Categorize methods and dispatch to specialized handlers
 	switch method {
 	case "Param":
-		if len(call.Args) >= 1 {
-			if name := extractStringLiteral(call.Args[0]); name != "" {
-				info.PathParams = append(info.PathParams, ParamInfo{
-					Name:     name,
-					GoType:   "string",
-					Required: true,
-				})
-			}
-		}
-	case "Query":
-		if len(call.Args) >= 1 {
-			if name := extractStringLiteral(call.Args[0]); name != "" {
-				info.QueryParams = append(info.QueryParams, ParamInfo{
-					Name:     name,
-					GoType:   "string",
-					Required: false,
-				})
-			}
-		}
-	case "DefaultQuery":
-		if len(call.Args) >= 1 {
-			if name := extractStringLiteral(call.Args[0]); name != "" {
-				info.QueryParams = append(info.QueryParams, ParamInfo{
-					Name:     name,
-					GoType:   "string",
-					Required: false,
-				})
-			}
-		}
+		a.extractParam(call, info)
+	case "Query", "DefaultQuery":
+		a.extractQueryParam(call, info, method == "Query")
 	case "GetHeader":
-		if len(call.Args) >= 1 {
-			if name := extractStringLiteral(call.Args[0]); name != "" {
-				info.HeaderParams = append(info.HeaderParams, ParamInfo{
-					Name:     name,
-					GoType:   "string",
-					Required: false,
-				})
-			}
-		}
+		a.extractHeaderParam(call, info)
 	case "ShouldBindJSON", "BindJSON", "ShouldBind", "Bind":
-		if len(call.Args) >= 1 {
-			if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
-				info.BodyType = typeName
-			}
-		}
+		a.extractBodyType(call, info, varTypeMap)
 	case "ShouldBindXML", "BindXML":
-		if len(call.Args) >= 1 {
-			if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
-				info.BodyType = typeName
-			}
-		}
+		a.extractBodyType(call, info, varTypeMap)
 	case "ShouldBindYAML", "BindYAML":
-		if len(call.Args) >= 1 {
-			if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
-				info.BodyType = typeName
-			}
-		}
+		a.extractBodyType(call, info, varTypeMap)
 	case "ShouldBindQuery", "BindQuery":
-		if len(call.Args) >= 1 {
-			if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
-				info.BodyType = typeName
-			}
-		}
+		a.extractBodyType(call, info, varTypeMap)
 	case "PostForm":
-		if len(call.Args) >= 1 {
-			if name := extractStringLiteral(call.Args[0]); name != "" {
-				info.QueryParams = append(info.QueryParams, ParamInfo{
-					Name:     name,
-					GoType:   "string",
-					Required: true,
-				})
-			}
-		}
+		a.extractFormParam(call, info, true)
 	case "DefaultPostForm":
-		if len(call.Args) >= 1 {
-			if name := extractStringLiteral(call.Args[0]); name != "" {
-				info.QueryParams = append(info.QueryParams, ParamInfo{
-					Name:     name,
-					GoType:   "string",
-					Required: false,
-				})
-			}
-		}
+		a.extractFormParam(call, info, false)
 	case "FormFile":
-		if len(call.Args) >= 1 {
-			if name := extractStringLiteral(call.Args[0]); name != "" {
-				info.QueryParams = append(info.QueryParams, ParamInfo{
-					Name:     name,
-					GoType:   "file",
-					Required: true,
-				})
-			}
-		}
-	case "JSON":
-		if len(call.Args) >= 2 {
-			statusCode := extractStatusCode(call.Args[0])
-			goType := extractTypeFromResponse(call.Args[1], varTypeMap)
-			info.Responses = append(info.Responses, ResponseInfo{
-				StatusCode: statusCode,
-				GoType:     goType,
-			})
-		}
-	case "XML":
-		if len(call.Args) >= 2 {
-			statusCode := extractStatusCode(call.Args[0])
-			goType := extractTypeFromResponse(call.Args[1], varTypeMap)
-			info.Responses = append(info.Responses, ResponseInfo{
-				StatusCode: statusCode,
-				GoType:     goType,
-			})
-		}
-	case "YAML":
-		if len(call.Args) >= 2 {
-			statusCode := extractStatusCode(call.Args[0])
-			goType := extractTypeFromResponse(call.Args[1], varTypeMap)
-			info.Responses = append(info.Responses, ResponseInfo{
-				StatusCode: statusCode,
-				GoType:     goType,
-			})
-		}
+		a.extractFileParam(call, info)
+	case "JSON", "XML", "YAML":
+		a.extractResponse(call, info, varTypeMap, "")
 	case "String":
-		if len(call.Args) >= 2 {
-			statusCode := extractStatusCode(call.Args[0])
-			info.Responses = append(info.Responses, ResponseInfo{
-				StatusCode: statusCode,
-				GoType:     "string",
-			})
-		}
+		a.extractResponse(call, info, varTypeMap, "string")
 	case "Data":
-		if len(call.Args) >= 2 {
-			statusCode := extractStatusCode(call.Args[0])
-			info.Responses = append(info.Responses, ResponseInfo{
-				StatusCode: statusCode,
-				GoType:     "binary",
-			})
-		}
+		a.extractResponse(call, info, varTypeMap, "binary")
 	case "Redirect":
-		if len(call.Args) >= 2 {
-			statusCode := extractStatusCode(call.Args[0])
-			info.Responses = append(info.Responses, ResponseInfo{
-				StatusCode: statusCode,
-				GoType:     "",
-			})
-		}
+		a.extractResponse(call, info, varTypeMap, "")
 	}
+}
+
+// extractParam extracts path parameter from c.Param() call.
+func (a *HandlerAnalyzer) extractParam(call *ast.CallExpr, info *HandlerInfo) {
+	if len(call.Args) < 1 {
+		return
+	}
+	if name := extractStringLiteral(call.Args[0]); name != "" {
+		info.PathParams = append(info.PathParams, ParamInfo{
+			Name:     name,
+			GoType:   "string",
+			Required: true,
+		})
+	}
+}
+
+// extractQueryParam extracts query parameter from c.Query() or c.DefaultQuery() call.
+func (a *HandlerAnalyzer) extractQueryParam(call *ast.CallExpr, info *HandlerInfo, required bool) {
+	if len(call.Args) < 1 {
+		return
+	}
+	if name := extractStringLiteral(call.Args[0]); name != "" {
+		info.QueryParams = append(info.QueryParams, ParamInfo{
+			Name:     name,
+			GoType:   "string",
+			Required: required,
+		})
+	}
+}
+
+// extractHeaderParam extracts header parameter from c.GetHeader() call.
+func (a *HandlerAnalyzer) extractHeaderParam(call *ast.CallExpr, info *HandlerInfo) {
+	if len(call.Args) < 1 {
+		return
+	}
+	if name := extractStringLiteral(call.Args[0]); name != "" {
+		info.HeaderParams = append(info.HeaderParams, ParamInfo{
+			Name:     name,
+			GoType:   "string",
+			Required: false,
+		})
+	}
+}
+
+// extractBodyType extracts body type from binding calls like c.ShouldBindJSON().
+func (a *HandlerAnalyzer) extractBodyType(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
+	if len(call.Args) < 1 {
+		return
+	}
+	if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
+		info.BodyType = typeName
+	}
+}
+
+// extractFormParam extracts form parameter from c.PostForm() or c.DefaultPostForm() call.
+func (a *HandlerAnalyzer) extractFormParam(call *ast.CallExpr, info *HandlerInfo, required bool) {
+	if len(call.Args) < 1 {
+		return
+	}
+	if name := extractStringLiteral(call.Args[0]); name != "" {
+		info.QueryParams = append(info.QueryParams, ParamInfo{
+			Name:     name,
+			GoType:   "string",
+			Required: required,
+		})
+	}
+}
+
+// extractFileParam extracts file parameter from c.FormFile() call.
+func (a *HandlerAnalyzer) extractFileParam(call *ast.CallExpr, info *HandlerInfo) {
+	if len(call.Args) < 1 {
+		return
+	}
+	if name := extractStringLiteral(call.Args[0]); name != "" {
+		info.QueryParams = append(info.QueryParams, ParamInfo{
+			Name:     name,
+			GoType:   "file",
+			Required: true,
+		})
+	}
+}
+
+// extractResponse extracts response information from c.JSON(), c.XML(), etc. calls.
+func (a *HandlerAnalyzer) extractResponse(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string, goType string) {
+	if len(call.Args) < 2 {
+		return
+	}
+	statusCode := extractStatusCode(call.Args[0])
+	if goType == "" {
+		goType = extractTypeFromResponse(call.Args[1], varTypeMap)
+	}
+	info.Responses = append(info.Responses, ResponseInfo{
+		StatusCode: statusCode,
+		GoType:     goType,
+	})
 }
 
 // extractTypeFromArg extracts type name from a binding argument.
@@ -426,7 +402,7 @@ func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string
 		// gin.H or similar
 		if sel, ok := e.Fun.(*ast.SelectorExpr); ok {
 			if sel.Sel.Name == "H" {
-				return "map[string]any"
+				return ginHType
 			}
 		}
 		// Could be a function call that returns a type, try to extract from return type

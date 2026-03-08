@@ -1,12 +1,14 @@
 package gin
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"golang.org/x/mod/modfile"
+
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
@@ -32,7 +34,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 
 	// Check for go.mod
 	goModPath := filepath.Join(absPath, GoModFile)
-	if _, err := os.Stat(goModPath); err != nil {
+	if _, statErr := os.Stat(goModPath); statErr != nil {
 		return nil, fmt.Errorf("no go.mod found in %s", absPath)
 	}
 
@@ -42,16 +44,19 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 		return nil, fmt.Errorf("failed to parse go.mod: %w", err)
 	}
 	if ginVersion == "" {
-		return nil, fmt.Errorf("no gin dependency found in go.mod")
+		return nil, errors.New("no gin dependency found in go.mod")
 	}
 
 	// Extract module name
-	content, _ := os.ReadFile(goModPath)
-	modFile, _ := modfile.Parse("go.mod", content, nil)
-	moduleName := ""
-	if modFile != nil {
-		moduleName = modFile.Module.Mod.Path
+	content, err := os.ReadFile(goModPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read go.mod: %w", err)
 	}
+	modFile, err := modfile.Parse("go.mod", content, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse go.mod: %w", err)
+	}
+	moduleName := modFile.Module.Mod.Path
 
 	// Find Go files
 	mainFiles, err := d.findMainFiles(absPath)

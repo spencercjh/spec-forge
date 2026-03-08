@@ -61,14 +61,16 @@ func (p *ASTParser) ParseFiles() error {
 		}
 
 		// Parse the file
+		// #nosec G122 - path is validated through filepath.Walk which handles symlink traversal
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
 
-		file, err := parser.ParseFile(p.fset, path, content, parser.ParseComments)
-		if err != nil {
-			// Log but continue with other files
+		file, parseErr := parser.ParseFile(p.fset, path, content, parser.ParseComments)
+		_ = parseErr // Intentionally ignore parse errors to skip malformed files
+		if file == nil {
+			// Skip files that failed to parse
 			return nil
 		}
 
@@ -104,9 +106,7 @@ func (p *ASTParser) extractGroups(file *ast.File) map[string]*GroupInfo {
 	groups := make(map[string]*GroupInfo)
 
 	ast.Inspect(file, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.AssignStmt:
-			// Pattern: api := r.Group("/api")
+		if node, ok := n.(*ast.AssignStmt); ok {
 			if len(node.Lhs) == 1 && len(node.Rhs) == 1 {
 				if group := p.parseGroupAssignment(node.Rhs[0]); group != nil {
 					if ident, ok := node.Lhs[0].(*ast.Ident); ok {
@@ -152,8 +152,7 @@ func (p *ASTParser) extractRoutesFromFile(path string, file *ast.File) []Route {
 
 	// Inspect the AST
 	ast.Inspect(file, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.CallExpr:
+		if node, ok := n.(*ast.CallExpr); ok {
 			if route := p.parseRouteCall(path, node); route != nil {
 				routes = append(routes, *route)
 			}
@@ -228,7 +227,7 @@ func isHTTPMethod(s string) bool {
 func convertPathFormat(path string) string {
 	// Replace :param with {param}
 	// Handle patterns like :id, :userId, etc.
-	result := ""
+	var result strings.Builder
 	for i := 0; i < len(path); i++ {
 		if path[i] == ':' {
 			// Find the end of the parameter name
@@ -238,16 +237,18 @@ func convertPathFormat(path string) string {
 			}
 			if j > i+1 {
 				// Convert :param to {param}
-				result += "{" + path[i+1:j] + "}"
+				result.WriteByte('{')
+				result.WriteString(path[i+1 : j])
+				result.WriteByte('}')
 				i = j - 1
 			} else {
-				result += string(path[i])
+				result.WriteByte(path[i])
 			}
 		} else {
-			result += string(path[i])
+			result.WriteByte(path[i])
 		}
 	}
-	return result
+	return result.String()
 }
 
 // isValidParamChar checks if a character is valid for a parameter name.

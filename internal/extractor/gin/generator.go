@@ -2,18 +2,24 @@ package gin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go/ast"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/spencercjh/spec-forge/internal/extractor"
 	"gopkg.in/yaml.v3"
+
+	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
 // Generator generates OpenAPI specs from Gin projects using AST parsing.
 type Generator struct{}
+
+// ginHType represents the gin.H map type for OpenAPI spec generation.
+const ginHType = "map[string]any"
 
 // NewGenerator creates a new Generator instance.
 func NewGenerator() *Generator {
@@ -21,10 +27,10 @@ func NewGenerator() *Generator {
 }
 
 // Generate generates OpenAPI spec from Gin project.
-func (g *Generator) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+func (g *Generator) Generate(_ context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
 	ginInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		return nil, fmt.Errorf("invalid framework data type")
+		return nil, errors.New("invalid framework data type")
 	}
 
 	// Step 1: Parse AST files
@@ -46,8 +52,8 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 		// Find handler function
 		handlerDecl := g.findHandlerDecl(route.HandlerName, parser.files)
 		if handlerDecl != nil {
-			handlerInfo, err := analyzer.AnalyzeHandler(handlerDecl)
-			if err != nil {
+			handlerInfo, analyzeErr := analyzer.AnalyzeHandler(handlerDecl)
+			if analyzeErr != nil {
 				continue // Log but continue
 			}
 			handlerInfos[route.HandlerName] = handlerInfo
@@ -58,14 +64,14 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 	schemaExtractor := NewSchemaExtractor(parser.files)
 	schemas := make(openapi3.Schemas)
 	for _, handlerInfo := range handlerInfos {
-		if handlerInfo.BodyType != "" && handlerInfo.BodyType != "map[string]any" {
-			if schema, err := schemaExtractor.ExtractSchema(handlerInfo.BodyType); err == nil {
+		if handlerInfo.BodyType != "" && handlerInfo.BodyType != ginHType {
+			if schema, extractErr := schemaExtractor.ExtractSchema(handlerInfo.BodyType); extractErr == nil {
 				schemas[handlerInfo.BodyType] = schema
 			}
 		}
 		for _, resp := range handlerInfo.Responses {
-			if resp.GoType != "" && resp.GoType != "map[string]any" {
-				if schema, err := schemaExtractor.ExtractSchema(resp.GoType); err == nil {
+			if resp.GoType != "" && resp.GoType != ginHType {
+				if schema, extractErr := schemaExtractor.ExtractSchema(resp.GoType); extractErr == nil {
 					schemas[resp.GoType] = schema
 				}
 			}
@@ -132,7 +138,7 @@ func (g *Generator) buildOpenAPIDoc(info *Info, routes []Route, handlerInfos map
 			doc.Paths.Set(route.FullPath, pathItem)
 		}
 
-		operation := g.buildOperation(route, handlerInfos[route.HandlerName], schemas)
+		operation := g.buildOperation(&route, handlerInfos[route.HandlerName], schemas)
 		setOperationForMethod(pathItem, route.Method, operation)
 	}
 
@@ -140,7 +146,7 @@ func (g *Generator) buildOpenAPIDoc(info *Info, routes []Route, handlerInfos map
 }
 
 // buildOperation builds an OpenAPI operation from a route.
-func (g *Generator) buildOperation(route Route, handlerInfo *HandlerInfo, schemas openapi3.Schemas) *openapi3.Operation {
+func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schemas openapi3.Schemas) *openapi3.Operation {
 	operation := &openapi3.Operation{
 		OperationID: route.HandlerName,
 		Summary:     route.HandlerName,
@@ -180,7 +186,7 @@ func (g *Generator) buildOperation(route Route, handlerInfo *HandlerInfo, schema
 	}
 
 	// Request body
-	if handlerInfo.BodyType != "" && handlerInfo.BodyType != "map[string]any" {
+	if handlerInfo.BodyType != "" && handlerInfo.BodyType != ginHType {
 		var schemaRef *openapi3.SchemaRef
 		if _, exists := schemas[handlerInfo.BodyType]; exists {
 			schemaRef = &openapi3.SchemaRef{Ref: "#/components/schemas/" + handlerInfo.BodyType}
@@ -209,7 +215,7 @@ func (g *Generator) buildOperation(route Route, handlerInfo *HandlerInfo, schema
 		}
 
 		if resp.GoType != "" {
-			if resp.GoType == "map[string]any" {
+			if resp.GoType == ginHType {
 				response.Content["application/json"] = &openapi3.MediaType{
 					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
 				}
@@ -227,7 +233,7 @@ func (g *Generator) buildOperation(route Route, handlerInfo *HandlerInfo, schema
 			}
 		}
 
-		statusCode := fmt.Sprintf("%d", resp.StatusCode)
+		statusCode := strconv.Itoa(resp.StatusCode)
 		operation.Responses.Set(statusCode, &openapi3.ResponseRef{Value: response})
 	}
 
@@ -299,12 +305,12 @@ func (g *Generator) writeOutput(doc *openapi3.T, opts *extractor.GenerateOptions
 	}
 
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	outputPath := filepath.Join(outputDir, outputFile+ext)
-	if err := os.WriteFile(outputPath, data, 0644); err != nil {
+	if err := os.WriteFile(outputPath, data, 0o600); err != nil {
 		return "", err
 	}
 

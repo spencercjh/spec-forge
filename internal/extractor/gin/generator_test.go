@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
@@ -27,7 +28,7 @@ go 1.21
 
 require github.com/gin-gonic/gin v1.9.1
 `
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644)
 
 	mainGo := `package main
 
@@ -49,12 +50,12 @@ func getUser(c *gin.Context) {
 	c.JSON(200, User{ID: 1, Name: "test"})
 }
 `
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0o644)
 
 	g := NewGenerator()
 	ctx := context.Background()
 	info := &extractor.ProjectInfo{
-		Framework:  "gin",
+		Framework: "gin",
 		FrameworkData: &Info{
 			ModuleName: "test",
 			GinVersion: "v1.9.1",
@@ -109,7 +110,7 @@ go 1.21
 
 require github.com/gin-gonic/gin v1.9.1
 `
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0644)
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644)
 
 	mainGo := `package main
 
@@ -122,12 +123,12 @@ func main() {
 	})
 }
 `
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0o644)
 
 	g := NewGenerator()
 	ctx := context.Background()
 	info := &extractor.ProjectInfo{
-		Framework:  "gin",
+		Framework: "gin",
 		FrameworkData: &Info{
 			ModuleName: "test",
 		},

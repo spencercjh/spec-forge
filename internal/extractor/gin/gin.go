@@ -56,7 +56,7 @@ func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extr
 }
 
 // Restore implements extractor.Extractor.Restore.
-func (e *Extractor) Restore(buildFilePath, originalContent string) error {
+func (e *Extractor) Restore(_, _ string) error {
 	// Gin projects don't need restore (no patching)
 	return nil
 }
