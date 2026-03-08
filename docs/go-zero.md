@@ -23,7 +23,7 @@ go install github.com/zeromicro/go-zero/tools/goctl@latest
 spec-forge generate ./my-go-zero-project
 
 # With AI enrichment
-LLM_API_KEY="your-key" spec-forge generate ./my-go-zero-project --enrich --language zh
+spec-forge generate ./my-go-zero-project --language zh
 ```
 
 ## References

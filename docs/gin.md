@@ -39,12 +39,8 @@ These annotations are **not validated by the Go compiler** — typos and stale r
 cd my-gin-project
 spec-forge generate . -o ./openapi
 
-# Generate with AI enrichment
-LLM_API_KEY="sk-xxx" spec-forge generate . \
-    --enrich \
-    --provider custom \
-    --model deepseek-chat \
-    --language zh
+# Generate with AI enrichment (configure .spec-forge.yaml first)
+spec-forge generate . --language zh
 
 # Verbose mode to see extraction details
 spec-forge generate . -v

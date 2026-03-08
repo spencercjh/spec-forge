@@ -31,7 +31,7 @@ For Maven multi-module projects, spec-forge automatically configures the `spring
 spec-forge generate ./my-spring-boot-project
 
 # With AI enrichment
-LLM_API_KEY="your-key" spec-forge generate ./my-spring-boot-project --enrich --language zh
+spec-forge generate ./my-spring-boot-project --language zh
 ```
 
 ## References

@@ -38,7 +38,7 @@ spec-forge generate ./my-grpc-project
 spec-forge generate ./my-grpc-project --proto-import-path ./third_party --proto-import-path ./vendor
 
 # Generate with AI enrichment
-LLM_API_KEY="your-key" spec-forge generate ./my-grpc-project --enrich --language zh
+spec-forge generate ./my-grpc-project --language zh
 ```
 
 ## Limitations
