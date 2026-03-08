@@ -63,6 +63,9 @@ func NewAPIFilePatcherWithExecutor(exec executor.Interface) *APIFilePatcher {
 	return patcher
 }
 
+// versionRegex matches semantic version patterns like "1.9.2" or "v1.9.2".
+var versionRegex = regexp.MustCompile(`v?(\d+\.\d+\.\d+)`)
+
 // getGoctlVersion returns the goctl version string (e.g., "1.9.2").
 func (p *APIFilePatcher) getGoctlVersion() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), versionCheckTimeout)
@@ -78,15 +81,19 @@ func (p *APIFilePatcher) getGoctlVersion() (string, error) {
 		return "", fmt.Errorf("failed to get goctl version: %w", err)
 	}
 
-	// Parse version from output
-	// goctl --version output: "goctl version 1.9.2 darwin/arm64"
-	fields := strings.Fields(result.Stdout)
-	if len(fields) < 3 {
+	// Parse version from output using regex to handle various formats:
+	// - "goctl version 1.9.2 darwin/arm64"
+	// - "goctl version v1.9.2 darwin/arm64"
+	// - "1.9.2"
+	// - "v1.9.2"
+	matches := versionRegex.FindStringSubmatch(result.Stdout)
+	if len(matches) < 2 {
 		return "", fmt.Errorf("unexpected goctl version output: %s", result.Stdout)
 	}
 
-	// fields[0] = "goctl", fields[1] = "version", fields[2] = "1.9.2"
-	return fields[2], nil
+	// matches[0] is the full match (may include v-prefix)
+	// matches[1] is the captured group without v-prefix
+	return matches[1], nil
 }
 
 // PatchAPIFiles scans and patches .api files to fix known issues.
