@@ -37,11 +37,13 @@ var (
 	generateSkipEnrich bool
 	// generateLanguage is the language for AI-generated descriptions
 	generateLanguage string
-	// generateOutput is the output directory for generated spec
-	generateOutput string
+	// generateOutputDir is the output directory for generated spec
+	generateOutputDir string
+	// generateOutputFormat is the output format (yaml or json)
+	generateOutputFormat string
 	// generateSkipPublish controls whether to skip publishing
 	generateSkipPublish bool
-	// generatePublishTarget is the publish target (local, readme)
+	// generatePublishTarget is the publish target (readme)
 	generatePublishTarget string
 	// generatePublishOverwrite controls whether to overwrite existing remote spec
 	generatePublishOverwrite bool
@@ -120,14 +122,20 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 4: Generate OpenAPI spec
 
 	// Determine output directory
-	outputDir := generateOutput
+	outputDir := generateOutputDir
 	if outputDir == "" {
 		outputDir = config.Get().Output.Dir
 	}
 
+	// Determine output format
+	outputFormat := generateOutputFormat
+	if outputFormat == "" {
+		outputFormat = config.Get().Output.Format
+	}
+
 	genOpts := &extractor.GenerateOptions{
 		OutputDir:        outputDir,
-		Format:           config.Get().Output.Format,
+		Format:           outputFormat,
 		Timeout:          generateTimeout,
 		SkipTests:        true,
 		ProtoImportPaths: generateProtoImportPaths,
@@ -186,7 +194,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		// Build publish options
 		pubOpts := &publisher.PublishOptions{
 			OutputPath: filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath)),
-			Format:     config.Get().Output.Format,
+			Format:     outputFormat,
 			Overwrite:  generatePublishOverwrite,
 		}
 
@@ -256,7 +264,9 @@ func init() {
 		"skip AI enrichment of the generated OpenAPI spec")
 	generateCmd.Flags().StringVar(&generateLanguage, "language", "en",
 		"language for AI-generated descriptions (e.g., en, zh)")
-	generateCmd.Flags().StringVarP(&generateOutput, "output", "o", "",
+	generateCmd.Flags().StringVarP(&generateOutputFormat, "output", "o", "",
+		"output format (yaml or json)")
+	generateCmd.Flags().StringVarP(&generateOutputDir, "output-dir", "d", "",
 		"output directory for generated spec (default: project's target/build dir)")
 	generateCmd.Flags().BoolVar(&generateSkipPublish, "skip-publish", false,
 		"skip publishing the generated spec (just copy to output directory)")
