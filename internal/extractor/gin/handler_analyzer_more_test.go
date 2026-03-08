@@ -130,25 +130,29 @@ func uploadFile(c *gin.Context) {
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
 
-	// Check for form parameters
+	// Check for file parameter in FileParams
 	foundFile := false
-	foundUserID := false
-	for _, param := range info.QueryParams {
+	for _, param := range info.FileParams {
 		if param.Name == "file" {
 			foundFile = true
 			if param.GoType != "file" {
 				t.Errorf("expected file type for 'file', got '%s'", param.GoType)
 			}
 		}
+	}
+	if !foundFile {
+		t.Error("expected 'file' parameter in FileParams")
+	}
+
+	// Check for form parameter in FormParams
+	foundUserID := false
+	for _, param := range info.FormParams {
 		if param.Name == "userId" {
 			foundUserID = true
 		}
 	}
-	if !foundFile {
-		t.Error("expected 'file' parameter")
-	}
 	if !foundUserID {
-		t.Error("expected 'userId' parameter")
+		t.Error("expected 'userId' parameter in FormParams")
 	}
 }
 

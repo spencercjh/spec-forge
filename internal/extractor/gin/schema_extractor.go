@@ -106,7 +106,10 @@ func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec) (*openapi3
 		// Parse struct tags
 		if field.Tag != nil {
 			tag := strings.Trim(field.Tag.Value, "`")
-			propertyName = e.applyTags(fieldSchemaRef.Value, tag, fieldName, schema)
+			// Guard against nil Value when field is a $ref to custom type
+			if fieldSchemaRef.Value != nil {
+				propertyName = e.applyTags(fieldSchemaRef.Value, tag, fieldName, schema)
+			}
 		}
 
 		// Skip fields with json:"-"
@@ -260,9 +263,9 @@ func (e *SchemaExtractor) applyTags(schema *openapi3.Schema, tag, fieldName stri
 		return propertyName
 	}
 
-	// Parse binding tag
+	// Parse binding tag (handle multiple comma-separated rules like "required,email")
 	if bindingTag := extractTagValue(tag, "binding"); bindingTag != "" {
-		if bindingTag == "required" {
+		if strings.Contains(bindingTag, "required") {
 			parentSchema.Required = append(parentSchema.Required, propertyName)
 		}
 	}

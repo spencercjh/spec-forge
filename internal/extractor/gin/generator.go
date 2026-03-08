@@ -224,25 +224,8 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 		})
 	}
 
-	// Request body
-	if handlerInfo.BodyType != "" && handlerInfo.BodyType != ginHType {
-		var schemaRef *openapi3.SchemaRef
-		if _, exists := schemas[handlerInfo.BodyType]; exists {
-			schemaRef = &openapi3.SchemaRef{Ref: "#/components/schemas/" + handlerInfo.BodyType}
-		} else {
-			// Fallback to generic object if schema not found
-			schemaRef = &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}}
-		}
-		operation.RequestBody = &openapi3.RequestBodyRef{
-			Value: &openapi3.RequestBody{
-				Content: openapi3.Content{
-					"application/json": {
-						Schema: schemaRef,
-					},
-				},
-			},
-		}
-	}
+	// Handle request body / form parameters based on binding source
+	g.buildRequestBody(operation, handlerInfo, schemas)
 
 	// Responses
 	operation.Responses = openapi3.NewResponses()
@@ -287,6 +270,89 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 	}
 
 	return operation
+}
+
+// buildRequestBody builds the request body or form parameters based on binding source.
+func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo *HandlerInfo, schemas openapi3.Schemas) {
+	// Handle form parameters (application/x-www-form-urlencoded)
+	if len(handlerInfo.FormParams) > 0 {
+		for _, param := range handlerInfo.FormParams {
+			operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{
+				Value: &openapi3.Parameter{
+					Name:        param.Name,
+					In:          "query",
+					Required:    param.Required,
+					Description: "Form parameter",
+					Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				},
+			})
+		}
+	}
+
+	// Handle file upload parameters (multipart/form-data)
+	if len(handlerInfo.FileParams) > 0 {
+		content := make(openapi3.Content)
+		schema := &openapi3.Schema{
+			Type:       &openapi3.Types{"object"},
+			Properties: make(openapi3.Schemas),
+		}
+		for _, param := range handlerInfo.FileParams {
+			schema.Properties[param.Name] = &openapi3.SchemaRef{
+				Value: &openapi3.Schema{
+					Type:   &openapi3.Types{"string"},
+					Format: "binary",
+				},
+			}
+			if param.Required {
+				schema.Required = append(schema.Required, param.Name)
+			}
+		}
+		content["multipart/form-data"] = &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: schema}}
+		operation.RequestBody = &openapi3.RequestBodyRef{
+			Value: &openapi3.RequestBody{
+				Required: true,
+				Content:  content,
+			},
+		}
+		return
+	}
+
+	// Handle body binding based on source
+	if handlerInfo.BodyType == "" || handlerInfo.BodyType == ginHType {
+		return
+	}
+
+	var schemaRef *openapi3.SchemaRef
+	if _, exists := schemas[handlerInfo.BodyType]; exists {
+		schemaRef = &openapi3.SchemaRef{Ref: "#/components/schemas/" + handlerInfo.BodyType}
+	} else {
+		// Fallback to generic object if schema not found
+		schemaRef = &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}}
+	}
+
+	// Determine content type based on binding source
+	contentType := "application/json"
+	switch handlerInfo.BindingSrc {
+	case BindingSourceXML:
+		contentType = "application/xml"
+	case BindingSourceYAML:
+		contentType = "application/x-yaml"
+	case BindingSourceQuery:
+		// Query binding - don't create request body, parameters are in query
+		return
+	case BindingSourceForm:
+		contentType = "application/x-www-form-urlencoded"
+	}
+
+	operation.RequestBody = &openapi3.RequestBodyRef{
+		Value: &openapi3.RequestBody{
+			Content: openapi3.Content{
+				contentType: {
+					Schema: schemaRef,
+				},
+			},
+		},
+	}
 }
 
 // setOperationForMethod sets the operation for the given HTTP method.

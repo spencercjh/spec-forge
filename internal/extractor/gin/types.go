@@ -28,12 +28,27 @@ type Route struct {
 	Middlewares []string // Middleware names
 }
 
+// BindingSource indicates the source of request binding.
+type BindingSource string
+
+const (
+	BindingSourceJSON      BindingSource = "json"      // application/json
+	BindingSourceXML       BindingSource = "xml"       // application/xml
+	BindingSourceYAML      BindingSource = "yaml"      // application/x-yaml
+	BindingSourceQuery     BindingSource = "query"     // query parameters
+	BindingSourceForm      BindingSource = "form"      // application/x-www-form-urlencoded
+	BindingSourceMultipart BindingSource = "multipart" // multipart/form-data
+)
+
 // HandlerInfo contains information extracted from a handler function.
 type HandlerInfo struct {
 	PathParams   []ParamInfo    // Path parameters (c.Param)
 	QueryParams  []ParamInfo    // Query parameters (c.Query)
 	HeaderParams []ParamInfo    // Header parameters (c.GetHeader)
+	FormParams   []ParamInfo    // Form parameters (c.PostForm)
+	FileParams   []ParamInfo    // File upload parameters (c.FormFile)
 	BodyType     string         // Request body type (from ShouldBindJSON)
+	BindingSrc   BindingSource  // Source of binding (json, xml, query, form, etc.)
 	Responses    []ResponseInfo // Response info (from c.JSON calls)
 }
 

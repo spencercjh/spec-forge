@@ -31,6 +31,8 @@ func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error)
 		PathParams:   []ParamInfo{},
 		QueryParams:  []ParamInfo{},
 		HeaderParams: []ParamInfo{},
+		FormParams:   []ParamInfo{},
+		FileParams:   []ParamInfo{},
 		Responses:    []ResponseInfo{},
 	}
 
@@ -184,13 +186,14 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 	case "GetHeader":
 		a.extractHeaderParam(call, info)
 	case "ShouldBindJSON", "BindJSON", "ShouldBind", "Bind":
-		a.extractBodyType(call, info, varTypeMap)
+		a.extractBodyType(call, info, varTypeMap, BindingSourceJSON)
 	case "ShouldBindXML", "BindXML":
-		a.extractBodyType(call, info, varTypeMap)
+		a.extractBodyType(call, info, varTypeMap, BindingSourceXML)
 	case "ShouldBindYAML", "BindYAML":
-		a.extractBodyType(call, info, varTypeMap)
+		a.extractBodyType(call, info, varTypeMap, BindingSourceYAML)
 	case "ShouldBindQuery", "BindQuery":
-		a.extractBodyType(call, info, varTypeMap)
+		// Query binding extracts query parameters, not body
+		a.extractQueryBinding(call, info, varTypeMap)
 	case "PostForm":
 		a.extractFormParam(call, info, true)
 	case "DefaultPostForm":
@@ -251,13 +254,27 @@ func (a *HandlerAnalyzer) extractHeaderParam(call *ast.CallExpr, info *HandlerIn
 }
 
 // extractBodyType extracts body type from binding calls like c.ShouldBindJSON().
-func (a *HandlerAnalyzer) extractBodyType(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
+func (a *HandlerAnalyzer) extractBodyType(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string, source BindingSource) {
 	if len(call.Args) < 1 {
 		return
 	}
 	if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
 		info.BodyType = typeName
-		slog.Debug("Extracted body type", "type", typeName)
+		info.BindingSrc = source
+		slog.Debug("Extracted body type", "type", typeName, "source", source)
+	}
+}
+
+// extractQueryBinding handles ShouldBindQuery by extracting query parameters from struct tags.
+// For now, we track that this is a query binding so the generator can handle it properly.
+func (a *HandlerAnalyzer) extractQueryBinding(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
+	if len(call.Args) < 1 {
+		return
+	}
+	if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
+		info.BodyType = typeName
+		info.BindingSrc = BindingSourceQuery
+		slog.Debug("Extracted query binding type", "type", typeName)
 	}
 }
 
@@ -267,7 +284,7 @@ func (a *HandlerAnalyzer) extractFormParam(call *ast.CallExpr, info *HandlerInfo
 		return
 	}
 	if name := extractStringLiteral(call.Args[0]); name != "" {
-		info.QueryParams = append(info.QueryParams, ParamInfo{
+		info.FormParams = append(info.FormParams, ParamInfo{
 			Name:     name,
 			GoType:   "string",
 			Required: required,
@@ -281,7 +298,7 @@ func (a *HandlerAnalyzer) extractFileParam(call *ast.CallExpr, info *HandlerInfo
 		return
 	}
 	if name := extractStringLiteral(call.Args[0]); name != "" {
-		info.QueryParams = append(info.QueryParams, ParamInfo{
+		info.FileParams = append(info.FileParams, ParamInfo{
 			Name:     name,
 			GoType:   "file",
 			Required: true,
