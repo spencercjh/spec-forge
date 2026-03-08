@@ -333,8 +333,10 @@ func TestGinDemo_JSONFormat(t *testing.T) {
 	t.Log("JSON format test passed!")
 }
 
-// TestGinDemo_DefaultOutput tests that when OutputDir is set to project path,
-// the spec is output there (simulating CLI default behavior).
+// TestGinDemo_DefaultOutput tests the generator's behavior when OutputDir
+// is set to the project path. Note: This test bypasses the CLI layer and
+// tests the extractor directly. The CLI layer (cmd/generate.go) handles
+// config precedence and passes the resolved outputDir to the generator.
 func TestGinDemo_DefaultOutput(t *testing.T) {
 	projectPath := "./gin-demo"
 
@@ -352,11 +354,11 @@ func TestGinDemo_DefaultOutput(t *testing.T) {
 		t.Fatalf("failed to detect project: %v", err)
 	}
 
-	// Generate with OutputDir set to project path (simulating CLI default behavior)
-	// The CLI layer sets outputDir = projectPath when user doesn't specify -d
+	// Generate with OutputDir set to project path
+	// The CLI layer (cmd/generate.go) resolves outputDir via: flag > config > projectPath
 	gen := gin.NewGenerator()
 	result, err := gen.Generate(ctx, projectPath, info, &extractor.GenerateOptions{
-		OutputDir: projectPath, // CLI sets this to projectPath by default
+		OutputDir: projectPath,
 		Format:    "yaml",
 	})
 	if err != nil {
