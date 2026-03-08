@@ -36,6 +36,14 @@ type Extractor struct {
 	generator *Generator
 }
 
+func NewExtractor() *Extractor {
+	return &Extractor{
+		detector:  NewDetector(),
+		patcher:   NewPatcher(),
+		generator: NewGenerator(),
+	}
+}
+
 // Name returns the extractor name.
 func (e *Extractor) Name() string {
 	return ExtractorName
@@ -43,17 +51,11 @@ func (e *Extractor) Name() string {
 
 // Detect analyzes a project and returns its information if it's a go-zero project.
 func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
-	if e.detector == nil {
-		e.detector = NewDetector()
-	}
 	return e.detector.Detect(projectPath)
 }
 
 // Patch checks if goctl is available for the go-zero project.
 func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.PatchResult, error) {
-	if e.patcher == nil {
-		e.patcher = NewPatcher()
-	}
 	_, err := e.patcher.Patch("")
 	if err != nil {
 		return nil, err
@@ -64,9 +66,6 @@ func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.Patch
 
 // Generate produces the OpenAPI spec from the go-zero project.
 func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
-	if e.generator == nil {
-		e.generator = NewGenerator()
-	}
 	return e.generator.Generate(ctx, projectPath, info, opts)
 }
 
