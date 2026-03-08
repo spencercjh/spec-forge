@@ -53,6 +53,8 @@ var (
 	generatePublishTarget string
 	// generatePublishOverwrite controls whether to overwrite existing remote spec
 	generatePublishOverwrite bool
+	// generateOverwriteOutput controls whether to overwrite existing local spec file
+	generateOverwriteOutput bool
 	// generateProtoImportPaths are additional import paths for protoc (-I flags)
 	generateProtoImportPaths []string
 )
@@ -146,7 +148,10 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		outputFormat = outputFormatYAML
 	}
 	// Normalize format value for consistent handling across extractors
-	outputFormat = normalizeOutputFormat(outputFormat)
+	outputFormat, err = normalizeOutputFormat(outputFormat)
+	if err != nil {
+		return errWrap("invalid output format", err)
+	}
 
 	genOpts := &extractor.GenerateOptions{
 		OutputDir:        outputDir,
@@ -215,7 +220,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	}
 
 	if absGenDir != absOutputDir {
-		if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
+		if err := copySpecToOutput(genResult.SpecFilePath, outputDir, generateOverwriteOutput); err != nil {
 			return errWrap("failed to copy spec to output directory", err)
 		}
 		slog.InfoContext(ctx, "Spec saved", "path", targetPath)
@@ -304,6 +309,8 @@ func init() {
 		"publish target (readme). If empty, spec is only saved locally")
 	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
 		"overwrite existing spec on remote platform")
+	generateCmd.Flags().BoolVar(&generateOverwriteOutput, "overwrite-output", false,
+		"overwrite existing local spec file if it already exists")
 	generateCmd.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
 }
@@ -446,21 +453,24 @@ func errWrap(msg string, err error) error {
 	return errors.New(msg + ": " + err.Error())
 }
 
-// normalizeOutputFormat normalizes the output format value for consistent handling.
-// Accepts: "yaml", "yml", "YAML", "json", "JSON" -> returns "yaml" or "json"
-func normalizeOutputFormat(format string) string {
-	switch strings.ToLower(format) {
+// normalizeOutputFormat normalizes and validates the output format value.
+// Accepts: "yaml", "yml", "YAML", "json", "JSON" -> returns "yaml" or "json".
+// Returns an error for unsupported formats to avoid silent fallback behavior.
+func normalizeOutputFormat(format string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(format))
+	switch normalized {
 	case "yaml", "yml":
-		return outputFormatYAML
+		return outputFormatYAML, nil
 	case "json":
-		return outputFormatJSON
+		return outputFormatJSON, nil
 	default:
-		return format // Return as-is for unknown values, extractors will handle error
+		return "", fmt.Errorf("unsupported output format %q; allowed values are %q and %q", format, outputFormatYAML, outputFormatJSON)
 	}
 }
 
-// copySpecToOutput copies the generated spec to the specified output directory
-func copySpecToOutput(srcPath, outputDir string) error {
+// copySpecToOutput copies the generated spec to the specified output directory.
+// If overwrite is false and the destination file already exists, an error is returned.
+func copySpecToOutput(srcPath, outputDir string, overwrite bool) error {
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -479,12 +489,15 @@ func copySpecToOutput(srcPath, outputDir string) error {
 
 	// Check if destination file already exists
 	if _, statErr := os.Stat(dstPath); statErr == nil {
-		return fmt.Errorf("destination file already exists: %s", dstPath)
+		if !overwrite {
+			return fmt.Errorf("destination file already exists: %s (use --overwrite-output to overwrite)", dstPath)
+		}
+		// Overwrite is allowed, continue
 	} else if !os.IsNotExist(statErr) {
 		return fmt.Errorf("failed to check destination file: %w", statErr)
 	}
 
-	// Create destination file
+	// Create destination file (truncates if exists)
 	dstFile, createErr := os.Create(dstPath)
 	if createErr != nil {
 		return fmt.Errorf("failed to create destination file: %w", createErr)

@@ -334,9 +334,11 @@ func TestGinDemo_JSONFormat(t *testing.T) {
 }
 
 // TestGinDemo_DefaultOutput tests the generator's behavior when OutputDir
-// is set to the project path. Note: This test bypasses the CLI layer and
-// tests the extractor directly. The CLI layer (cmd/generate.go) handles
-// config precedence and passes the resolved outputDir to the generator.
+// is set to the project path using the Extractor interface directly.
+// Note: This test bypasses the CLI layer and tests the extractor directly.
+// The CLI layer (cmd/generate.go) handles config precedence (flag > config > default)
+// and passes the resolved outputDir to the generator. For true end-to-end CLI
+// testing, consider invoking the spec-forge binary directly.
 func TestGinDemo_DefaultOutput(t *testing.T) {
 	projectPath := "./gin-demo"
 
