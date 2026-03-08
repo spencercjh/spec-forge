@@ -36,10 +36,9 @@ jobs:
       - name: Setup golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.10
+          version: latest
           verify: true
           install-only: true
-          skip-cache: true
 
       - name: Format check
         run: make fmt
