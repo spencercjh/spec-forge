@@ -2,13 +2,26 @@
 package gozero
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"golang.org/x/mod/semver"
+
+	"github.com/spencercjh/spec-forge/internal/executor"
 )
+
+// mockExecutor is a test double for executor.Interface.
+type mockExecutor struct {
+	result *executor.ExecuteResult
+	err    error
+}
+
+func (m *mockExecutor) Execute(ctx context.Context, opts *executor.ExecuteOptions) (*executor.ExecuteResult, error) {
+	return m.result, m.err
+}
 
 func TestAPIFilePatcher_checkNeedsPatch(t *testing.T) {
 	tests := []struct {
@@ -256,64 +269,95 @@ func TestAPIFilePatcher_HasPatchedFiles(t *testing.T) {
 func TestGoctlVersionCompare(t *testing.T) {
 	tests := []struct {
 		name       string
-		version    string
+		output     string
 		shouldSkip bool
 	}{
 		{
 			name:       "exactly 1.9.2",
-			version:    "1.9.2",
+			output:     "goctl version 1.9.2 darwin/arm64",
 			shouldSkip: true,
 		},
 		{
 			name:       "greater than 1.9.2",
-			version:    "1.9.3",
+			output:     "goctl version 1.9.3 linux/amd64",
 			shouldSkip: true,
 		},
 		{
-			name:       "much greater",
-			version:    "1.10.0",
+			name:       "much greater (1.10.0)",
+			output:     "goctl version 1.10.0 windows/amd64",
 			shouldSkip: true,
 		},
 		{
 			name:       "version 1.9.10 (multi-digit component)",
-			version:    "1.9.10",
+			output:     "goctl version 1.9.10 darwin/arm64",
 			shouldSkip: true,
 		},
 		{
 			name:       "version 2.0.0",
-			version:    "2.0.0",
+			output:     "goctl version 2.0.0 linux/amd64",
 			shouldSkip: true,
 		},
 		{
 			name:       "less than 1.9.2",
-			version:    "1.9.1",
+			output:     "goctl version 1.9.1 darwin/arm64",
 			shouldSkip: false,
 		},
 		{
 			name:       "much less than 1.9.2",
-			version:    "1.8.0",
+			output:     "goctl version 1.8.0 linux/amd64",
 			shouldSkip: false,
 		},
 		{
 			name:       "version 1.8.10 (multi-digit, but less)",
-			version:    "1.8.10",
+			output:     "goctl version 1.8.10 windows/amd64",
+			shouldSkip: false,
+		},
+		{
+			name:       "version with v-prefix",
+			output:     "goctl version v1.9.2 darwin/arm64",
+			shouldSkip: true,
+		},
+		{
+			name:       "old version with v-prefix",
+			output:     "goctl version v1.9.1 linux/amd64",
 			shouldSkip: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			patcher := NewAPIFilePatcher()
-			patcher.skipPatch = shouldSkipPatch(tt.version)
+			mockExec := &mockExecutor{
+				result: &executor.ExecuteResult{
+					ExitCode: 0,
+					Stdout:   tt.output,
+					Stderr:   "",
+				},
+				err: nil,
+			}
+
+			patcher := NewAPIFilePatcherWithExecutor(mockExec)
 			if patcher.skipPatch != tt.shouldSkip {
-				t.Errorf("version %s: expected skipPatch=%v, got %v", tt.version, tt.shouldSkip, patcher.skipPatch)
+				t.Errorf("output %q: expected skipPatch=%v, got %v", tt.output, tt.shouldSkip, patcher.skipPatch)
 			}
 		})
 	}
 }
 
+func TestGoctlVersionDetectionError(t *testing.T) {
+	// When version detection fails, should default to patching (skipPatch = false)
+	mockExec := &mockExecutor{
+		result: nil,
+		err:    &executor.CommandNotFoundError{Command: "goctl"},
+	}
+
+	patcher := NewAPIFilePatcherWithExecutor(mockExec)
+	if patcher.skipPatch {
+		t.Error("expected skipPatch=false when version detection fails")
+	}
+}
+
 // shouldSkipPatch checks if a given goctl version should skip patching.
-// This is a helper function for testing.
+// This is a helper function for testing semver comparison logic directly.
 func shouldSkipPatch(version string) bool {
 	return semver.Compare("v"+version, "v"+minGoctlVersionForPatch) >= 0
 }
