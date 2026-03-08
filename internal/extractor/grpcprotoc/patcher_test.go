@@ -3,6 +3,7 @@ package grpcprotoc_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/spencercjh/spec-forge/internal/executor"
@@ -99,13 +100,13 @@ func TestPatcher_Patch_ProtocNotInstalled(t *testing.T) {
 
 	// Check that the error contains the installation hint
 	expectedMsg := "protoc not found"
-	if err != nil && !contains(err.Error(), expectedMsg) {
+	if err != nil && !strings.Contains(err.Error(), expectedMsg) {
 		t.Errorf("Expected error message to contain '%s', got: %s", expectedMsg, err.Error())
 	}
 
 	// Verify the installation hint is included
 	installHint := "github.com/protocolbuffers/protobuf/releases"
-	if err != nil && !contains(err.Error(), installHint) {
+	if err != nil && !strings.Contains(err.Error(), installHint) {
 		t.Errorf("Expected error message to contain installation hint '%s', got: %s", installHint, err.Error())
 	}
 }
@@ -145,13 +146,13 @@ func TestPatcher_Patch_ProtocGenConnectOpenAPINotInstalled(t *testing.T) {
 
 	// Check that the error contains the installation hint
 	expectedMsg := "protoc-gen-connect-openapi not found"
-	if err != nil && !contains(err.Error(), expectedMsg) {
+	if err != nil && !strings.Contains(err.Error(), expectedMsg) {
 		t.Errorf("Expected error message to contain '%s', got: %s", expectedMsg, err.Error())
 	}
 
 	// Verify the installation hint is included
 	installHint := "go install github.com/sudorandom/protoc-gen-connect-openapi@latest"
-	if err != nil && !contains(err.Error(), installHint) {
+	if err != nil && !strings.Contains(err.Error(), installHint) {
 		t.Errorf("Expected error message to contain installation hint '%s', got: %s", installHint, err.Error())
 	}
 }
@@ -187,7 +188,7 @@ func TestPatcher_Patch_ProtocCommandFailed(t *testing.T) {
 	}
 
 	expectedMsg := "protoc version check failed"
-	if err != nil && !contains(err.Error(), expectedMsg) {
+	if err != nil && !strings.Contains(err.Error(), expectedMsg) {
 		t.Errorf("Expected error message to contain '%s', got: %s", expectedMsg, err.Error())
 	}
 }
@@ -229,7 +230,7 @@ func TestPatcher_Patch_ProtocGenConnectOpenAPICommandFailed(t *testing.T) {
 	}
 
 	expectedMsg := "protoc-gen-connect-openapi version check failed"
-	if err != nil && !contains(err.Error(), expectedMsg) {
+	if err != nil && !strings.Contains(err.Error(), expectedMsg) {
 		t.Errorf("Expected error message to contain '%s', got: %s", expectedMsg, err.Error())
 	}
 }
@@ -289,14 +290,4 @@ func TestNewPatcherWithExecutor(t *testing.T) {
 	if result == nil || !result.ProtocInstalled {
 		t.Error("Expected protoc to be installed")
 	}
-}
-
-// Helper function
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
