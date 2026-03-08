@@ -275,11 +275,6 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 			foundPath = path
 			return filepath.SkipAll
 		}
-		// Also check for any .openapi.json or .openapi.yaml files
-		if !file.IsDir() && (strings.HasSuffix(path, ".openapi.json") || strings.HasSuffix(path, ".openapi.yaml")) {
-			foundPath = path
-			return filepath.SkipAll
-		}
 		return nil
 	})
 	if err == nil && foundPath != "" {
