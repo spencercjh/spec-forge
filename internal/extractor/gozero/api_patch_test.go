@@ -133,7 +133,17 @@ func TestAPIFilePatcher_PatchAPIFiles(t *testing.T) {
 	file2 := filepath.Join(dir, "api2.api")
 	os.WriteFile(file2, []byte(`prefix: "/api/alert-center"`), 0o644)
 
-	patcher := NewAPIFilePatcher()
+	// Use mock executor with old goctl version (< 1.9.2) to enable patching
+	mockExec := &mockExecutor{
+		result: &executor.ExecuteResult{
+			ExitCode: 0,
+			Stdout:   "goctl version 1.9.1 darwin/arm64",
+			Stderr:   "",
+		},
+		err: nil,
+	}
+
+	patcher := NewAPIFilePatcherWithExecutor(mockExec)
 	result, err := patcher.PatchAPIFiles([]string{file1, file2})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -161,7 +171,17 @@ func TestAPIFilePatcher_Cleanup(t *testing.T) {
 	apiFile := filepath.Join(dir, "test.api")
 	os.WriteFile(apiFile, []byte("prefix: /api/alert-center"), 0o644)
 
-	patcher := NewAPIFilePatcher()
+	// Use mock executor with old goctl version (< 1.9.2) to enable patching
+	mockExec := &mockExecutor{
+		result: &executor.ExecuteResult{
+			ExitCode: 0,
+			Stdout:   "goctl version 1.9.1 darwin/arm64",
+			Stderr:   "",
+		},
+		err: nil,
+	}
+
+	patcher := NewAPIFilePatcherWithExecutor(mockExec)
 	patcher.PatchAPIFiles([]string{apiFile})
 
 	// Get patched path before cleanup
