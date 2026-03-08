@@ -12,6 +12,13 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+// Validation rule constants for goconst compliance
+const (
+	validateRuleEmail = "email"
+	validateRuleURL   = "url"
+	validateRuleUUID  = "uuid"
+)
+
 // SchemaExtractor extracts OpenAPI schemas from Go structs.
 type SchemaExtractor struct {
 	files     map[string]*ast.File
@@ -308,11 +315,11 @@ func (e *SchemaExtractor) applyValidation(schema *openapi3.Schema, validateTag, 
 
 		// Parse format validators
 		switch rule {
-		case "email":
-			schema.Format = "email"
-		case "url":
+		case validateRuleEmail:
+			schema.Format = validateRuleEmail
+		case validateRuleURL:
 			schema.Format = "uri"
-		case "uuid":
+		case validateRuleUUID:
 			schema.Format = "uuid"
 		}
 
