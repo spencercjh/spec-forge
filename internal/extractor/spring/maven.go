@@ -188,8 +188,8 @@ func (p *MavenParser) AddDependency(pom *gopom.Project, groupID, artifactID, ver
 // AddPlugin adds a plugin to the pom build section with proper execution configuration.
 func (p *MavenParser) AddPlugin(pom *gopom.Project, groupID, artifactID, version string) {
 	// Configure execution with integration-test phase for automatic app startup
-	id := "integration-test"
-	phase := "integration-test"
+	id := integrationTestExecID
+	phase := integrationTestPhase
 	goals := []string{"generate"}
 	plugin := gopom.Plugin{
 		GroupID:    &groupID,
@@ -241,8 +241,10 @@ func (p *MavenParser) HasPlugin(pom *gopom.Project) bool {
 }
 
 const (
-	springBootGroupID    = "org.springframework.boot"
-	springBootArtifactID = "spring-boot-maven-plugin"
+	springBootGroupID     = "org.springframework.boot"
+	springBootArtifactID  = "spring-boot-maven-plugin"
+	integrationTestPhase  = "integration-test"
+	integrationTestExecID = "integration-test"
 )
 
 // HasSpringBootStartStopGoals checks if spring-boot-maven-plugin has start/stop goals configured.

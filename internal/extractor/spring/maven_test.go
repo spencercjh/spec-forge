@@ -168,10 +168,10 @@ func TestMavenParser_AddPlugin(t *testing.T) {
 	}
 
 	exec := (*plugin.Executions)[0]
-	if exec.ID == nil || *exec.ID != "integration-test" {
+	if exec.ID == nil || *exec.ID != integrationTestExecID {
 		t.Errorf("Expected execution ID 'integration-test', got %v", exec.ID)
 	}
-	if exec.Phase == nil || *exec.Phase != "integration-test" {
+	if exec.Phase == nil || *exec.Phase != integrationTestPhase {
 		t.Errorf("Expected execution phase 'integration-test', got %v", exec.Phase)
 	}
 	if exec.Goals == nil || len(*exec.Goals) != 1 || (*exec.Goals)[0] != "generate" {
