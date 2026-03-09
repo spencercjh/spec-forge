@@ -54,7 +54,7 @@ func NewAPIFilePatcherWithExecutor(exec executor.Interface) *APIFilePatcher {
 	}
 
 	// Check goctl version to determine if patching is needed
-	if version, err := patcher.getGoctlVersion(); err == nil {
+	if version, err := patcher.getGoctlVersion(context.Background()); err == nil {
 		// Use semantic version comparison (add "v" prefix for semver.Compare)
 		patcher.skipPatch = semver.Compare("v"+version, "v"+minGoctlVersionForPatch) >= 0
 		if patcher.skipPatch {
@@ -71,12 +71,13 @@ func NewAPIFilePatcherWithExecutor(exec executor.Interface) *APIFilePatcher {
 var versionRegex = regexp.MustCompile(`v?(\d+\.\d+\.\d+)`)
 
 // getGoctlVersion returns the goctl version string (e.g., "1.9.2").
-func (p *APIFilePatcher) getGoctlVersion() (string, error) {
+func (p *APIFilePatcher) getGoctlVersion(ctx context.Context) (string, error) {
 	if p.exec == nil {
 		return "", fmt.Errorf("executor is nil")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), versionCheckTimeout)
+	// Apply timeout to the provided context
+	ctx, cancel := context.WithTimeout(ctx, versionCheckTimeout)
 	defer cancel()
 
 	opts := &executor.ExecuteOptions{
