@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/mod/semver"
-
 	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
@@ -374,10 +372,4 @@ func TestGoctlVersionDetectionError(t *testing.T) {
 	if patcher.skipPatch {
 		t.Error("expected skipPatch=false when version detection fails")
 	}
-}
-
-// shouldSkipPatch checks if a given goctl version should skip patching.
-// This is a helper function for testing semver comparison logic directly.
-func shouldSkipPatch(version string) bool {
-	return semver.Compare("v"+version, "v"+minGoctlVersionForPatch) >= 0
 }
