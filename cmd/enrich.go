@@ -249,6 +249,45 @@ func getCustomAPIKey(enrichCfg config.EnrichConfig) string { //nolint:gocritic /
 	return os.Getenv(getCustomAPIKeyEnv(enrichCfg))
 }
 
+// newEnrichCmd creates a new enrich command instance for testing.
+func newEnrichCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "enrich <spec-file>",
+		Short: "Enrich OpenAPI spec with AI-generated descriptions",
+		Long: `Enrich OpenAPI specification by using LLM to generate missing descriptions
+for APIs and fields.
+
+Supports multiple LLM providers: OpenAI, Anthropic, Ollama, and custom OpenAI-compatible services.
+
+Examples:
+  # Enrich with OpenAI
+  spec-forge enrich openapi.yaml --provider openai --model gpt-4o
+
+  # Enrich with Chinese descriptions
+  spec-forge enrich openapi.yaml --provider openai --language zh
+
+  # Use custom internal AI service
+  spec-forge enrich openapi.yaml \
+    --provider custom \
+    --custom-base-url https://ai.company.com/v1 \
+    --custom-api-key-env COMPANY_AI_KEY`,
+		Args: cobra.ExactArgs(1),
+		RunE: runEnrich,
+	}
+
+	c.Flags().StringVar(&enrichProvider, "provider", "", "LLM provider (openai, anthropic, ollama, custom)")
+	c.Flags().StringVar(&enrichModel, "model", "", "LLM model name")
+	c.Flags().StringVar(&enrichLanguage, "language", "en", "Output language for descriptions")
+	c.Flags().StringVarP(&enrichOutput, "output", "o", "", "Output file (default: overwrite input)")
+	c.Flags().IntVar(&enrichConcurrency, "concurrency", 3, "Number of concurrent LLM calls")
+	c.Flags().DurationVar(&enrichTimeout, "timeout", 30*time.Second, "Timeout for single LLM call")
+	c.Flags().StringVar(&enrichCustomBaseURL, "custom-base-url", "", "Custom provider API URL")
+	c.Flags().StringVar(&enrichCustomAPIKey, "custom-api-key", "", "Custom provider API key (or use env var)")
+	c.Flags().StringVar(&enrichCustomAPIKeyEnv, "custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
+
+	return c
+}
+
 func init() {
 	rootCmd.AddCommand(enrichCmd)
 

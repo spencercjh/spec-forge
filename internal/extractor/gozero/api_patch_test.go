@@ -237,7 +237,7 @@ func TestValidateAPIFile(t *testing.T) {
 				t.Fatalf("failed to write test file: %v", err)
 			}
 
-			err := ValidateAPIFile(apiFile)
+			err := validateAPIFile(apiFile)
 			if tt.shouldError {
 				if err == nil {
 					t.Error("expected error, got nil")

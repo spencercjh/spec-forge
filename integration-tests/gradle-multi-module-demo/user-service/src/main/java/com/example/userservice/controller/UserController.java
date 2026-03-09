@@ -1,26 +1,112 @@
 package com.example.userservice.controller;
 
 import com.example.shared.ApiResponse;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import com.example.shared.FileUploadResult;
+import com.example.shared.PageResult;
+import com.example.shared.User;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+/**
+ * User management REST API for multi-module project.
+ */
 @RestController
-@RequestMapping("/api/users")
-@Tag(name = "User", description = "User management APIs")
+@RequestMapping("/api/v1/users")
 public class UserController {
 
-    @GetMapping
-    @Operation(summary = "Get all users", description = "Returns list of all users")
-    public ApiResponse<List<String>> getAllUsers() {
-        return ApiResponse.success(List.of("user1", "user2", "user3"));
+    private final Map<Long, User> userStore = new HashMap<>();
+
+    public UserController() {
+        userStore.put(1L, new User(1L, "john_doe", "john@example.com", "John Doe", 30));
+        userStore.put(2L, new User(2L, "jane_smith", "jane@example.com", "Jane Smith", 25));
+        userStore.put(3L, new User(3L, "bob_wilson", "bob@example.com", "Bob Wilson", 35));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get user by ID", description = "Returns a single user by ID")
-    public ApiResponse<String> getUserById(@PathVariable String id) {
-        return ApiResponse.success("user-" + id);
+    public ApiResponse<User> getUserById(@PathVariable Long id) {
+        User user = userStore.get(id);
+        if (user == null) {
+            return ApiResponse.error(404, "User not found");
+        }
+        return ApiResponse.success(user);
+    }
+
+    @GetMapping
+    public ApiResponse<PageResult<User>> listUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String username) {
+
+        List<User> allUsers = new ArrayList<>(userStore.values());
+
+        if (username != null && !username.isEmpty()) {
+            allUsers.removeIf(u -> !u.getUsername().contains(username));
+        }
+
+        int start = page * size;
+        int end = Math.min(start + size, allUsers.size());
+        List<User> pageContent = allUsers.subList(start, end);
+
+        PageResult<User> result = new PageResult<>();
+        result.setContent(pageContent);
+        result.setPageNumber(page);
+        result.setPageSize(size);
+        result.setTotal(allUsers.size());
+        result.setTotalPages((int) Math.ceil((double) allUsers.size() / size));
+
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping
+    public ApiResponse<User> createUser(@RequestBody User user) {
+        Long newId = (long) (userStore.size() + 1);
+        user.setId(newId);
+        userStore.put(newId, user);
+        return ApiResponse.success(user);
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<FileUploadResult> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "userId", required = false) Long userId) {
+
+        FileUploadResult result = new FileUploadResult();
+        result.setFilename(file.getOriginalFilename());
+        result.setSize(file.getSize());
+        result.setContentType(file.getContentType());
+        result.setMessage("File uploaded successfully for user: " + (userId != null ? userId : "anonymous"));
+
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping(value = "/{id}/profile", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ApiResponse<User> updateProfile(
+            @PathVariable Long id,
+            @RequestParam(required = false) String fullName,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) Integer age) {
+
+        User user = userStore.get(id);
+        if (user == null) {
+            return ApiResponse.error(404, "User not found with id: " + id);
+        }
+
+        if (fullName != null) {
+            user.setFullName(fullName);
+        }
+        if (email != null) {
+            user.setEmail(email);
+        }
+        if (age != null) {
+            user.setAge(age);
+        }
+
+        return ApiResponse.success(user);
     }
 }

@@ -63,7 +63,7 @@ func TestPatchSwagger_ArrayItemsMissing(t *testing.T) {
 				},
 			}
 
-			PatchSwagger(doc)
+			patchSwagger(doc)
 
 			if tt.schema.Type != nil && tt.schema.Type.Is("array") {
 				if tt.schema.Items != nil {
@@ -140,7 +140,7 @@ func TestPatchSwagger_SkipDashParameters(t *testing.T) {
 				},
 			}
 
-			PatchSwagger(doc)
+			patchSwagger(doc)
 
 			gotParams := doc.Paths[tt.path].Get.Parameters
 			assert.Len(t, gotParams, tt.wantParamCount)
@@ -221,7 +221,7 @@ func TestPatchSwagger_RemoveInvalidPathParams(t *testing.T) {
 				},
 			}
 
-			PatchSwagger(doc)
+			patchSwagger(doc)
 
 			gotParams := doc.Paths[tt.path].Get.Parameters
 			assert.Len(t, gotParams, tt.wantParamCount)
@@ -270,7 +270,7 @@ func TestPatchSwagger_AllPatchesTogether(t *testing.T) {
 		},
 	}
 
-	PatchSwagger(doc)
+	patchSwagger(doc)
 
 	// Check parameters
 	gotParams := doc.Paths["/users/{userId}"].Get.Parameters
@@ -291,13 +291,13 @@ func TestPatchSwagger_AllPatchesTogether(t *testing.T) {
 
 func TestPatchSwagger_NilDoc(t *testing.T) {
 	// Should not panic
-	PatchSwagger(nil)
+	patchSwagger(nil)
 }
 
 func TestPatchSwagger_EmptyDoc(t *testing.T) {
 	// Should not panic
 	doc := &openapi2.T{}
-	PatchSwagger(doc)
+	patchSwagger(doc)
 }
 
 func TestExtractPathParams(t *testing.T) {
@@ -406,7 +406,7 @@ func TestPatchSwagger_NestedArrayItems(t *testing.T) {
 		},
 	}
 
-	PatchSwagger(doc)
+	patchSwagger(doc)
 
 	// Check that nested array items are patched
 	nestedItems := doc.Definitions["NestedArray"].Value.Properties["level1"].Value.Items.Value.Items
@@ -434,7 +434,7 @@ func TestPatchSwagger_AllOperations(t *testing.T) {
 		},
 	}
 
-	PatchSwagger(doc)
+	patchSwagger(doc)
 
 	// All operations should have empty parameters
 	assert.Empty(t, doc.Paths["/test"].Get.Parameters)

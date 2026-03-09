@@ -286,6 +286,50 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	return nil
 }
 
+// newGenerateCmd creates a new generate command instance for testing.
+func newGenerateCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "generate [path]",
+		Short: "Generate OpenAPI spec from source code",
+		Long: `Generate OpenAPI specification by running the complete pipeline:
+detect -> patch -> generate -> validate -> restore (optional)
+
+This is the main command that orchestrates the entire workflow.
+
+By default, the original pom.xml/build.gradle is restored after extraction
+to preserve your project's formatting. Use --keep-patched to keep the changes.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: runGenerate,
+	}
+
+	c.Flags().BoolVar(&generateKeepPatched, "keep-patched", false,
+		"keep the patched pom.xml/build.gradle (default: restore original after extraction)")
+	c.Flags().BoolVar(&generateSkipValidate, "skip-validate", false,
+		"skip validation of the generated OpenAPI spec")
+	c.Flags().DurationVar(&generateTimeout, "timeout", 5*time.Minute,
+		"timeout for Maven/Gradle commands")
+	c.Flags().BoolVar(&generateSkipEnrich, "skip-enrich", false,
+		"skip AI enrichment of the generated OpenAPI spec")
+	c.Flags().StringVar(&generateLanguage, "language", "en",
+		"language for AI-generated descriptions (e.g., en, zh)")
+	c.Flags().StringVarP(&generateOutputFormat, "output", "o", "",
+		"output format (yaml or json, default: yaml)")
+	c.Flags().StringVarP(&generateOutputDir, "output-dir", "d", "",
+		"output directory for generated spec (default: project root)")
+	c.Flags().BoolVar(&generateSkipPublish, "skip-publish", false,
+		"skip publishing to remote platforms")
+	c.Flags().StringVar(&generatePublishTarget, "publish-target", "",
+		"publish target (readme). If empty, spec is only saved locally")
+	c.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
+		"overwrite existing spec on remote platform")
+	c.Flags().BoolVar(&generateOverwriteOutput, "overwrite-output", false,
+		"overwrite existing local spec file if it already exists")
+	c.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
+		"additional import paths for protoc (-I flags), can be specified multiple times")
+
+	return c
+}
+
 func init() {
 	rootCmd.AddCommand(generateCmd)
 

@@ -36,6 +36,35 @@ func Execute() {
 	}
 }
 
+// NewRootCommand creates a fresh root command instance for testing.
+// This avoids global state pollution between tests.
+func NewRootCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "spec-forge",
+		Short: "Generate OpenAPI specifications from source code",
+		Long: `Spec Forge is a CLI tool that automatically generates OpenAPI specifications
+from your source code. It supports multiple frameworks and uses AI to enhance
+API descriptions.
+
+Core workflow: Source Code -> Extract -> Enrich -> Publish`,
+		Version: "0.1.0",
+	}
+
+	// Persistent flags
+	c.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is .spec-forge.yaml)")
+	c.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
+
+	// Initialize viper binding
+	cobra.OnInitialize(initConfig)
+
+	// Add all subcommands using factory functions
+	c.AddCommand(newGenerateCmd())
+	c.AddCommand(newEnrichCmd())
+	c.AddCommand(newPublishCmd())
+
+	return c
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 

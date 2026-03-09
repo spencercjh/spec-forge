@@ -107,6 +107,40 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// newPublishCmd creates a new publish command instance for testing.
+func newPublishCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "publish [spec-file]",
+		Short: "Publish OpenAPI spec to target platform",
+		Long: `Publish OpenAPI specification to external platforms.
+
+Supports:
+- ReadMe (via rdme CLI)
+
+Note: Local file output is handled by the generate command.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: runPublish,
+	}
+
+	c.Flags().StringVarP(&publishFormat, "format", "f", "yaml", "output format (yaml or json)")
+	c.Flags().StringVarP(&publishOutput, "output", "o", "", "output file path (currently unused for 'readme'; reserved for future publishers)")
+	c.Flags().StringVarP(&publishTarget, "to", "t", "", "publish target (required: readme)")
+	c.Flags().BoolVar(&publishOverwrite, "overwrite", false, "overwrite existing spec")
+
+	// ReadMe-specific flags
+	c.Flags().StringVar(&readMeAPIKey, "readme-api-key", "", "ReadMe API key (or set README_API_KEY env var)")
+	c.Flags().StringVar(&readMeBranch, "readme-branch", "", "ReadMe version/branch (default: stable)")
+	c.Flags().StringVar(&readMeSlug, "readme-slug", "", "ReadMe API slug/identifier")
+	c.Flags().BoolVar(&readMeUseSpecVersion, "readme-use-spec-version", false, "use OpenAPI info.version as ReadMe version")
+
+	// Mark target as required
+	if err := c.MarkFlagRequired("to"); err != nil {
+		panic(fmt.Sprintf("failed to mark flag 'to' as required: %v", err))
+	}
+
+	return c
+}
+
 func init() {
 	rootCmd.AddCommand(publishCmd)
 

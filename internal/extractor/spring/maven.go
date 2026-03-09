@@ -13,8 +13,8 @@ import (
 // MavenParser parses and analyzes Maven pom.xml files.
 type MavenParser struct{}
 
-// NewMavenParser creates a new MavenParser instance.
-func NewMavenParser() *MavenParser {
+// newMavenParser creates a new MavenParser instance.
+func newMavenParser() *MavenParser {
 	return &MavenParser{}
 }
 

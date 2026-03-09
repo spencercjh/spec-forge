@@ -253,9 +253,9 @@ func (p *APIFilePatcher) HasPatchedFiles() bool {
 	return len(p.patchedFiles) > 0
 }
 
-// ValidateAPIFile checks for issues that cannot be automatically patched.
+// validateAPIFile checks for issues that cannot be automatically patched.
 // Returns an error with helpful message if manual intervention is needed.
-func ValidateAPIFile(apiFile string) error {
+func validateAPIFile(apiFile string) error {
 	content, err := os.ReadFile(apiFile)
 	if err != nil {
 		return err
