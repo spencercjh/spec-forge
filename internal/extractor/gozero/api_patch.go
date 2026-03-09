@@ -72,6 +72,10 @@ var versionRegex = regexp.MustCompile(`v?(\d+\.\d+\.\d+)`)
 
 // getGoctlVersion returns the goctl version string (e.g., "1.9.2").
 func (p *APIFilePatcher) getGoctlVersion() (string, error) {
+	if p.exec == nil {
+		return "", fmt.Errorf("executor is nil")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), versionCheckTimeout)
 	defer cancel()
 
