@@ -18,9 +18,9 @@ import (
 	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
-// minGoctlVersionForPatch is the minimum goctl version that fixes issue #5425.
-// goctl 1.9.2+ has fixed the multi-hyphen prefix parsing issue.
-const minGoctlVersionForPatch = "1.9.2"
+// minGoctlVersionWithoutPatch is the minimum goctl version where patching is not needed.
+// goctl 1.9.2+ has fixed the multi-hyphen prefix parsing issue (#5425).
+const minGoctlVersionWithoutPatch = "1.9.2"
 
 // versionCheckTimeout is the timeout for goctl version check.
 const versionCheckTimeout = 5 * time.Second
@@ -61,7 +61,7 @@ func NewAPIFilePatcherWithExecutor(exec executor.Interface) *APIFilePatcher {
 	cancel()
 	if err == nil {
 		// Use semantic version comparison (add "v" prefix for semver.Compare)
-		patcher.skipPatch = semver.Compare("v"+version, "v"+minGoctlVersionForPatch) >= 0
+		patcher.skipPatch = semver.Compare("v"+version, "v"+minGoctlVersionWithoutPatch) >= 0
 		if patcher.skipPatch {
 			slog.Debug("goctl version >= 1.9.2, skipping API file patching (issue #5425 fixed upstream)")
 		}
