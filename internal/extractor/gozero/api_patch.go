@@ -55,7 +55,11 @@ func NewAPIFilePatcherWithExecutor(exec executor.Interface) *APIFilePatcher {
 	}
 
 	// Check goctl version to determine if patching is needed
-	if version, err := patcher.getGoctlVersion(context.Background()); err == nil {
+	// Use a short timeout to avoid blocking if goctl is not responding
+	ctx, cancel := context.WithTimeout(context.Background(), versionCheckTimeout)
+	version, err := patcher.getGoctlVersion(ctx)
+	cancel()
+	if err == nil {
 		// Use semantic version comparison (add "v" prefix for semver.Compare)
 		patcher.skipPatch = semver.Compare("v"+version, "v"+minGoctlVersionForPatch) >= 0
 		if patcher.skipPatch {
