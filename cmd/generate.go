@@ -383,7 +383,7 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 
 	// Save enriched spec to file
 	var data []byte
-	if filepath.Ext(specFilePath) == ".json" {
+	if strings.ToLower(filepath.Ext(specFilePath)) == ".json" {
 		data, err = result.MarshalJSON()
 	} else {
 		var yamlData any
@@ -497,8 +497,8 @@ func copySpecToOutput(srcPath, outputDir string, overwrite bool) error {
 		return fmt.Errorf("failed to check destination file: %w", statErr)
 	}
 
-	// Create destination file (truncates if exists)
-	dstFile, createErr := os.Create(dstPath)
+	// Create destination file (truncates if exists) with restrictive permissions
+	dstFile, createErr := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if createErr != nil {
 		return fmt.Errorf("failed to create destination file: %w", createErr)
 	}
