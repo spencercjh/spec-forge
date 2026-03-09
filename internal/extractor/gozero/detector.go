@@ -2,6 +2,7 @@
 package gozero
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -91,13 +92,13 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 
 	goZeroInfo.APIFiles = apiFiles
 
-	// Check if goctl is available
+	// Check if goctl is available (required for generation)
 	goZeroInfo.HasGoctl = d.checkGoctl()
-	if goZeroInfo.HasGoctl {
-		slog.Info("goctl is available")
-	} else {
-		slog.Warn("goctl not found in PATH", "hint", "install with: go install github.com/zeromicro/go-zero/tools/goctl@latest")
+	if !goZeroInfo.HasGoctl {
+		slog.Error("goctl not found in PATH", "hint", "install with: go install github.com/zeromicro/go-zero/tools/goctl@latest")
+		return nil, errors.New("goctl is required but not found in PATH. Please install: go install github.com/zeromicro/go-zero/tools/goctl@latest")
 	}
+	slog.Info("goctl is available")
 
 	info := &extractor.ProjectInfo{
 		Framework:     FrameworkGoZero,
