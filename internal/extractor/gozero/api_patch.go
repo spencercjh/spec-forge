@@ -99,7 +99,7 @@ func (p *APIFilePatcher) getGoctlVersion(ctx context.Context) (string, error) {
 	// - "v1.9.2"
 	matches := versionRegex.FindStringSubmatch(result.Stdout)
 	if len(matches) < 2 {
-		return "", fmt.Errorf("unexpected goctl version output: %s", result.Stdout)
+		return "", fmt.Errorf("unexpected goctl version output: %q", strings.TrimSpace(result.Stdout))
 	}
 
 	// matches[0] is the full match (may include v-prefix)
