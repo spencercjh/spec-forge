@@ -88,6 +88,7 @@ func (p *APIFilePatcher) getGoctlVersion(ctx context.Context) (string, error) {
 	opts := &executor.ExecuteOptions{
 		Command: "goctl",
 		Args:    []string{"--version"},
+		Timeout: versionCheckTimeout,
 	}
 
 	result, err := p.exec.Execute(ctx, opts)
