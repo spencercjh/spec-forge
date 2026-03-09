@@ -4,6 +4,7 @@ package gozero
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -73,7 +74,7 @@ var versionRegex = regexp.MustCompile(`v?(\d+\.\d+\.\d+)`)
 // getGoctlVersion returns the goctl version string (e.g., "1.9.2").
 func (p *APIFilePatcher) getGoctlVersion(ctx context.Context) (string, error) {
 	if p.exec == nil {
-		return "", fmt.Errorf("executor is nil")
+		return "", errors.New("executor is nil")
 	}
 
 	// Apply timeout to the provided context
