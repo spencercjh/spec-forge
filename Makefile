@@ -88,7 +88,16 @@ dev: build
 	./$(BUILD_DIR)/$(BINARY_NAME) --help
 
 # Verify all checks pass (deps, fmt, lint, test)
-verify: deps fmt lint test
+# Mirrors CI workflow: checks for uncommitted changes after deps/fmt
+verify: deps
+	@echo "Checking go.mod/go.sum are tidy..."
+	@git diff --exit-code -- go.mod go.sum
+	$(GOLINT) fmt ./...
+	$(GOCMD) fix ./...
+	@echo "Checking formatting produced no changes..."
+	@git diff --exit-code
+	$(GOLINT) run ./...
+	$(GOTEST) -v -coverprofile=coverage.out ./...
 	@echo "All checks passed!"
 
 help:
@@ -106,5 +115,5 @@ help:
 	@echo "  install       - Install binary to GOPATH/bin"
 	@echo "  build-linux   - Build for Linux"
 	@echo "  dev           - Build and show help"
-	@echo "  verify        - Run all checks (deps, fmt, lint, test)"
+	@echo "  verify        - Run all checks (deps tidy, fmt, lint, test) with change detection"
 	@echo "  help          - Show this help message"
