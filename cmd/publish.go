@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
@@ -31,13 +29,12 @@ var (
 var publishCmd = &cobra.Command{
 	Use:   "publish [spec-file]",
 	Short: "Publish OpenAPI spec to target platform",
-	Long: `Publish OpenAPI specification to local files or external platforms.
+	Long: `Publish OpenAPI specification to external platforms.
 
 Supports:
-- Local file system (YAML/JSON)
-- Postman
-- Apifox
-- Swagger UI`,
+- ReadMe (via rdme CLI)
+
+Note: Local file output is handled by the generate command.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runPublish,
 }
@@ -71,14 +68,8 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build publish options
-	// Avoid input/output path conflict for local publisher
-	outputPath := publishOutput
-	if pub.Name() == "local" && !cmd.Flags().Changed("output") {
-		outputPath = resolveOutputPath(specFile, publishOutput)
-	}
-
 	opts := &publisher.PublishOptions{
-		OutputPath: outputPath,
+		OutputPath: publishOutput,
 		Format:     publishFormat,
 		Overwrite:  publishOverwrite,
 	}
@@ -116,38 +107,22 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// resolveOutputPath avoids input/output path conflicts for local publisher.
-// If the default output path would overwrite the input file, it generates a unique path.
-func resolveOutputPath(inputPath, defaultOutput string) string {
-	// Clean paths for comparison
-	inputPath = filepath.Clean(inputPath)
-	defaultOutput = filepath.Clean(defaultOutput)
-
-	// If default output is different from input, use it
-	if defaultOutput != inputPath {
-		return defaultOutput
-	}
-
-	// Generate a unique path to avoid overwriting input
-	// Example: openapi.yaml -> openapi.published.yaml
-	dir := filepath.Dir(defaultOutput)
-	ext := filepath.Ext(defaultOutput)
-	base := strings.TrimSuffix(filepath.Base(defaultOutput), ext)
-
-	return filepath.Join(dir, base+".published"+ext)
-}
-
 func init() {
 	rootCmd.AddCommand(publishCmd)
 
 	publishCmd.Flags().StringVarP(&publishFormat, "format", "f", "yaml", "output format (yaml or json)")
-	publishCmd.Flags().StringVarP(&publishOutput, "output", "o", "./openapi.yaml", "output file path (for local publisher)")
-	publishCmd.Flags().StringVarP(&publishTarget, "to", "t", "local", "publish target (local, readme)")
-	publishCmd.Flags().BoolVar(&publishOverwrite, "overwrite", false, "overwrite existing file")
+	publishCmd.Flags().StringVarP(&publishOutput, "output", "o", "", "output file path (currently unused for 'readme'; reserved for future publishers)")
+	publishCmd.Flags().StringVarP(&publishTarget, "to", "t", "", "publish target (required: readme)")
+	publishCmd.Flags().BoolVar(&publishOverwrite, "overwrite", false, "overwrite existing spec")
 
 	// ReadMe-specific flags
 	publishCmd.Flags().StringVar(&readMeAPIKey, "readme-api-key", "", "ReadMe API key (or set README_API_KEY env var)")
 	publishCmd.Flags().StringVar(&readMeBranch, "readme-branch", "", "ReadMe version/branch (default: stable)")
 	publishCmd.Flags().StringVar(&readMeSlug, "readme-slug", "", "ReadMe API slug/identifier")
 	publishCmd.Flags().BoolVar(&readMeUseSpecVersion, "readme-use-spec-version", false, "use OpenAPI info.version as ReadMe version")
+
+	// Mark target as required
+	if err := publishCmd.MarkFlagRequired("to"); err != nil {
+		panic(fmt.Sprintf("failed to mark flag 'to' as required: %v", err))
+	}
 }

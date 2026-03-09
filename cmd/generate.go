@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/spencercjh/spec-forge/internal/config"
 	"github.com/spencercjh/spec-forge/internal/enricher"
@@ -22,6 +24,11 @@ import (
 	"github.com/spencercjh/spec-forge/internal/extractor/builtin" // registers built-in extractors
 	"github.com/spencercjh/spec-forge/internal/publisher"
 	"github.com/spencercjh/spec-forge/internal/validator"
+)
+
+const (
+	outputFormatYAML = "yaml"
+	outputFormatJSON = "json"
 )
 
 var (
@@ -36,14 +43,18 @@ var (
 	generateSkipEnrich bool
 	// generateLanguage is the language for AI-generated descriptions
 	generateLanguage string
-	// generateOutput is the output directory for generated spec
-	generateOutput string
+	// generateOutputDir is the output directory for generated spec
+	generateOutputDir string
+	// generateOutputFormat is the output format (yaml or json)
+	generateOutputFormat string
 	// generateSkipPublish controls whether to skip publishing
 	generateSkipPublish bool
-	// generatePublishTarget is the publish target (local, readme)
+	// generatePublishTarget is the publish target (readme)
 	generatePublishTarget string
 	// generatePublishOverwrite controls whether to overwrite existing remote spec
 	generatePublishOverwrite bool
+	// generateOverwriteOutput controls whether to overwrite existing local spec file
+	generateOverwriteOutput bool
 	// generateProtoImportPaths are additional import paths for protoc (-I flags)
 	generateProtoImportPaths []string
 )
@@ -119,14 +130,32 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 4: Generate OpenAPI spec
 
 	// Determine output directory
-	outputDir := generateOutput
+	// Precedence: flag > config > default (project root)
+	outputDir := generateOutputDir
 	if outputDir == "" {
 		outputDir = config.Get().Output.Dir
+	}
+	if outputDir == "" {
+		outputDir = path // Default to project root
+	}
+
+	// Determine output format
+	outputFormat := generateOutputFormat
+	if outputFormat == "" {
+		outputFormat = config.Get().Output.Format
+	}
+	if outputFormat == "" {
+		outputFormat = outputFormatYAML
+	}
+	// Normalize format value for consistent handling across extractors
+	outputFormat, err = normalizeOutputFormat(outputFormat)
+	if err != nil {
+		return errWrap("invalid output format", err)
 	}
 
 	genOpts := &extractor.GenerateOptions{
 		OutputDir:        outputDir,
-		Format:           config.Get().Output.Format,
+		Format:           outputFormat,
 		Timeout:          generateTimeout,
 		SkipTests:        true,
 		ProtoImportPaths: generateProtoImportPaths,
@@ -145,9 +174,9 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 5: Validate the generated spec
 	if !generateSkipValidate {
 		v := validator.NewValidator()
-		valResult, err := v.Validate(ctx, genResult.SpecFilePath)
-		if err != nil {
-			return errWrap("validation error", err)
+		valResult, valErr := v.Validate(ctx, genResult.SpecFilePath)
+		if valErr != nil {
+			return errWrap("validation error", valErr)
 		}
 
 		if !valResult.Valid {
@@ -166,33 +195,53 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 6: Enrich with AI (optional)
 	cfg := config.Get()
 	if !generateSkipEnrich && cfg.Enrich.Enabled && cfg.Enrich.Provider != "" && cfg.Enrich.Model != "" {
-		if err := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg); err != nil {
+		if enrichErr := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg); enrichErr != nil {
 			// Log warning but don't fail - enrichment is optional
-			slog.WarnContext(ctx, "Enrichment failed (non-fatal)", "error", err)
+			slog.WarnContext(ctx, "Enrichment failed (non-fatal)", "error", enrichErr)
 		}
 	} else {
 		slog.InfoContext(ctx, "Enrichment skipped", "status", "⏭️")
 	}
 
-	// Step 7: Publish the spec (default: local publisher)
-	if !generateSkipPublish {
-		// Determine publish target
-		target := generatePublishTarget
-		if target == "" {
-			target = "local" // Default to local
-		}
+	// Step 7: Ensure spec is in the output directory
+	// Some extractors (Spring) generate to target/build and need copying
+	// Others (Gin, go-zero, gRPC) may already have written to outputDir
+	genDir := filepath.Dir(genResult.SpecFilePath)
+	targetPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
 
+	// Clean paths for comparison
+	absGenDir, err := filepath.Abs(genDir)
+	if err != nil {
+		absGenDir = genDir // Fallback to relative path
+	}
+	absOutputDir, err := filepath.Abs(outputDir)
+	if err != nil {
+		absOutputDir = outputDir // Fallback to relative path
+	}
+
+	if absGenDir != absOutputDir {
+		if err := copySpecToOutput(genResult.SpecFilePath, outputDir, generateOverwriteOutput); err != nil {
+			return errWrap("failed to copy spec to output directory", err)
+		}
+		slog.InfoContext(ctx, "Spec saved", "path", targetPath)
+		// Update genResult.SpecFilePath to point to the copied file for publishing
+		genResult.SpecFilePath = targetPath
+	} else {
+		slog.InfoContext(ctx, "Spec saved", "path", genResult.SpecFilePath)
+	}
+
+	// Step 8: Publish the spec to remote platforms (optional)
+	if !generateSkipPublish && generatePublishTarget != "" {
 		// Create publisher using factory
-		pub, err := publisher.NewPublisher(target)
+		pub, err := publisher.NewPublisher(generatePublishTarget)
 		if err != nil {
 			return errWrap("failed to create publisher", err)
 		}
 
 		// Build publish options
-		// Default to overwrite for all publishers (convenient for CI), user can disable with --publish-overwrite=false
 		pubOpts := &publisher.PublishOptions{
-			OutputPath: filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath)),
-			Format:     config.Get().Output.Format,
+			OutputPath: genResult.SpecFilePath,
+			Format:     outputFormat,
 			Overwrite:  generatePublishOverwrite,
 		}
 
@@ -229,18 +278,6 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		if pubResult.Message != "" {
 			slog.InfoContext(ctx, "Publisher output", "message", pubResult.Message)
 		}
-	} else if outputDir != "" {
-		// Skip publish: just copy to output directory if needed
-		genDir := filepath.Dir(genResult.SpecFilePath)
-		if genDir != outputDir {
-			if err := copySpecToOutput(genResult.SpecFilePath, outputDir); err != nil {
-				return errWrap("failed to copy spec to output directory", err)
-			}
-			finalSpecPath := filepath.Join(outputDir, filepath.Base(genResult.SpecFilePath))
-			slog.InfoContext(ctx, "Spec copied to output directory (publish skipped)", "path", finalSpecPath)
-		} else {
-			slog.InfoContext(ctx, "Spec already in output directory", "path", genResult.SpecFilePath)
-		}
 	}
 
 	// Step 8: Output final result
@@ -262,14 +299,18 @@ func init() {
 		"skip AI enrichment of the generated OpenAPI spec")
 	generateCmd.Flags().StringVar(&generateLanguage, "language", "en",
 		"language for AI-generated descriptions (e.g., en, zh)")
-	generateCmd.Flags().StringVarP(&generateOutput, "output", "o", "",
-		"output directory for generated spec (default: project's target/build dir)")
+	generateCmd.Flags().StringVarP(&generateOutputFormat, "output", "o", "",
+		"output format (yaml or json, default: yaml)")
+	generateCmd.Flags().StringVarP(&generateOutputDir, "output-dir", "d", "",
+		"output directory for generated spec (default: project root)")
 	generateCmd.Flags().BoolVar(&generateSkipPublish, "skip-publish", false,
-		"skip publishing the generated spec (just copy to output directory)")
-	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "local",
-		"publish target (local, readme)")
+		"skip publishing to remote platforms")
+	generateCmd.Flags().StringVar(&generatePublishTarget, "publish-target", "",
+		"publish target (readme). If empty, spec is only saved locally")
 	generateCmd.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
-		"overwrite existing spec (applies to both local and remote publishers)")
+		"overwrite existing spec on remote platform")
+	generateCmd.Flags().BoolVar(&generateOverwriteOutput, "overwrite-output", false,
+		"overwrite existing local spec file if it already exists")
 	generateCmd.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
 }
@@ -340,17 +381,26 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 		}
 	}
 
-	// Publish result using Publisher
-	pub := publisher.NewLocalPublisher()
-	pubResult, err := pub.Publish(ctx, result, &publisher.PublishOptions{
-		OutputPath: specFilePath,
-		Overwrite:  true,
-	})
+	// Save enriched spec to file
+	var data []byte
+	if strings.ToLower(filepath.Ext(specFilePath)) == ".json" {
+		data, err = result.MarshalJSON()
+	} else {
+		var yamlData any
+		yamlData, err = result.MarshalYAML()
+		if err == nil {
+			data, err = yaml.Marshal(yamlData)
+		}
+	}
 	if err != nil {
-		return fmt.Errorf("failed to save enriched spec: %w", err)
+		return fmt.Errorf("failed to marshal enriched spec: %w", err)
 	}
 
-	slog.InfoContext(ctx, "OpenAPI spec enriched", "output", pubResult.Path)
+	if writeErr := os.WriteFile(specFilePath, data, 0o600); writeErr != nil {
+		return fmt.Errorf("failed to write enriched spec: %w", writeErr)
+	}
+
+	slog.InfoContext(ctx, "OpenAPI spec enriched", "output", specFilePath)
 	return nil
 }
 
@@ -403,8 +453,24 @@ func errWrap(msg string, err error) error {
 	return errors.New(msg + ": " + err.Error())
 }
 
-// copySpecToOutput copies the generated spec to the specified output directory
-func copySpecToOutput(srcPath, outputDir string) error {
+// normalizeOutputFormat normalizes and validates the output format value.
+// Accepts: "yaml", "yml", "YAML", "json", "JSON" -> returns "yaml" or "json".
+// Returns an error for unsupported formats to avoid silent fallback behavior.
+func normalizeOutputFormat(format string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(format))
+	switch normalized {
+	case "yaml", "yml":
+		return outputFormatYAML, nil
+	case "json":
+		return outputFormatJSON, nil
+	default:
+		return "", fmt.Errorf("unsupported output format %q; allowed values are %q and %q", format, outputFormatYAML, outputFormatJSON)
+	}
+}
+
+// copySpecToOutput copies the generated spec to the specified output directory.
+// If overwrite is false and the destination file already exists, an error is returned.
+func copySpecToOutput(srcPath, outputDir string, overwrite bool) error {
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -421,16 +487,26 @@ func copySpecToOutput(srcPath, outputDir string) error {
 	filename := filepath.Base(srcPath)
 	dstPath := filepath.Join(outputDir, filename)
 
-	// Create destination file
-	dstFile, err := os.Create(dstPath)
-	if err != nil {
-		return fmt.Errorf("failed to create destination file: %w", err)
+	// Check if destination file already exists
+	if _, statErr := os.Stat(dstPath); statErr == nil {
+		if !overwrite {
+			return fmt.Errorf("destination file already exists: %s (use --overwrite-output to overwrite)", dstPath)
+		}
+		// Overwrite is allowed, continue
+	} else if !os.IsNotExist(statErr) {
+		return fmt.Errorf("failed to check destination file: %w", statErr)
+	}
+
+	// Create destination file (truncates if exists) with restrictive permissions
+	dstFile, createErr := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if createErr != nil {
+		return fmt.Errorf("failed to create destination file: %w", createErr)
 	}
 	defer dstFile.Close()
 
 	// Copy content
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+	if _, copyErr := io.Copy(dstFile, srcFile); copyErr != nil {
+		return fmt.Errorf("failed to copy file: %w", copyErr)
 	}
 
 	return nil

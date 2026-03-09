@@ -333,6 +333,60 @@ func TestGinDemo_JSONFormat(t *testing.T) {
 	t.Log("JSON format test passed!")
 }
 
+// TestGinDemo_DefaultOutput tests the generator's behavior when OutputDir
+// is set to the project path using the Extractor interface directly.
+// Note: This test bypasses the CLI layer and tests the extractor directly.
+// The CLI layer (cmd/generate.go) handles config precedence (flag > config > default)
+// and passes the resolved outputDir to the generator. For true end-to-end CLI
+// testing, consider invoking the spec-forge binary directly.
+func TestGinDemo_DefaultOutput(t *testing.T) {
+	projectPath := "./gin-demo"
+
+	// Check if project exists
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		t.Skip("Gin demo project not found")
+	}
+
+	ctx := context.Background()
+
+	// Detect project
+	detector := gin.NewDetector()
+	info, err := detector.Detect(projectPath)
+	if err != nil {
+		t.Fatalf("failed to detect project: %v", err)
+	}
+
+	// Generate with OutputDir set to project path
+	// The CLI layer (cmd/generate.go) resolves outputDir via: flag > config > projectPath
+	gen := gin.NewGenerator()
+	result, err := gen.Generate(ctx, projectPath, info, &extractor.GenerateOptions{
+		OutputDir: projectPath,
+		Format:    "yaml",
+	})
+	if err != nil {
+		t.Fatalf("failed to generate spec: %v", err)
+	}
+
+	// Verify output is in project root
+	expectedPath := filepath.Join(projectPath, "openapi.yaml")
+	absResultPath, _ := filepath.Abs(result.SpecFilePath)
+	absExpectedPath, _ := filepath.Abs(expectedPath)
+
+	if absResultPath != absExpectedPath {
+		t.Errorf("expected spec at %s, got %s", absExpectedPath, absResultPath)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(result.SpecFilePath); err != nil {
+		t.Fatalf("spec file not found: %s", result.SpecFilePath)
+	}
+
+	// Cleanup
+	_ = os.Remove(result.SpecFilePath)
+
+	t.Logf("Spec correctly output to project root: %s", result.SpecFilePath)
+}
+
 func TestGinDemo_AutoDetection(t *testing.T) {
 	projectPath := "./gin-demo"
 

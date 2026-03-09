@@ -59,7 +59,7 @@ func Default() *Config {
 			Enabled: true,
 		},
 		Output: OutputConfig{
-			Dir:    "./openapi",
+			Dir:    "", // Empty means CLI defaults to project root unless overridden by config output.dir or --output-dir flag
 			Format: "yaml",
 		},
 		Extract: ExtractConfig{

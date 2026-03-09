@@ -6,16 +6,18 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/spencercjh/spec-forge/internal/config"
 	"github.com/spencercjh/spec-forge/internal/enricher"
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
-	"github.com/spencercjh/spec-forge/internal/publisher"
 )
 
 var (
@@ -55,6 +57,7 @@ Examples:
 	RunE: runEnrich,
 }
 
+//nolint:gocyclo // CLI command runner with many branches
 func runEnrich(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	specFile := args[0]
@@ -157,17 +160,33 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		outputFile = specFile // Overwrite input by default
 	}
 
-	// Publish result using Publisher
-	pub := publisher.NewLocalPublisher()
-	pubResult, err := pub.Publish(ctx, result, &publisher.PublishOptions{
-		OutputPath: outputFile,
-		Overwrite:  true,
-	})
+	// Save enriched spec to file
+	var data []byte
+	if strings.ToLower(filepath.Ext(outputFile)) == ".json" {
+		data, err = result.MarshalJSON()
+	} else {
+		var yamlData any
+		yamlData, err = result.MarshalYAML()
+		if err == nil {
+			data, err = yaml.Marshal(yamlData)
+		}
+	}
 	if err != nil {
-		return fmt.Errorf("failed to save spec: %w", err)
+		return fmt.Errorf("failed to marshal enriched spec: %w", err)
 	}
 
-	slog.InfoContext(ctx, "Enrichment complete", "output", pubResult.Path)
+	// Ensure output directory exists
+	if dir := filepath.Dir(outputFile); dir != "" && dir != "." {
+		if mkdirErr := os.MkdirAll(dir, 0o755); mkdirErr != nil {
+			return fmt.Errorf("failed to create output directory %q: %w", dir, mkdirErr)
+		}
+	}
+
+	if writeErr := os.WriteFile(outputFile, data, 0o600); writeErr != nil {
+		return fmt.Errorf("failed to write enriched spec: %w", writeErr)
+	}
+
+	slog.InfoContext(ctx, "Enrichment complete", "output", outputFile)
 	return nil
 }
 

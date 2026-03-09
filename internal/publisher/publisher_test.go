@@ -14,36 +14,6 @@ func TestNewPublisher(t *testing.T) {
 		wantErrType error
 	}{
 		{
-			name:     "local publisher lowercase",
-			destType: "local",
-			wantName: "local",
-			wantErr:  false,
-		},
-		{
-			name:     "local publisher uppercase",
-			destType: "LOCAL",
-			wantName: "local",
-			wantErr:  false,
-		},
-		{
-			name:     "local publisher mixed case",
-			destType: "Local",
-			wantName: "local",
-			wantErr:  false,
-		},
-		{
-			name:     "local publisher with whitespace",
-			destType: "  local  ",
-			wantName: "local",
-			wantErr:  false,
-		},
-		{
-			name:     "empty string defaults to local",
-			destType: "",
-			wantName: "local",
-			wantErr:  false,
-		},
-		{
 			name:     "readme publisher lowercase",
 			destType: "readme",
 			wantName: "readme",
@@ -60,6 +30,17 @@ func TestNewPublisher(t *testing.T) {
 			destType: "ReadMe",
 			wantName: "readme",
 			wantErr:  false,
+		},
+		{
+			name:     "empty string returns error",
+			destType: "",
+			wantErr:  true,
+		},
+		{
+			name:        "local publisher removed",
+			destType:    "local",
+			wantErr:     true,
+			wantErrType: ErrUnknownPublisher,
 		},
 		{
 			name:        "unknown publisher type",
@@ -114,5 +95,11 @@ func TestErrUnknownPublisher(t *testing.T) {
 	_, err = NewPublisher("invalid")
 	if !errors.Is(err, ErrUnknownPublisher) {
 		t.Errorf("NewPublisher(\"invalid\") error should wrap ErrUnknownPublisher, got: %v", err)
+	}
+
+	// Test that "local" returns ErrUnknownPublisher (since it's removed)
+	_, err = NewPublisher("local")
+	if !errors.Is(err, ErrUnknownPublisher) {
+		t.Errorf("NewPublisher(\"local\") error should wrap ErrUnknownPublisher, got: %v", err)
 	}
 }
