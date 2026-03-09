@@ -47,6 +47,7 @@ func (p *Patcher) Patch(_ string) (*PatchResult, error) {
 	opts := &executor.ExecuteOptions{
 		Command: "goctl",
 		Args:    []string{"--version"},
+		Timeout: versionCheckTimeout,
 	}
 
 	result, err := p.exec.Execute(ctx, opts)

@@ -2,11 +2,24 @@
 package gozero
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spencercjh/spec-forge/internal/executor"
 )
+
+// mockExecutor is a test double for executor.Interface.
+type mockExecutor struct {
+	result *executor.ExecuteResult
+	err    error
+}
+
+func (m *mockExecutor) Execute(ctx context.Context, opts *executor.ExecuteOptions) (*executor.ExecuteResult, error) {
+	return m.result, m.err
+}
 
 func TestAPIFilePatcher_checkNeedsPatch(t *testing.T) {
 	tests := []struct {
@@ -118,7 +131,17 @@ func TestAPIFilePatcher_PatchAPIFiles(t *testing.T) {
 	file2 := filepath.Join(dir, "api2.api")
 	os.WriteFile(file2, []byte(`prefix: "/api/alert-center"`), 0o644)
 
-	patcher := NewAPIFilePatcher()
+	// Use mock executor with old goctl version (< 1.9.2) to enable patching
+	mockExec := &mockExecutor{
+		result: &executor.ExecuteResult{
+			ExitCode: 0,
+			Stdout:   "goctl version 1.9.1 darwin/arm64",
+			Stderr:   "",
+		},
+		err: nil,
+	}
+
+	patcher := NewAPIFilePatcherWithExecutor(mockExec)
 	result, err := patcher.PatchAPIFiles([]string{file1, file2})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -146,7 +169,17 @@ func TestAPIFilePatcher_Cleanup(t *testing.T) {
 	apiFile := filepath.Join(dir, "test.api")
 	os.WriteFile(apiFile, []byte("prefix: /api/alert-center"), 0o644)
 
-	patcher := NewAPIFilePatcher()
+	// Use mock executor with old goctl version (< 1.9.2) to enable patching
+	mockExec := &mockExecutor{
+		result: &executor.ExecuteResult{
+			ExitCode: 0,
+			Stdout:   "goctl version 1.9.1 darwin/arm64",
+			Stderr:   "",
+		},
+		err: nil,
+	}
+
+	patcher := NewAPIFilePatcherWithExecutor(mockExec)
 	patcher.PatchAPIFiles([]string{apiFile})
 
 	// Get patched path before cleanup
@@ -248,5 +281,95 @@ func TestAPIFilePatcher_HasPatchedFiles(t *testing.T) {
 	patcher.patchedFiles["/test.api"] = "/test.api.patched"
 	if !patcher.HasPatchedFiles() {
 		t.Error("should be true after patching")
+	}
+}
+
+func TestGoctlVersionCompare(t *testing.T) {
+	tests := []struct {
+		name       string
+		output     string
+		shouldSkip bool
+	}{
+		{
+			name:       "exactly 1.9.2",
+			output:     "goctl version 1.9.2 darwin/arm64",
+			shouldSkip: true,
+		},
+		{
+			name:       "greater than 1.9.2",
+			output:     "goctl version 1.9.3 linux/amd64",
+			shouldSkip: true,
+		},
+		{
+			name:       "much greater (1.10.0)",
+			output:     "goctl version 1.10.0 windows/amd64",
+			shouldSkip: true,
+		},
+		{
+			name:       "version 1.9.10 (multi-digit component)",
+			output:     "goctl version 1.9.10 darwin/arm64",
+			shouldSkip: true,
+		},
+		{
+			name:       "version 2.0.0",
+			output:     "goctl version 2.0.0 linux/amd64",
+			shouldSkip: true,
+		},
+		{
+			name:       "less than 1.9.2",
+			output:     "goctl version 1.9.1 darwin/arm64",
+			shouldSkip: false,
+		},
+		{
+			name:       "much less than 1.9.2",
+			output:     "goctl version 1.8.0 linux/amd64",
+			shouldSkip: false,
+		},
+		{
+			name:       "version 1.8.10 (multi-digit, but less)",
+			output:     "goctl version 1.8.10 windows/amd64",
+			shouldSkip: false,
+		},
+		{
+			name:       "version with v-prefix",
+			output:     "goctl version v1.9.2 darwin/arm64",
+			shouldSkip: true,
+		},
+		{
+			name:       "old version with v-prefix",
+			output:     "goctl version v1.9.1 linux/amd64",
+			shouldSkip: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockExec := &mockExecutor{
+				result: &executor.ExecuteResult{
+					ExitCode: 0,
+					Stdout:   tt.output,
+					Stderr:   "",
+				},
+				err: nil,
+			}
+
+			patcher := NewAPIFilePatcherWithExecutor(mockExec)
+			if patcher.skipPatch != tt.shouldSkip {
+				t.Errorf("output %q: expected skipPatch=%v, got %v", tt.output, tt.shouldSkip, patcher.skipPatch)
+			}
+		})
+	}
+}
+
+func TestGoctlVersionDetectionError(t *testing.T) {
+	// When version detection fails, should default to patching (skipPatch = false)
+	mockExec := &mockExecutor{
+		result: nil,
+		err:    &executor.CommandNotFoundError{Command: "goctl"},
+	}
+
+	patcher := NewAPIFilePatcherWithExecutor(mockExec)
+	if patcher.skipPatch {
+		t.Error("expected skipPatch=false when version detection fails")
 	}
 }
