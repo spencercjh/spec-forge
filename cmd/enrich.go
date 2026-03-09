@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -161,7 +162,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 
 	// Save enriched spec to file
 	var data []byte
-	if filepath.Ext(outputFile) == ".json" {
+	if strings.ToLower(filepath.Ext(outputFile)) == ".json" {
 		data, err = result.MarshalJSON()
 	} else {
 		var yamlData any
