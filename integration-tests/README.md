@@ -109,12 +109,6 @@ go test -tags=e2e ./...
 | `e2e_publish_test.go` | `TestE2E_Publish_NonExistentSpec` | Tests error handling for non-existent spec file |
 | `e2e_publish_test.go` | `TestE2E_Publish_InvalidSpec` | Tests error handling for invalid spec format |
 
-### Other Test Files
-
-| Test File | Type | Description |
-|-----------|------|-------------|
-| `error_test.go` | E2E | Tests error handling for missing commands |
-
 ### Spec Assertion Helpers
 
 The `spec_assertions_test.go` file provides comprehensive OpenAPI spec validation utilities:

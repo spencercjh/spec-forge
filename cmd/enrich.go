@@ -243,12 +243,13 @@ func getCustomAPIKeyEnv(enrichCfg *config.EnrichConfig, flagValue string) string
 }
 
 func getCustomAPIKey(enrichCfg *config.EnrichConfig, flagValue string) string {
-	// First check config file
-	if enrichCfg.APIKey != "" {
-		return enrichCfg.APIKey
+	// Priority: env > config
+	// First check environment variable
+	if apiKey := os.Getenv(getCustomAPIKeyEnv(enrichCfg, flagValue)); apiKey != "" {
+		return apiKey
 	}
-	// Then check environment variable
-	return os.Getenv(getCustomAPIKeyEnv(enrichCfg, flagValue))
+	// Then check config file
+	return enrichCfg.APIKey
 }
 
 // newEnrichCmd creates a new enrich command instance for testing.

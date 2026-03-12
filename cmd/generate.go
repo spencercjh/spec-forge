@@ -311,7 +311,7 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 	c.Flags().String("language", "en",
 		"language for AI-generated descriptions (e.g., en, zh)")
 	c.Flags().StringP("output", "o", "",
-		"output format (yaml or json, default: yaml)")
+		"output format (yaml or json; defaults to yaml if not specified in config)")
 	c.Flags().StringP("output-dir", "d", "",
 		"output directory for generated spec (default: project root)")
 	c.Flags().Bool("skip-publish", false,
