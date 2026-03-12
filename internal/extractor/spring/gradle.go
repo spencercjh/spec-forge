@@ -15,8 +15,8 @@ import (
 // GradleParser parses and modifies Gradle build.gradle files.
 type GradleParser struct{}
 
-// NewGradleParser creates a new GradleParser instance.
-func NewGradleParser() *GradleParser {
+// newGradleParser creates a new GradleParser instance.
+func newGradleParser() *GradleParser {
 	return &GradleParser{}
 }
 

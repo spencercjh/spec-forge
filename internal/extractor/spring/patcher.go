@@ -30,8 +30,8 @@ type Patcher struct {
 func NewPatcher() *Patcher {
 	return &Patcher{
 		detector:     NewDetector(),
-		mavenParser:  NewMavenParser(),
-		gradleParser: NewGradleParser(),
+		mavenParser:  newMavenParser(),
+		gradleParser: newGradleParser(),
 	}
 }
 

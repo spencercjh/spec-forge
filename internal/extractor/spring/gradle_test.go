@@ -1,13 +1,11 @@
-// Package spring_test tests the Spring extractor implementation.
-package spring_test
+// Package spring tests the Spring extractor implementation.
+package spring
 
 import (
 	"os"
 	"testing"
 
 	"github.com/scagogogo/gradle-parser/pkg/model"
-
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 )
 
 const (
@@ -22,7 +20,7 @@ func TestGradleParser_Parse(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewGradleParser()
+	parser := newGradleParser()
 	build, err := parser.Parse(gradlePath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -40,7 +38,7 @@ func TestGradleParser_HasSpringdocDependency(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewGradleParser()
+	parser := newGradleParser()
 	build, err := parser.Parse(gradlePath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -58,7 +56,7 @@ func TestGradleParser_HasSpringdocPlugin(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewGradleParser()
+	parser := newGradleParser()
 	build, err := parser.Parse(gradlePath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -76,7 +74,7 @@ func TestGradleParser_GetSpringdocVersion(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewGradleParser()
+	parser := newGradleParser()
 	build, err := parser.Parse(gradlePath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -95,7 +93,7 @@ func TestGradleParser_GetSpringBootVersion(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewGradleParser()
+	parser := newGradleParser()
 	build, err := parser.Parse(gradlePath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -112,7 +110,7 @@ func TestGradleParser_GetSpringBootVersion(t *testing.T) {
 }
 
 func TestGradleParser_FindDependency(t *testing.T) {
-	parser := spring.NewGradleParser()
+	parser := newGradleParser()
 
 	// Create a minimal project for testing
 	project := &model.Project{
@@ -136,7 +134,7 @@ func TestGradleParser_FindDependency(t *testing.T) {
 }
 
 func TestGradleParser_FindPlugin(t *testing.T) {
-	parser := spring.NewGradleParser()
+	parser := newGradleParser()
 
 	// Create a minimal project for testing
 	project := &model.Project{

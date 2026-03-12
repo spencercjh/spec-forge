@@ -9,11 +9,11 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-// PatchSwagger patches known bugs in goctl swagger generation.
+// patchSwagger patches known bugs in goctl swagger generation.
 // This addresses issues #5426, #5427, and #5428.
-func PatchSwagger(doc *openapi2.T) {
+func patchSwagger(doc *openapi2.T) {
 	if doc == nil {
-		slog.Debug("PatchSwagger called with nil document")
+		slog.Debug("patchSwagger called with nil document")
 		return
 	}
 

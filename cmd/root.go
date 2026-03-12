@@ -9,11 +9,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	cfgFile string
-	verbose bool
-)
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "spec-forge",
@@ -36,6 +31,37 @@ func Execute() {
 	}
 }
 
+// NewRootCommand creates a fresh root command instance for testing.
+// This avoids global state pollution between tests.
+func NewRootCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "spec-forge",
+		Short: "Generate OpenAPI specifications from source code",
+		Long: `Spec Forge is a CLI tool that automatically generates OpenAPI specifications
+from your source code. It supports multiple frameworks and uses AI to enhance
+API descriptions.
+
+Core workflow: Source Code -> Extract -> Enrich -> Publish`,
+		Version: "0.1.0",
+	}
+
+	// Persistent flags - use local variables bound directly to the command
+	c.PersistentFlags().StringP("config", "c", "", "config file (default is .spec-forge.yaml)")
+	c.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
+
+	// Bind verbose flag to viper for config file support
+	if err := viper.BindPFlag("verbose", c.PersistentFlags().Lookup("verbose")); err != nil {
+		slog.Error("failed to bind verbose flag", "error", err)
+	}
+
+	// Add all subcommands using factory functions
+	c.AddCommand(newGenerateCmd())
+	c.AddCommand(newEnrichCmd())
+	c.AddCommand(newPublishCmd())
+
+	return c
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -47,6 +73,13 @@ func init() {
 		os.Exit(1)
 	}
 }
+
+// cfgFile and verbose are only used by the global rootCmd (not by NewRootCommand)
+// This maintains backward compatibility for the main CLI while allowing isolated testing.
+var (
+	cfgFile string
+	verbose bool
+)
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {

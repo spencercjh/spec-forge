@@ -1,13 +1,11 @@
-// Package spring_test tests the Spring extractor implementation.
-package spring_test
+// Package spring tests the Spring extractor implementation.
+package spring
 
 import (
 	"os"
 	"testing"
 
 	"github.com/vifraa/gopom"
-
-	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 )
 
 const (
@@ -22,7 +20,7 @@ func TestMavenParser_Parse(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 	pom, err := parser.Parse(pomPath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -40,7 +38,7 @@ func TestMavenParser_GetSpringBootVersion(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 	pom, err := parser.Parse(pomPath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -63,7 +61,7 @@ func TestMavenParser_HasSpringdocDependency(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 	pom, err := parser.Parse(pomPath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -81,7 +79,7 @@ func TestMavenParser_GetSpringdocVersion(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 	pom, err := parser.Parse(pomPath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -100,7 +98,7 @@ func TestMavenParser_HasSpringdocPlugin(t *testing.T) {
 		t.Skip("Integration test project not found")
 	}
 
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 	pom, err := parser.Parse(pomPath)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
@@ -112,7 +110,7 @@ func TestMavenParser_HasSpringdocPlugin(t *testing.T) {
 }
 
 func TestMavenParser_FindDependency(t *testing.T) {
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 
 	// Create a minimal pom for testing
 	webVersion := "4.0.3"
@@ -137,7 +135,7 @@ func TestMavenParser_FindDependency(t *testing.T) {
 }
 
 func TestMavenParser_AddPlugin(t *testing.T) {
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 
 	// Create a minimal pom without plugins
 	pom := &gopom.Project{}
@@ -170,10 +168,10 @@ func TestMavenParser_AddPlugin(t *testing.T) {
 	}
 
 	exec := (*plugin.Executions)[0]
-	if exec.ID == nil || *exec.ID != "integration-test" {
+	if exec.ID == nil || *exec.ID != integrationTestExecID {
 		t.Errorf("Expected execution ID 'integration-test', got %v", exec.ID)
 	}
-	if exec.Phase == nil || *exec.Phase != "integration-test" {
+	if exec.Phase == nil || *exec.Phase != integrationTestPhase {
 		t.Errorf("Expected execution phase 'integration-test', got %v", exec.Phase)
 	}
 	if exec.Goals == nil || len(*exec.Goals) != 1 || (*exec.Goals)[0] != "generate" {
@@ -182,7 +180,7 @@ func TestMavenParser_AddPlugin(t *testing.T) {
 }
 
 func TestMavenParser_HasSpringBootStartStopGoals(t *testing.T) {
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 
 	t.Run("has start/stop goals", func(t *testing.T) {
 		pom, err := parser.Parse(mavenTestPath)
@@ -205,7 +203,7 @@ func TestMavenParser_HasSpringBootStartStopGoals(t *testing.T) {
 }
 
 func TestMavenParser_ConfigureSpringBootPlugin(t *testing.T) {
-	parser := spring.NewMavenParser()
+	parser := newMavenParser()
 
 	t.Run("already configured", func(t *testing.T) {
 		pom, err := parser.Parse(mavenTestPath)

@@ -12,19 +12,6 @@ import (
 	"github.com/spencercjh/spec-forge/internal/publisher"
 )
 
-var (
-	publishFormat    string
-	publishOutput    string
-	publishTarget    string
-	publishOverwrite bool
-
-	// ReadMe-specific flags
-	readMeAPIKey         string
-	readMeBranch         string
-	readMeSlug           string
-	readMeUseSpecVersion bool
-)
-
 // publishCmd represents the publish command
 var publishCmd = &cobra.Command{
 	Use:   "publish [spec-file]",
@@ -46,10 +33,28 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		specFile = args[0]
 	}
 
-	slog.InfoContext(ctx, "Publishing spec", "file", specFile, "target", publishTarget)
+	// Get flag values from command (isolated per command instance)
+	//nolint:errcheck // flags are bound at command creation, errors not possible
+	format, _ := cmd.Flags().GetString("format")
+	//nolint:errcheck
+	output, _ := cmd.Flags().GetString("output")
+	//nolint:errcheck
+	target, _ := cmd.Flags().GetString("to")
+	//nolint:errcheck
+	overwrite, _ := cmd.Flags().GetBool("overwrite")
+	//nolint:errcheck
+	readMeAPIKey, _ := cmd.Flags().GetString("readme-api-key")
+	//nolint:errcheck
+	readMeBranch, _ := cmd.Flags().GetString("readme-branch")
+	//nolint:errcheck
+	readMeSlug, _ := cmd.Flags().GetString("readme-slug")
+	//nolint:errcheck
+	readMeUseSpecVersion, _ := cmd.Flags().GetBool("readme-use-spec-version")
+
+	slog.InfoContext(ctx, "Publishing spec", "file", specFile, "target", target)
 
 	// Create publisher using factory
-	pub, err := publisher.NewPublisher(publishTarget)
+	pub, err := publisher.NewPublisher(target)
 	if err != nil {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
@@ -69,9 +74,9 @@ func runPublish(cmd *cobra.Command, args []string) error {
 
 	// Build publish options
 	opts := &publisher.PublishOptions{
-		OutputPath: publishOutput,
-		Format:     publishFormat,
-		Overwrite:  publishOverwrite,
+		OutputPath: output,
+		Format:     format,
+		Overwrite:  overwrite,
 	}
 
 	// Add ReadMe-specific options if using ReadMe publisher
@@ -106,6 +111,54 @@ func runPublish(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+
+// newPublishCmd creates a new publish command instance for testing.
+func newPublishCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "publish [spec-file]",
+		Short: "Publish OpenAPI spec to target platform",
+		Long: `Publish OpenAPI specification to external platforms.
+
+Supports:
+- ReadMe (via rdme CLI)
+
+Note: Local file output is handled by the generate command.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: runPublish,
+	}
+
+	c.Flags().StringP("format", "f", "yaml", "output format (yaml or json)")
+	c.Flags().StringP("output", "o", "", "output file path (currently unused for 'readme'; reserved for future publishers)")
+	c.Flags().StringP("to", "t", "", "publish target (required: readme)")
+	c.Flags().Bool("overwrite", false, "overwrite existing spec")
+
+	// ReadMe-specific flags
+	c.Flags().String("readme-api-key", "", "ReadMe API key (or set README_API_KEY env var)")
+	c.Flags().String("readme-branch", "", "ReadMe version/branch (default: stable)")
+	c.Flags().String("readme-slug", "", "ReadMe API slug/identifier")
+	c.Flags().Bool("readme-use-spec-version", false, "use OpenAPI info.version as ReadMe version")
+
+	// Mark target as required
+	if err := c.MarkFlagRequired("to"); err != nil {
+		panic(fmt.Sprintf("failed to mark flag 'to' as required: %v", err))
+	}
+
+	return c
+}
+
+// publish command flag variables for global rootCmd only
+var (
+	publishFormat    string
+	publishOutput    string
+	publishTarget    string
+	publishOverwrite bool
+
+	// ReadMe-specific flags
+	readMeAPIKey         string
+	readMeBranch         string
+	readMeSlug           string
+	readMeUseSpecVersion bool
+)
 
 func init() {
 	rootCmd.AddCommand(publishCmd)

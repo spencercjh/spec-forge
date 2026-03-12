@@ -156,12 +156,18 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 		opts.OutputFile = defaultOutputFileName
 	}
 
-	// Determine the working directory
+	// Determine the working directory and module info
 	workDir := projectPath
+	var mainModule string
 	if info.FrameworkData != nil {
-		if springInfo, ok := info.FrameworkData.(*Info); ok && springInfo.IsMultiModule && springInfo.MainModulePath != "" {
-			// For multi-module projects, run from the main module directory
-			workDir = filepath.Dir(springInfo.MainModulePath)
+		if springInfo, ok := info.FrameworkData.(*Info); ok && springInfo.IsMultiModule {
+			// For Gradle multi-module projects, run from the main module directory
+			// For Maven multi-module projects, stay in root directory and use -pl -am flags
+			if info.BuildTool == BuildToolGradle && springInfo.MainModulePath != "" {
+				workDir = filepath.Dir(springInfo.MainModulePath)
+			}
+			// Store main module name for Maven multi-module builds
+			mainModule = springInfo.MainModule
 		}
 	}
 
@@ -173,7 +179,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 	// Generate based on build tool
 	switch info.BuildTool {
 	case BuildToolMaven:
-		return g.generateMaven(ctx, absWorkDir, info, opts)
+		return g.generateMaven(ctx, absWorkDir, info, opts, mainModule)
 	case BuildToolGradle:
 		return g.generateGradle(ctx, absWorkDir, info, opts)
 	default:
@@ -267,7 +273,7 @@ func (g *Generator) resolveGradleCommand(workDir string) string {
 }
 
 // generateMaven generates OpenAPI spec using Maven springdoc plugin.
-func (g *Generator) generateMaven(ctx context.Context, workDir string, _ *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
+func (g *Generator) generateMaven(ctx context.Context, workDir string, _ *extractor.ProjectInfo, opts *extractor.GenerateOptions, mainModule string) (*extractor.GenerateResult, error) {
 	// Resolve Maven command (wrapper or system)
 	mavenCmd := g.resolveMavenCommand(workDir)
 
@@ -275,6 +281,11 @@ func (g *Generator) generateMaven(ctx context.Context, workDir string, _ *extrac
 	// Per springdoc official documentation, use "verify" phase to trigger springdoc plugin
 	args := []string{
 		"verify",
+	}
+
+	// For multi-module projects, specify the module and build dependencies
+	if mainModule != "" {
+		args = append(args, "-pl", mainModule, "-am")
 	}
 
 	// Skip tests by default
@@ -310,7 +321,12 @@ func (g *Generator) generateMaven(ctx context.Context, workDir string, _ *extrac
 	}
 
 	// Find the generated spec file
-	specPath, err := g.findGeneratedSpec(workDir, nil, "target", opts)
+	// For multi-module projects, search in the main module's target directory
+	searchDir := workDir
+	if mainModule != "" {
+		searchDir = filepath.Join(workDir, mainModule)
+	}
+	specPath, err := g.findGeneratedSpec(searchDir, nil, "target", opts)
 	if err != nil {
 		return nil, err
 	}

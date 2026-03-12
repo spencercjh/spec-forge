@@ -20,21 +20,9 @@ import (
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 )
 
-var (
-	enrichProvider        string
-	enrichModel           string
-	enrichLanguage        string
-	enrichOutput          string
-	enrichConcurrency     int
-	enrichTimeout         time.Duration
-	enrichCustomBaseURL   string
-	enrichCustomAPIKey    string
-	enrichCustomAPIKeyEnv string
-)
-
 // enrichCmd represents the enrich command
 var enrichCmd = &cobra.Command{
-	Use:   "enrich <spec-file>",
+	Use:   "enrich \u003cspec-file\u003e",
 	Short: "Enrich OpenAPI spec with AI-generated descriptions",
 	Long: `Enrich OpenAPI specification by using LLM to generate missing descriptions
 for APIs and fields.
@@ -64,8 +52,24 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 
 	cfg := config.Get()
 
+	// Get flag values from command (isolated per command instance)
+	//nolint:errcheck // flags are bound at command creation, errors not possible
+	providerFlag, _ := cmd.Flags().GetString("provider")
+	//nolint:errcheck
+	modelFlag, _ := cmd.Flags().GetString("model")
+	//nolint:errcheck
+	languageFlag, _ := cmd.Flags().GetString("language")
+	//nolint:errcheck
+	concurrencyFlag, _ := cmd.Flags().GetInt("concurrency")
+	//nolint:errcheck
+	timeoutFlag, _ := cmd.Flags().GetDuration("timeout")
+	//nolint:errcheck
+	customBaseURLFlag, _ := cmd.Flags().GetString("custom-base-url")
+	//nolint:errcheck
+	customAPIKeyEnvFlag, _ := cmd.Flags().GetString("custom-api-key-env")
+
 	// Determine provider
-	prov := enrichProvider
+	prov := providerFlag
 	if prov == "" {
 		prov = cfg.Enrich.Provider
 	}
@@ -74,7 +78,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine model
-	model := enrichModel
+	model := modelFlag
 	if model == "" {
 		model = cfg.Enrich.Model
 	}
@@ -83,7 +87,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine language
-	lang := enrichLanguage
+	lang := languageFlag
 	if lang == "" {
 		lang = cfg.Enrich.Language
 	}
@@ -92,7 +96,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create provider
-	p, err := createProvider(prov, model, cfg.Enrich)
+	p, err := createProvider(prov, model, cfg.Enrich, customBaseURLFlag, customAPIKeyEnvFlag)
 	if err != nil {
 		return err
 	}
@@ -113,12 +117,20 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load spec: %w", err)
 	}
 
+	// Determine output file
+	//nolint:errcheck
+	outputFlag, _ := cmd.Flags().GetString("output")
+	outputFile := outputFlag
+	if outputFile == "" {
+		outputFile = specFile // Overwrite input by default
+	}
+
 	// Create enricher config
-	customBaseURL := enrichCustomBaseURL
+	customBaseURL := customBaseURLFlag
 	if customBaseURL == "" {
 		customBaseURL = cfg.Enrich.BaseURL
 	}
-	customAPIKeyEnv := enrichCustomAPIKeyEnv
+	customAPIKeyEnv := customAPIKeyEnvFlag
 	if customAPIKeyEnv == "" {
 		customAPIKeyEnv = cfg.Enrich.APIKeyEnv
 	}
@@ -127,8 +139,8 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		Provider:        prov,
 		Model:           model,
 		Language:        lang,
-		Concurrency:     enrichConcurrency,
-		Timeout:         enrichTimeout,
+		Concurrency:     concurrencyFlag,
+		Timeout:         timeoutFlag,
 		CustomBaseURL:   customBaseURL,
 		CustomAPIKeyEnv: customAPIKeyEnv,
 	}
@@ -152,12 +164,6 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		} else {
 			return fmt.Errorf("enrichment failed: %w", err)
 		}
-	}
-
-	// Determine output file
-	outputFile := enrichOutput
-	if outputFile == "" {
-		outputFile = specFile // Overwrite input by default
 	}
 
 	// Save enriched spec to file
@@ -191,9 +197,9 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 }
 
 // createProvider creates a provider based on the provider type
-func createProvider(providerType, model string, enrichCfg config.EnrichConfig) (provider.Provider, error) { //nolint:gocritic // copying config is acceptable
+func createProvider(providerType, model string, enrichCfg config.EnrichConfig, customBaseURL, customAPIKeyEnv string) (provider.Provider, error) { //nolint:gocritic // copying config is acceptable
 	// Determine baseURL: flag > config > default
-	baseURL := enrichCustomBaseURL
+	baseURL := customBaseURL
 	if baseURL == "" {
 		baseURL = enrichCfg.BaseURL
 	}
@@ -217,18 +223,18 @@ func createProvider(providerType, model string, enrichCfg config.EnrichConfig) (
 			return nil, errors.New("ANTHROPIC_API_KEY environment variable not set")
 		}
 	case "custom":
-		cfg.APIKey = getCustomAPIKey(enrichCfg)
+		cfg.APIKey = getCustomAPIKey(&enrichCfg, customAPIKeyEnv)
 		if cfg.APIKey == "" {
-			return nil, fmt.Errorf("API key not found. Set %s environment variable", getCustomAPIKeyEnv(enrichCfg))
+			return nil, fmt.Errorf("API key not found. Set %s environment variable", getCustomAPIKeyEnv(&enrichCfg, customAPIKeyEnv))
 		}
 	}
 
 	return provider.NewProvider(cfg)
 }
 
-func getCustomAPIKeyEnv(enrichCfg config.EnrichConfig) string { //nolint:gocritic // copying config is acceptable
-	if enrichCustomAPIKeyEnv != "" {
-		return enrichCustomAPIKeyEnv
+func getCustomAPIKeyEnv(enrichCfg *config.EnrichConfig, flagValue string) string {
+	if flagValue != "" {
+		return flagValue
 	}
 	if enrichCfg.APIKeyEnv != "" {
 		return enrichCfg.APIKeyEnv
@@ -236,18 +242,65 @@ func getCustomAPIKeyEnv(enrichCfg config.EnrichConfig) string { //nolint:gocriti
 	return "LLM_API_KEY"
 }
 
-func getCustomAPIKey(enrichCfg config.EnrichConfig) string { //nolint:gocritic // copying config is acceptable
-	// First check explicit flag
-	if enrichCustomAPIKey != "" {
-		return enrichCustomAPIKey
+func getCustomAPIKey(enrichCfg *config.EnrichConfig, flagValue string) string {
+	// Priority: env > config
+	// First check environment variable
+	if apiKey := os.Getenv(getCustomAPIKeyEnv(enrichCfg, flagValue)); apiKey != "" {
+		return apiKey
 	}
 	// Then check config file
-	if enrichCfg.APIKey != "" {
-		return enrichCfg.APIKey
-	}
-	// Then check environment variable
-	return os.Getenv(getCustomAPIKeyEnv(enrichCfg))
+	return enrichCfg.APIKey
 }
+
+// newEnrichCmd creates a new enrich command instance for testing.
+func newEnrichCmd() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "enrich \u003cspec-file\u003e",
+		Short: "Enrich OpenAPI spec with AI-generated descriptions",
+		Long: `Enrich OpenAPI specification by using LLM to generate missing descriptions
+for APIs and fields.
+
+Supports multiple LLM providers: OpenAI, Anthropic, Ollama, and custom OpenAI-compatible services.
+
+Examples:
+  # Enrich with OpenAI
+  spec-forge enrich openapi.yaml --provider openai --model gpt-4o
+
+  # Enrich with Chinese descriptions
+  spec-forge enrich openapi.yaml --provider openai --language zh
+
+  # Use custom internal AI service
+  spec-forge enrich openapi.yaml \
+    --provider custom \
+    --custom-base-url https://ai.company.com/v1 \
+    --custom-api-key-env COMPANY_AI_KEY`,
+		Args: cobra.ExactArgs(1),
+		RunE: runEnrich,
+	}
+
+	c.Flags().String("provider", "", "LLM provider (openai, anthropic, ollama, custom)")
+	c.Flags().String("model", "", "LLM model name")
+	c.Flags().String("language", "en", "Output language for descriptions")
+	c.Flags().StringP("output", "o", "", "Output file (default: overwrite input)")
+	c.Flags().Int("concurrency", 3, "Number of concurrent LLM calls")
+	c.Flags().Duration("timeout", 30*time.Second, "Timeout for single LLM call")
+	c.Flags().String("custom-base-url", "", "Custom provider API URL")
+	c.Flags().String("custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
+
+	return c
+}
+
+// enrich command flag variables for global rootCmd only
+var (
+	enrichProvider        string
+	enrichModel           string
+	enrichLanguage        string
+	enrichOutput          string
+	enrichConcurrency     int
+	enrichTimeout         time.Duration
+	enrichCustomBaseURL   string
+	enrichCustomAPIKeyEnv string
+)
 
 func init() {
 	rootCmd.AddCommand(enrichCmd)
@@ -259,6 +312,5 @@ func init() {
 	enrichCmd.Flags().IntVar(&enrichConcurrency, "concurrency", 3, "Number of concurrent LLM calls")
 	enrichCmd.Flags().DurationVar(&enrichTimeout, "timeout", 30*time.Second, "Timeout for single LLM call")
 	enrichCmd.Flags().StringVar(&enrichCustomBaseURL, "custom-base-url", "", "Custom provider API URL")
-	enrichCmd.Flags().StringVar(&enrichCustomAPIKey, "custom-api-key", "", "Custom provider API key (or use env var)")
 	enrichCmd.Flags().StringVar(&enrichCustomAPIKeyEnv, "custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
 }

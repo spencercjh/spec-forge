@@ -296,7 +296,7 @@ func (g *Generator) convertSwaggerToOpenAPI(swaggerPath string, opts *extractor.
 
 	// Apply patches for known goctl swagger bugs (#5426-5428)
 	slog.Debug("applying patches for known goctl swagger bugs")
-	PatchSwagger(swagger2Doc)
+	patchSwagger(swagger2Doc)
 
 	// Convert to OpenAPI 3.0
 	slog.Debug("converting to OpenAPI 3.0")

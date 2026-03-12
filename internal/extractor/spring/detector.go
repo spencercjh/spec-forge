@@ -18,8 +18,8 @@ type Detector struct {
 // NewDetector creates a new Detector instance.
 func NewDetector() *Detector {
 	return &Detector{
-		mavenParser:  NewMavenParser(),
-		gradleParser: NewGradleParser(),
+		mavenParser:  newMavenParser(),
+		gradleParser: newGradleParser(),
 	}
 }
 
