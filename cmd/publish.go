@@ -34,13 +34,21 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get flag values from command (isolated per command instance)
+	//nolint:errcheck // flags are bound at command creation, errors not possible
 	format, _ := cmd.Flags().GetString("format")
+	//nolint:errcheck
 	output, _ := cmd.Flags().GetString("output")
+	//nolint:errcheck
 	target, _ := cmd.Flags().GetString("to")
+	//nolint:errcheck
 	overwrite, _ := cmd.Flags().GetBool("overwrite")
+	//nolint:errcheck
 	readMeAPIKey, _ := cmd.Flags().GetString("readme-api-key")
+	//nolint:errcheck
 	readMeBranch, _ := cmd.Flags().GetString("readme-branch")
+	//nolint:errcheck
 	readMeSlug, _ := cmd.Flags().GetString("readme-slug")
+	//nolint:errcheck
 	readMeUseSpecVersion, _ := cmd.Flags().GetBool("readme-use-spec-version")
 
 	slog.InfoContext(ctx, "Publishing spec", "file", specFile, "target", target)

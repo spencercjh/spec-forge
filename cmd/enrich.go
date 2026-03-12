@@ -53,12 +53,19 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	cfg := config.Get()
 
 	// Get flag values from command (isolated per command instance)
+	//nolint:errcheck // flags are bound at command creation, errors not possible
 	providerFlag, _ := cmd.Flags().GetString("provider")
+	//nolint:errcheck
 	modelFlag, _ := cmd.Flags().GetString("model")
+	//nolint:errcheck
 	languageFlag, _ := cmd.Flags().GetString("language")
+	//nolint:errcheck
 	concurrencyFlag, _ := cmd.Flags().GetInt("concurrency")
+	//nolint:errcheck
 	timeoutFlag, _ := cmd.Flags().GetDuration("timeout")
+	//nolint:errcheck
 	customBaseURLFlag, _ := cmd.Flags().GetString("custom-base-url")
+	//nolint:errcheck
 	customAPIKeyEnvFlag, _ := cmd.Flags().GetString("custom-api-key-env")
 
 	// Determine provider
@@ -111,6 +118,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine output file
+	//nolint:errcheck
 	outputFlag, _ := cmd.Flags().GetString("output")
 	outputFile := outputFlag
 	if outputFile == "" {
@@ -215,16 +223,16 @@ func createProvider(providerType, model string, enrichCfg config.EnrichConfig, c
 			return nil, errors.New("ANTHROPIC_API_KEY environment variable not set")
 		}
 	case "custom":
-		cfg.APIKey = getCustomAPIKey(enrichCfg, customAPIKeyEnv)
+		cfg.APIKey = getCustomAPIKey(&enrichCfg, customAPIKeyEnv)
 		if cfg.APIKey == "" {
-			return nil, fmt.Errorf("API key not found. Set %s environment variable", getCustomAPIKeyEnv(enrichCfg, customAPIKeyEnv))
+			return nil, fmt.Errorf("API key not found. Set %s environment variable", getCustomAPIKeyEnv(&enrichCfg, customAPIKeyEnv))
 		}
 	}
 
 	return provider.NewProvider(cfg)
 }
 
-func getCustomAPIKeyEnv(enrichCfg config.EnrichConfig, flagValue string) string {
+func getCustomAPIKeyEnv(enrichCfg *config.EnrichConfig, flagValue string) string {
 	if flagValue != "" {
 		return flagValue
 	}
@@ -234,7 +242,7 @@ func getCustomAPIKeyEnv(enrichCfg config.EnrichConfig, flagValue string) string 
 	return "LLM_API_KEY"
 }
 
-func getCustomAPIKey(enrichCfg config.EnrichConfig, flagValue string) string { //nolint:gocritic // copying config is acceptable
+func getCustomAPIKey(enrichCfg *config.EnrichConfig, flagValue string) string {
 	// First check config file
 	if enrichCfg.APIKey != "" {
 		return enrichCfg.APIKey

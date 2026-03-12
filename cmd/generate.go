@@ -56,17 +56,29 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	slog.InfoContext(ctx, "Generating OpenAPI spec", "path", path)
 
 	// Get all flag values from command (isolated per command instance)
+	//nolint:errcheck // flags are bound at command creation, errors not possible
 	keepPatched, _ := cmd.Flags().GetBool("keep-patched")
+	//nolint:errcheck
 	skipValidate, _ := cmd.Flags().GetBool("skip-validate")
+	//nolint:errcheck
 	timeout, _ := cmd.Flags().GetDuration("timeout")
+	//nolint:errcheck
 	skipEnrich, _ := cmd.Flags().GetBool("skip-enrich")
+	//nolint:errcheck
 	language, _ := cmd.Flags().GetString("language")
+	//nolint:errcheck
 	outputDirFlag, _ := cmd.Flags().GetString("output-dir")
+	//nolint:errcheck
 	outputFormatFlag, _ := cmd.Flags().GetString("output")
+	//nolint:errcheck
 	skipPublish, _ := cmd.Flags().GetBool("skip-publish")
+	//nolint:errcheck
 	publishTarget, _ := cmd.Flags().GetString("publish-target")
+	//nolint:errcheck
 	publishOverwrite, _ := cmd.Flags().GetBool("publish-overwrite")
+	//nolint:errcheck
 	overwriteOutput, _ := cmd.Flags().GetBool("overwrite-output")
+	//nolint:errcheck
 	protoImportPaths, _ := cmd.Flags().GetStringSlice("proto-import-path")
 
 	// Step 1: Detect framework - try all registered extractors
@@ -318,17 +330,17 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 
 // generate command flag variables for global rootCmd only
 var (
-	generateKeepPatched bool
-	generateSkipValidate bool
-	generateTimeout time.Duration
-	generateSkipEnrich bool
-	generateLanguage string
-	generateOutputDir string
-	generateOutputFormat string
-	generateSkipPublish bool
-	generatePublishTarget string
+	generateKeepPatched      bool
+	generateSkipValidate     bool
+	generateTimeout          time.Duration
+	generateSkipEnrich       bool
+	generateLanguage         string
+	generateOutputDir        string
+	generateOutputFormat     string
+	generateSkipPublish      bool
+	generatePublishTarget    string
 	generatePublishOverwrite bool
-	generateOverwriteOutput bool
+	generateOverwriteOutput  bool
 	generateProtoImportPaths []string
 )
 
