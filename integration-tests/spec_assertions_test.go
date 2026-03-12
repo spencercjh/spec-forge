@@ -53,7 +53,7 @@ func (v *SpecValidator) ValidateOpenAPIVersion() {
 	}
 
 	// Should start with 3.
-	if version[:2] != "3." {
+	if !strings.HasPrefix(version, "3.") {
 		v.t.Errorf("expected OpenAPI version to start with '3.', got %s", version)
 	}
 	v.t.Logf("OpenAPI version: %s", version)
@@ -392,7 +392,12 @@ func (v *SpecValidator) FullValidation(config ValidationConfig) {
 			v.ValidateResponseCodes(op.Path, op.Method, op.ExpectedResponseCodes)
 		}
 		if op.ValidateResponseContent != "" {
-			v.ValidateResponseContent(op.Path, op.Method, "200", op.ValidateResponseContent)
+			// Use first expected response code, or default to "200"
+			responseCode := "200"
+			if len(op.ExpectedResponseCodes) > 0 {
+				responseCode = op.ExpectedResponseCodes[0]
+			}
+			v.ValidateResponseContent(op.Path, op.Method, responseCode, op.ValidateResponseContent)
 		}
 		if op.WantRequestBody != "" {
 			v.ValidateRequestBody(op.Path, op.Method, op.WantRequestBody)

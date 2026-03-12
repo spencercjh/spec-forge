@@ -13,7 +13,7 @@ import (
 // This addresses issues #5426, #5427, and #5428.
 func patchSwagger(doc *openapi2.T) {
 	if doc == nil {
-		slog.Debug("PatchSwagger called with nil document")
+		slog.Debug("patchSwagger called with nil document")
 		return
 	}
 

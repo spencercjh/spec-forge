@@ -47,9 +47,7 @@ func TestE2E_GoZero_Generate(t *testing.T) {
 	// go-zero generation may fail if goctl is not available
 	// This is expected behavior
 	if err != nil {
-		t.Logf("generate command failed (may be due to missing goctl): %v", err)
-		t.Logf("stderr: %s", stderr.String())
-		return
+		t.Skipf("generate command failed (may be due to missing goctl): %v\nstderr: %s", err, stderr.String())
 	}
 
 	// Find the generated spec file

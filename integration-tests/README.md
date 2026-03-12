@@ -49,7 +49,7 @@ go test ./...
 
 ### End-to-End Tests
 
-E2E tests use Cobra's `ExecuteContext` to test the complete CLI workflow:
+E2E tests use Cobra's `Execute` to test the complete CLI workflow:
 
 ```bash
 # Run all E2E tests
@@ -99,8 +99,8 @@ go test -tags=e2e ./...
 | Test File | Tests | Description |
 |-----------|-------|-------------|
 | `e2e_generate_test.go` | `TestE2E_Generate_Help` | Tests generate command help |
-| `e2e_generate_test.go` | `TestE2E_Generate_MavenSpringBoot` | Tests full CLI generate flow |
-| `e2e_generate_test.go` | `TestE2E_Generate_Gin` | Tests full CLI generate flow for Gin |
+| `e2e_generate_test.go` | `TestE2E_Generate_Version` | Tests CLI version output |
+| `e2e_generate_test.go` | `TestE2E_Generate_InvalidProject` | Tests error handling for non-existent project |
 | `e2e_enrich_test.go` | `TestE2E_Enrich_Help` | Tests enrich command help |
 | `e2e_publish_test.go` | `TestE2E_Publish_Help` | Tests publish command help |
 | `e2e_publish_test.go` | `TestE2E_Publish_MissingAPIKey` | Tests error handling for missing API key |

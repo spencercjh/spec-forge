@@ -47,9 +47,7 @@ func TestE2E_GrpcProtoc_Generate(t *testing.T) {
 	err := rootCmd.Execute()
 	// protoc generation may fail if tools are not available
 	if err != nil {
-		t.Logf("generate command failed (may be due to missing protoc): %v", err)
-		t.Logf("stderr: %s", stderr.String())
-		return
+		t.Skipf("generate command failed (may be due to missing protoc): %v\nstderr: %s", err, stderr.String())
 	}
 
 	// Find the generated spec file

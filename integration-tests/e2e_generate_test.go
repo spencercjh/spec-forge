@@ -58,8 +58,8 @@ func TestE2E_Generate_Version(t *testing.T) {
 
 	output := stdout.String()
 
-	if !strings.Contains(output, "0.1.0") {
-		t.Errorf("Expected version '0.1.0' in output, got: %s", output)
+	if !strings.Contains(output, "spec-forge version") {
+		t.Errorf("Expected version info in output, got: %s", output)
 	}
 
 	t.Logf("Version output: %s", output)

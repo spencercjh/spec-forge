@@ -31,34 +31,6 @@ const (
 	outputFormatJSON = "json"
 )
 
-var (
-	// generateKeepPatched controls whether to keep the patched pom/build file
-	// Default is false (restore original) for generate command
-	generateKeepPatched bool
-	// generateSkipValidate controls whether to skip validation
-	generateSkipValidate bool
-	// generateTimeout is the timeout for generation commands
-	generateTimeout time.Duration
-	// generateSkipEnrich controls whether to skip AI enrichment
-	generateSkipEnrich bool
-	// generateLanguage is the language for AI-generated descriptions
-	generateLanguage string
-	// generateOutputDir is the output directory for generated spec
-	generateOutputDir string
-	// generateOutputFormat is the output format (yaml or json)
-	generateOutputFormat string
-	// generateSkipPublish controls whether to skip publishing
-	generateSkipPublish bool
-	// generatePublishTarget is the publish target (readme)
-	generatePublishTarget string
-	// generatePublishOverwrite controls whether to overwrite existing remote spec
-	generatePublishOverwrite bool
-	// generateOverwriteOutput controls whether to overwrite existing local spec file
-	generateOverwriteOutput bool
-	// generateProtoImportPaths are additional import paths for protoc (-I flags)
-	generateProtoImportPaths []string
-)
-
 // generateCmd represents the generate command
 var generateCmd = &cobra.Command{
 	Use:   "generate [path]",
@@ -83,6 +55,20 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 
 	slog.InfoContext(ctx, "Generating OpenAPI spec", "path", path)
 
+	// Get all flag values from command (isolated per command instance)
+	keepPatched, _ := cmd.Flags().GetBool("keep-patched")
+	skipValidate, _ := cmd.Flags().GetBool("skip-validate")
+	timeout, _ := cmd.Flags().GetDuration("timeout")
+	skipEnrich, _ := cmd.Flags().GetBool("skip-enrich")
+	language, _ := cmd.Flags().GetString("language")
+	outputDirFlag, _ := cmd.Flags().GetString("output-dir")
+	outputFormatFlag, _ := cmd.Flags().GetString("output")
+	skipPublish, _ := cmd.Flags().GetBool("skip-publish")
+	publishTarget, _ := cmd.Flags().GetString("publish-target")
+	publishOverwrite, _ := cmd.Flags().GetBool("publish-overwrite")
+	overwriteOutput, _ := cmd.Flags().GetBool("overwrite-output")
+	protoImportPaths, _ := cmd.Flags().GetStringSlice("proto-import-path")
+
 	// Step 1: Detect framework - try all registered extractors
 	extractorImpl, info, err := builtin.DetectFramework(path)
 	if err != nil {
@@ -97,7 +83,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 
 	// Step 2: Patch project if needed
 	patchOpts := &extractor.PatchOptions{
-		KeepPatched: generateKeepPatched,
+		KeepPatched: keepPatched,
 	}
 
 	patchResult, err := extractorImpl.Patch(path, patchOpts)
@@ -106,7 +92,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	}
 
 	// Step 3: If we patched the file and should restore later, defer the restore
-	if !generateKeepPatched && patchResult.OriginalContent != "" {
+	if !keepPatched && patchResult.OriginalContent != "" {
 		defer func() {
 			slog.InfoContext(ctx, "Restoring original build file...")
 			if restoreErr := extractorImpl.Restore(patchResult.BuildFilePath, patchResult.OriginalContent); restoreErr != nil {
@@ -131,7 +117,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 
 	// Determine output directory
 	// Precedence: flag > config > default (project root)
-	outputDir := generateOutputDir
+	outputDir := outputDirFlag
 	if outputDir == "" {
 		outputDir = config.Get().Output.Dir
 	}
@@ -140,7 +126,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	}
 
 	// Determine output format
-	outputFormat := generateOutputFormat
+	outputFormat := outputFormatFlag
 	if outputFormat == "" {
 		outputFormat = config.Get().Output.Format
 	}
@@ -156,9 +142,9 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	genOpts := &extractor.GenerateOptions{
 		OutputDir:        outputDir,
 		Format:           outputFormat,
-		Timeout:          generateTimeout,
+		Timeout:          timeout,
 		SkipTests:        true,
-		ProtoImportPaths: generateProtoImportPaths,
+		ProtoImportPaths: protoImportPaths,
 	}
 
 	genResult, err := extractorImpl.Generate(ctx, path, info, genOpts)
@@ -172,7 +158,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	)
 
 	// Step 5: Validate the generated spec
-	if !generateSkipValidate {
+	if !skipValidate {
 		v := validator.NewValidator()
 		valResult, valErr := v.Validate(ctx, genResult.SpecFilePath)
 		if valErr != nil {
@@ -194,8 +180,8 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 
 	// Step 6: Enrich with AI (optional)
 	cfg := config.Get()
-	if !generateSkipEnrich && cfg.Enrich.Enabled && cfg.Enrich.Provider != "" && cfg.Enrich.Model != "" {
-		if enrichErr := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg); enrichErr != nil {
+	if !skipEnrich && cfg.Enrich.Enabled && cfg.Enrich.Provider != "" && cfg.Enrich.Model != "" {
+		if enrichErr := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg, language); enrichErr != nil {
 			// Log warning but don't fail - enrichment is optional
 			slog.WarnContext(ctx, "Enrichment failed (non-fatal)", "error", enrichErr)
 		}
@@ -220,7 +206,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	}
 
 	if absGenDir != absOutputDir {
-		if err := copySpecToOutput(genResult.SpecFilePath, outputDir, generateOverwriteOutput); err != nil {
+		if err := copySpecToOutput(genResult.SpecFilePath, outputDir, overwriteOutput); err != nil {
 			return errWrap("failed to copy spec to output directory", err)
 		}
 		slog.InfoContext(ctx, "Spec saved", "path", targetPath)
@@ -231,9 +217,9 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	}
 
 	// Step 8: Publish the spec to remote platforms (optional)
-	if !generateSkipPublish && generatePublishTarget != "" {
+	if !skipPublish && publishTarget != "" {
 		// Create publisher using factory
-		pub, err := publisher.NewPublisher(generatePublishTarget)
+		pub, err := publisher.NewPublisher(publishTarget)
 		if err != nil {
 			return errWrap("failed to create publisher", err)
 		}
@@ -242,7 +228,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		pubOpts := &publisher.PublishOptions{
 			OutputPath: genResult.SpecFilePath,
 			Format:     outputFormat,
-			Overwrite:  generatePublishOverwrite,
+			Overwrite:  publishOverwrite,
 		}
 
 		// Add ReadMe-specific options if using ReadMe publisher
@@ -302,33 +288,49 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 		RunE: runGenerate,
 	}
 
-	c.Flags().BoolVar(&generateKeepPatched, "keep-patched", false,
+	c.Flags().Bool("keep-patched", false,
 		"keep the patched pom.xml/build.gradle (default: restore original after extraction)")
-	c.Flags().BoolVar(&generateSkipValidate, "skip-validate", false,
+	c.Flags().Bool("skip-validate", false,
 		"skip validation of the generated OpenAPI spec")
-	c.Flags().DurationVar(&generateTimeout, "timeout", 5*time.Minute,
+	c.Flags().Duration("timeout", 5*time.Minute,
 		"timeout for Maven/Gradle commands")
-	c.Flags().BoolVar(&generateSkipEnrich, "skip-enrich", false,
+	c.Flags().Bool("skip-enrich", false,
 		"skip AI enrichment of the generated OpenAPI spec")
-	c.Flags().StringVar(&generateLanguage, "language", "en",
+	c.Flags().String("language", "en",
 		"language for AI-generated descriptions (e.g., en, zh)")
-	c.Flags().StringVarP(&generateOutputFormat, "output", "o", "",
+	c.Flags().StringP("output", "o", "",
 		"output format (yaml or json, default: yaml)")
-	c.Flags().StringVarP(&generateOutputDir, "output-dir", "d", "",
+	c.Flags().StringP("output-dir", "d", "",
 		"output directory for generated spec (default: project root)")
-	c.Flags().BoolVar(&generateSkipPublish, "skip-publish", false,
+	c.Flags().Bool("skip-publish", false,
 		"skip publishing to remote platforms")
-	c.Flags().StringVar(&generatePublishTarget, "publish-target", "",
+	c.Flags().String("publish-target", "",
 		"publish target (readme). If empty, spec is only saved locally")
-	c.Flags().BoolVar(&generatePublishOverwrite, "publish-overwrite", false,
+	c.Flags().Bool("publish-overwrite", false,
 		"overwrite existing spec on remote platform")
-	c.Flags().BoolVar(&generateOverwriteOutput, "overwrite-output", false,
+	c.Flags().Bool("overwrite-output", false,
 		"overwrite existing local spec file if it already exists")
-	c.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
+	c.Flags().StringSlice("proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
 
 	return c
 }
+
+// generate command flag variables for global rootCmd only
+var (
+	generateKeepPatched bool
+	generateSkipValidate bool
+	generateTimeout time.Duration
+	generateSkipEnrich bool
+	generateLanguage string
+	generateOutputDir string
+	generateOutputFormat string
+	generateSkipPublish bool
+	generatePublishTarget string
+	generatePublishOverwrite bool
+	generateOverwriteOutput bool
+	generateProtoImportPaths []string
+)
 
 func init() {
 	rootCmd.AddCommand(generateCmd)
@@ -360,11 +362,11 @@ func init() {
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
-func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.Config) error {
+func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.Config, language string) error {
 	slog.InfoContext(ctx, "Enriching OpenAPI spec with AI descriptions...")
 
 	// Determine language
-	lang := generateLanguage
+	lang := language
 	if lang == "" {
 		lang = cfg.Enrich.Language
 	}
