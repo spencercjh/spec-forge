@@ -219,6 +219,7 @@ func TestE2E_GinDemo_DefaultOutput(t *testing.T) {
 		"generate",
 		projectPath,
 		"--output", "yaml",
+		"--output-dir", projectPath,
 		"--skip-enrich",
 		"--skip-publish",
 	})
