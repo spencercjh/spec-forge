@@ -46,14 +46,64 @@ func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error)
 	// Build variable type map for type inference
 	varTypeMap := a.buildVarTypeMap(fn.Body)
 
+	// Check if handler has form context (comments, PostForm, FormFile, etc.)
+	// This helps infer that ShouldBind should use form binding
+	hasFormContext := a.hasFormContext(fn)
+
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		if node, ok := n.(*ast.CallExpr); ok {
-			a.parseHandlerCall(node, info, varTypeMap)
+			a.parseHandlerCall(node, info, varTypeMap, hasFormContext)
 		}
 		return true
 	})
 
+	// For form binding, expand struct fields into form params
+	if info.BindingSrc == BindingSourceForm && info.BodyType != "" {
+		formParams := a.extractFormParamsFromType(info.BodyType)
+		info.FormParams = append(info.FormParams, formParams...)
+	}
+
 	return info, nil
+}
+
+// hasFormContext checks if the handler contains form-related calls or comments.
+// This is used to infer that ShouldBind should use form binding.
+func (a *HandlerAnalyzer) hasFormContext(fn *ast.FuncDecl) bool {
+	// Check function comments for form-related keywords
+	if fn.Doc != nil {
+		for _, comment := range fn.Doc.List {
+			if strings.Contains(strings.ToLower(comment.Text), "form") {
+				return true
+			}
+		}
+	}
+
+	// Check function name for form-related keywords
+	if strings.Contains(strings.ToLower(fn.Name.Name), "form") {
+		return true
+	}
+
+	// Check body for form-related calls
+	if fn.Body != nil {
+		found := false
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if call, ok := n.(*ast.CallExpr); ok {
+				if sel, ok := call.Fun.(*ast.SelectorExpr); ok {
+					switch sel.Sel.Name {
+					case "PostForm", "DefaultPostForm", "FormFile", "MultipartForm":
+						found = true
+						return false
+					}
+				}
+			}
+			return true
+		})
+		if found {
+			return true
+		}
+	}
+
+	return false
 }
 
 // buildVarTypeMap builds a map of variable names to their types.
@@ -165,7 +215,7 @@ func inferTypeFromVarName(varName string) string {
 }
 
 // parseHandlerCall parses a call expression in a handler.
-func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
+func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string, hasFormContext bool) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return
@@ -186,8 +236,16 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 		a.extractQueryParam(call, info, method == "Query")
 	case "GetHeader":
 		a.extractHeaderParam(call, info)
-	case "ShouldBindJSON", "BindJSON", "ShouldBind", "Bind":
+	case "ShouldBindJSON", "BindJSON":
 		a.extractBodyType(call, info, varTypeMap, BindingSourceJSON)
+	case "ShouldBind", "Bind":
+		// ShouldBind auto-detects based on Content-Type
+		// Use form binding if we detect form context in the handler
+		if hasFormContext {
+			a.extractBodyType(call, info, varTypeMap, BindingSourceForm)
+		} else {
+			a.extractBodyType(call, info, varTypeMap, BindingSourceJSON)
+		}
 	case "ShouldBindXML", "BindXML":
 		a.extractBodyType(call, info, varTypeMap, BindingSourceXML)
 	case "ShouldBindYAML", "BindYAML":
@@ -320,6 +378,70 @@ func (a *HandlerAnalyzer) extractQueryParamsFromType(typeName string) []ParamInf
 					paramName = parts[0]
 				}
 			} else if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
+				parts := strings.Split(jsonTag, ",")
+				if parts[0] != "" && parts[0] != "-" {
+					paramName = parts[0]
+				}
+			}
+
+			// Check binding tag for required
+			if bindingTag := extractTagValue(tag, "binding"); bindingTag != "" {
+				if strings.Contains(bindingTag, "required") {
+					isRequired = true
+				}
+			}
+		}
+
+		if paramName == "" || paramName == "-" {
+			continue
+		}
+
+		goType := a.extractGoTypeName(field.Type)
+
+		params = append(params, ParamInfo{
+			Name:     paramName,
+			GoType:   goType,
+			Required: isRequired,
+		})
+	}
+
+	return params
+}
+
+// extractFormParamsFromType extracts form parameters from a struct type's form tags.
+func (a *HandlerAnalyzer) extractFormParamsFromType(typeName string) []ParamInfo {
+	var params []ParamInfo
+
+	typeSpec := a.findTypeSpec(typeName)
+	if typeSpec == nil {
+		return params
+	}
+
+	structType, ok := typeSpec.Type.(*ast.StructType)
+	if !ok {
+		return params
+	}
+
+	for _, field := range structType.Fields.List {
+		if len(field.Names) == 0 {
+			continue
+		}
+
+		fieldName := field.Names[0].Name
+		paramName := fieldName
+		isRequired := false
+
+		if field.Tag != nil {
+			tag := strings.Trim(field.Tag.Value, "`")
+
+			// Check form tag
+			if formTag := extractTagValue(tag, "form"); formTag != "" {
+				parts := strings.Split(formTag, ",")
+				if parts[0] != "" {
+					paramName = parts[0]
+				}
+			} else if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
+				// Fallback to json tag
 				parts := strings.Split(jsonTag, ",")
 				if parts[0] != "" && parts[0] != "-" {
 					paramName = parts[0]
