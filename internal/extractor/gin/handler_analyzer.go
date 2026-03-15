@@ -412,6 +412,15 @@ func statusCodeFromName(name string) int {
 }
 
 // extractTypeFromResponse extracts type from response argument.
+// isGenericMapType checks if a type is a generic map type (gin.H, map[string]any, etc.)
+// These types should have their Data field extracted rather than using the type itself.
+func isGenericMapType(typeName string) bool {
+	return typeName == "gin.H" ||
+		typeName == "map[string]any" ||
+		typeName == "map[string]interface{}" ||
+		typeName == "H"
+}
+
 func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string {
 	switch e := expr.(type) {
 	case *ast.Ident:
@@ -421,8 +430,23 @@ func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string
 		}
 		return e.Name
 	case *ast.CompositeLit:
-		// First check if this is ApiResponse{Data: user} pattern
-		// Try to extract the type from the Data field
+		// First extract the composite literal type itself
+		var typeName string
+		if ident, ok := e.Type.(*ast.Ident); ok {
+			typeName = ident.Name
+		} else if sel, ok := e.Type.(*ast.SelectorExpr); ok {
+			if x, ok := sel.X.(*ast.Ident); ok {
+				typeName = x.Name + "." + sel.Sel.Name
+			}
+		}
+
+		// If it's a wrapper type (e.g., ApiResponse), return the wrapper type
+		// rather than extracting from Data field
+		if typeName != "" && !isGenericMapType(typeName) {
+			return typeName
+		}
+
+		// For generic types (gin.H, map[string]any), try to extract from Data field
 		for _, elt := range e.Elts {
 			if kv, ok := elt.(*ast.KeyValueExpr); ok {
 				if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "Data" {
@@ -434,14 +458,10 @@ func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string
 				}
 			}
 		}
-		// Fall back to extracting the composite literal type itself
-		if ident, ok := e.Type.(*ast.Ident); ok {
-			return ident.Name
-		}
-		if sel, ok := e.Type.(*ast.SelectorExpr); ok {
-			if x, ok := sel.X.(*ast.Ident); ok {
-				return x.Name + "." + sel.Sel.Name
-			}
+
+		// Return the type name if we have it (even for generic types without Data field)
+		if typeName != "" {
+			return typeName
 		}
 	case *ast.CallExpr:
 		// gin.H or similar
