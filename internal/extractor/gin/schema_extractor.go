@@ -50,31 +50,132 @@ func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, e
 		return nil, fmt.Errorf("type %s not found", typeName)
 	}
 
-	// Extract schema from struct
-	schema, err := e.extractStructSchema(typeSpec)
+	// Extract schema based on underlying type
+	var schema *openapi3.Schema
+	var err error
+
+	switch underlying := typeSpec.Type.(type) {
+	case *ast.StructType:
+		schema, err = e.extractStructSchema(typeSpec, underlying)
+	case *ast.Ident:
+		// Type alias (e.g., type CustomString string)
+		schema = goTypeToSchema(underlying.Name)
+	case *ast.ArrayType:
+		// Type alias for array (e.g., type IDs []int)
+		itemSchema := e.fieldToSchema(underlying.Elt)
+		schema = &openapi3.Schema{
+			Type:  &openapi3.Types{"array"},
+			Items: &openapi3.SchemaRef{Value: itemSchema},
+		}
+	default:
+		// Fallback to object for unknown types
+		schema = &openapi3.Schema{Type: &openapi3.Types{"object"}}
+	}
+
 	if err != nil {
-		slog.Error("Failed to extract struct schema", "type", typeName, "error", err)
+		slog.Error("Failed to extract schema", "type", typeName, "error", err)
 		return nil, err
 	}
 
 	ref := &openapi3.SchemaRef{Value: schema}
 	e.typeCache[typeName] = ref
-	slog.Debug("Extracted schema", "type", typeName, "properties", len(schema.Properties))
+	slog.Debug("Extracted schema", "type", typeName)
 	return ref, nil
 }
 
-// findTypeSpec finds a type definition by name.
-func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
-	for _, file := range e.files {
-		for _, decl := range file.Decls {
-			genDecl, ok := decl.(*ast.GenDecl)
-			if !ok || genDecl.Tok != token.TYPE {
-				continue
+// ExtractAllSchemas extracts a type and all its nested referenced types.
+// This ensures that when Company is extracted, Address (if referenced) is also extracted.
+func (e *SchemaExtractor) ExtractAllSchemas(typeName string) (openapi3.Schemas, error) {
+	schemas := make(openapi3.Schemas)
+	visited := make(map[string]bool)
+
+	var extractRecursive func(string) error
+	extractRecursive = func(name string) error {
+		// Skip already visited or builtin types
+		if visited[name] {
+			return nil
+		}
+		visited[name] = true
+
+		// Skip primitive types
+		if isPrimitiveType(name) {
+			return nil
+		}
+
+		// Extract this type
+		schemaRef, err := e.ExtractSchema(name)
+		if err != nil {
+			// Log warning but continue - type might be from external package
+			slog.Warn("Failed to extract nested schema", "type", name, "error", err)
+			return nil
+		}
+
+		schemas[name] = schemaRef
+
+		// Find and extract all referenced types from this schema
+		if schemaRef.Value != nil && schemaRef.Value.Properties != nil {
+			for _, propRef := range schemaRef.Value.Properties {
+				if propRef.Ref != "" {
+					// Extract the type name from $ref (e.g., "#/components/schemas/Address" -> "Address")
+					refName := strings.TrimPrefix(propRef.Ref, "#/components/schemas/")
+					if err := extractRecursive(refName); err != nil {
+						return err
+					}
+				}
+				// Also check array items
+				if propRef.Value != nil && propRef.Value.Items != nil && propRef.Value.Items.Ref != "" {
+					refName := strings.TrimPrefix(propRef.Value.Items.Ref, "#/components/schemas/")
+					if err := extractRecursive(refName); err != nil {
+						return err
+					}
+				}
 			}
-			for _, spec := range genDecl.Specs {
-				typeSpec, ok := spec.(*ast.TypeSpec)
-				if ok && typeSpec.Name.Name == name {
-					return typeSpec
+		}
+
+		return nil
+	}
+
+	if err := extractRecursive(typeName); err != nil {
+		return nil, err
+	}
+
+	return schemas, nil
+}
+
+// isPrimitiveType checks if a type name is a primitive Go type.
+func isPrimitiveType(name string) bool {
+	primitives := []string{"string", "int", "int32", "int64", "uint", "uint32", "uint64",
+		"float32", "float64", "bool", "byte", "rune", "time.Time"}
+	for _, p := range primitives {
+		if name == p {
+			return true
+		}
+	}
+	return false
+}
+
+// findTypeSpec finds a type definition by name.
+// Supports both local types ("User") and cross-package types ("models.User").
+func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
+	// For cross-package references (e.g., "models.User"), try to find by short name
+	shortName := name
+	if idx := strings.LastIndex(name, "."); idx != -1 {
+		shortName = name[idx+1:]
+	}
+
+	// Try full name first, then short name
+	for _, tryName := range []string{name, shortName} {
+		for _, file := range e.files {
+			for _, decl := range file.Decls {
+				genDecl, ok := decl.(*ast.GenDecl)
+				if !ok || genDecl.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range genDecl.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if ok && typeSpec.Name.Name == tryName {
+						return typeSpec
+					}
 				}
 			}
 		}
@@ -83,11 +184,7 @@ func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
 }
 
 // extractStructSchema extracts schema from a struct type.
-func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec) (*openapi3.Schema, error) {
-	structType, ok := typeSpec.Type.(*ast.StructType)
-	if !ok {
-		return nil, fmt.Errorf("type %s is not a struct", typeSpec.Name.Name)
-	}
+func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec, structType *ast.StructType) (*openapi3.Schema, error) {
 
 	schema := &openapi3.Schema{
 		Type:       &openapi3.Types{"object"},
@@ -156,10 +253,25 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 			},
 		}
 	case *ast.SelectorExpr:
-		// Package qualified type (e.g., time.Time)
+		// Package qualified type (e.g., time.Time, models.User)
 		if x, ok := t.X.(*ast.Ident); ok {
 			fullName := x.Name + "." + t.Sel.Name
-			return &openapi3.SchemaRef{Value: goTypeToSchema(fullName)}
+			shortName := t.Sel.Name
+
+			// Check if it's a known primitive type (like time.Time)
+			schema := goTypeToSchema(fullName)
+			if schema.Type != nil && (*schema.Type)[0] != "object" {
+				return &openapi3.SchemaRef{Value: schema}
+			}
+
+			// It's a custom type - try to find it and create a reference
+			// Try both full name (models.User) and short name (User)
+			if e.findTypeSpec(fullName) != nil || e.findTypeSpec(shortName) != nil {
+				// Use short name for schema reference
+				ref := "#/components/schemas/" + shortName
+				return &openapi3.SchemaRef{Ref: ref}
+			}
+			return &openapi3.SchemaRef{Value: schema}
 		}
 	}
 

@@ -429,6 +429,7 @@ type SchemaPropertyExpectation struct {
 	Name     string
 	Type     string
 	ItemType string // For array types, the item schema reference
+	Ref      string // For reference types, the expected schema reference (e.g., "Address")
 }
 
 // ValidateSchemaProperty validates a specific schema property
@@ -491,6 +492,21 @@ func (v *SpecValidator) ValidateSchemaProperty(schemaName string, prop SchemaPro
 			} else {
 				v.t.Errorf("expected array items to reference %s, got %s", expectedRef, itemRef)
 			}
+		}
+	}
+
+	// For reference types, validate $ref
+	if prop.Ref != "" {
+		ref, ok := propData["$ref"].(string)
+		if ok {
+			expectedRef := "#/components/schemas/" + prop.Ref
+			if ref == expectedRef {
+				v.t.Logf("  schema %s.%s $ref=%s: OK", schemaName, prop.Name, prop.Ref)
+			} else {
+				v.t.Errorf("expected property %s to reference %s, got %s", prop.Name, expectedRef, ref)
+			}
+		} else {
+			v.t.Errorf("expected property %s to have $ref to %s", prop.Name, prop.Ref)
 		}
 	}
 }

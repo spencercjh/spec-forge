@@ -196,16 +196,19 @@ func (p *ASTParser) parseRouteCall(file string, call *ast.CallExpr) *Route {
 		return nil
 	}
 
-	// Extract path
+	// Extract path (can be empty string for group root)
 	path := extractStringLiteral(call.Args[0])
-	if path == "" {
-		return nil
-	}
+	// Note: path can be "" for group routes like r.Group("/api").GET("", handler)
 
 	// Check if this is a group route
 	fullPath := path
 	if group, ok := p.groups[routerVar.Name]; ok {
 		fullPath = group.BasePath + path
+	}
+
+	// If fullPath is empty after all processing, skip this route
+	if fullPath == "" {
+		return nil
 	}
 
 	// Convert Gin path format (:id) to OpenAPI path format ({id})

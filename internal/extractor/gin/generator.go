@@ -81,20 +81,36 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 	schemas := make(openapi3.Schemas)
 	for _, handlerInfo := range handlerInfos {
 		if handlerInfo.BodyType != "" && handlerInfo.BodyType != ginHType {
-			if schema, extractErr := schemaExtractor.ExtractSchema(handlerInfo.BodyType); extractErr == nil {
-				schemas[handlerInfo.BodyType] = schema
-				slog.DebugContext(ctx, "Extracted request body schema", "type", handlerInfo.BodyType)
+			extractedSchemas, extractErr := schemaExtractor.ExtractAllSchemas(handlerInfo.BodyType)
+			if extractErr == nil {
+				for name, schema := range extractedSchemas {
+					// Use short name (without package prefix) for schema key
+					shortName := name
+					if idx := strings.LastIndex(name, "."); idx != -1 {
+						shortName = name[idx+1:]
+					}
+					schemas[shortName] = schema
+				}
+				slog.DebugContext(ctx, "Extracted request body schemas", "type", handlerInfo.BodyType, "count", len(extractedSchemas))
 			} else {
-				slog.WarnContext(ctx, "Failed to extract schema", "type", handlerInfo.BodyType, "error", extractErr)
+				slog.WarnContext(ctx, "Failed to extract schemas", "type", handlerInfo.BodyType, "error", extractErr)
 			}
 		}
 		for _, resp := range handlerInfo.Responses {
 			if resp.GoType != "" && resp.GoType != ginHType {
-				if schema, extractErr := schemaExtractor.ExtractSchema(resp.GoType); extractErr == nil {
-					schemas[resp.GoType] = schema
-					slog.DebugContext(ctx, "Extracted response schema", "type", resp.GoType)
+				extractedSchemas, extractErr := schemaExtractor.ExtractAllSchemas(resp.GoType)
+				if extractErr == nil {
+					for name, schema := range extractedSchemas {
+						// Use short name (without package prefix) for schema key
+						shortName := name
+						if idx := strings.LastIndex(name, "."); idx != -1 {
+							shortName = name[idx+1:]
+						}
+						schemas[shortName] = schema
+					}
+					slog.DebugContext(ctx, "Extracted response schemas", "type", resp.GoType, "count", len(extractedSchemas))
 				} else {
-					slog.WarnContext(ctx, "Failed to extract schema", "type", resp.GoType, "error", extractErr)
+					slog.WarnContext(ctx, "Failed to extract schemas", "type", resp.GoType, "error", extractErr)
 				}
 			}
 		}
@@ -121,14 +137,32 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 }
 
 // findHandlerDecl finds a handler function declaration by name.
+// Supports both local handlers ("getUser") and cross-package handlers ("handlers.GetUser").
 func (g *Generator) findHandlerDecl(name string, files map[string]*ast.File) *ast.FuncDecl {
 	if name == "" {
 		return nil
 	}
-	for _, file := range files {
-		for _, decl := range file.Decls {
-			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == name {
-				return fn
+
+	// Check if it's a cross-package reference (e.g., "handlers.GetUser")
+	parts := strings.Split(name, ".")
+	if len(parts) == 2 {
+		// Cross-package handler: packageName.FunctionName
+		// Try to find by function name only since we can't easily resolve imports
+		funcName := parts[1]
+		for _, file := range files {
+			for _, decl := range file.Decls {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == funcName {
+					return fn
+				}
+			}
+		}
+	} else {
+		// Local handler: just search by name
+		for _, file := range files {
+			for _, decl := range file.Decls {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == name {
+					return fn
+				}
 			}
 		}
 	}
@@ -263,16 +297,23 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 				response.Content["application/json"] = &openapi3.MediaType{
 					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
 				}
-			} else if _, exists := schemas[resp.GoType]; exists {
-				response.Content["application/json"] = &openapi3.MediaType{
-					Schema: &openapi3.SchemaRef{
-						Ref: "#/components/schemas/" + resp.GoType,
-					},
-				}
 			} else {
-				// Fallback to generic object if schema not found
-				response.Content["application/json"] = &openapi3.MediaType{
-					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
+				// Use short name (without package prefix) for schema lookup and $ref
+				shortName := resp.GoType
+				if idx := strings.LastIndex(resp.GoType, "."); idx != -1 {
+					shortName = resp.GoType[idx+1:]
+				}
+				if _, exists := schemas[shortName]; exists {
+					response.Content["application/json"] = &openapi3.MediaType{
+						Schema: &openapi3.SchemaRef{
+							Ref: "#/components/schemas/" + shortName,
+						},
+					}
+				} else {
+					// Fallback to generic object if schema not found
+					response.Content["application/json"] = &openapi3.MediaType{
+						Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
+					}
 				}
 			}
 		}
@@ -344,9 +385,15 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 		return
 	}
 
+	// Use short name (without package prefix) for schema lookup and $ref
+	shortBodyType := handlerInfo.BodyType
+	if idx := strings.LastIndex(handlerInfo.BodyType, "."); idx != -1 {
+		shortBodyType = handlerInfo.BodyType[idx+1:]
+	}
+
 	var schemaRef *openapi3.SchemaRef
-	if _, exists := schemas[handlerInfo.BodyType]; exists {
-		schemaRef = &openapi3.SchemaRef{Ref: "#/components/schemas/" + handlerInfo.BodyType}
+	if _, exists := schemas[shortBodyType]; exists {
+		schemaRef = &openapi3.SchemaRef{Ref: "#/components/schemas/" + shortBodyType}
 	} else {
 		// Fallback to generic object if schema not found
 		schemaRef = &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}}

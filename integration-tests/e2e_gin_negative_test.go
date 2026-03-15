@@ -163,9 +163,10 @@ func TestE2E_Gin_NestedModels_ComplexTypes(t *testing.T) {
 	})
 
 	// Validate nested struct property (Address inside Company)
+	// Address is now properly extracted as a separate schema and referenced
 	validator.ValidateSchemaProperty("Company", SchemaPropertyExpectation{
-		Name: "address",
-		Type: "object", // Nested struct becomes object
+		Name:    "address",
+		Ref:     "Address", // Nested struct references Address schema
 	})
 
 	// Validate array of structs (Employees)

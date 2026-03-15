@@ -145,6 +145,9 @@ func getCompany(c *gin.Context) {
 }
 
 func updateCompany(c *gin.Context) {
+	id := c.Param("id")
+	_ = id
+
 	var req UpdateCompanyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -157,7 +160,8 @@ func updateCompany(c *gin.Context) {
 }
 
 func listCompanyEmployees(c *gin.Context) {
-	// id := c.Param("id")
+	id := c.Param("id")
+	_ = id
 	c.JSON(http.StatusOK, []Employee{
 		{
 			ID:   1,

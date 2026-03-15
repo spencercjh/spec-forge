@@ -141,15 +141,25 @@ func (a *HandlerAnalyzer) extractVarDeclTypes(node *ast.DeclStmt, varTypeMap map
 			if i < len(valueSpec.Values) {
 				// Check if value is a composite literal with type
 				if comp, ok := valueSpec.Values[i].(*ast.CompositeLit); ok {
-					if ident, ok := comp.Type.(*ast.Ident); ok {
-						varTypeMap[name.Name] = ident.Name
+					switch t := comp.Type.(type) {
+					case *ast.Ident:
+						varTypeMap[name.Name] = t.Name
+					case *ast.SelectorExpr:
+						if x, ok := t.X.(*ast.Ident); ok {
+							varTypeMap[name.Name] = x.Name + "." + t.Sel.Name
+						}
 					}
 				}
 			}
 			// Also check explicit type
 			if valueSpec.Type != nil {
-				if ident, ok := valueSpec.Type.(*ast.Ident); ok {
-					varTypeMap[name.Name] = ident.Name
+				switch t := valueSpec.Type.(type) {
+				case *ast.Ident:
+					varTypeMap[name.Name] = t.Name
+				case *ast.SelectorExpr:
+					if x, ok := t.X.(*ast.Ident); ok {
+						varTypeMap[name.Name] = x.Name + "." + t.Sel.Name
+					}
 				}
 			}
 		}
@@ -171,8 +181,13 @@ func (a *HandlerAnalyzer) extractAssignTypes(node *ast.AssignStmt, varTypeMap ma
 		}
 		// Check if RHS is a composite literal with type
 		if comp, ok := node.Rhs[i].(*ast.CompositeLit); ok {
-			if typeIdent, ok := comp.Type.(*ast.Ident); ok {
-				varTypeMap[ident.Name] = typeIdent.Name
+			switch t := comp.Type.(type) {
+			case *ast.Ident:
+				varTypeMap[ident.Name] = t.Name
+			case *ast.SelectorExpr:
+				if x, ok := t.X.(*ast.Ident); ok {
+					varTypeMap[ident.Name] = x.Name + "." + t.Sel.Name
+				}
 			}
 		} else {
 			// Try to infer type from variable name using heuristic
