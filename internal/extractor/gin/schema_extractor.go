@@ -19,6 +19,9 @@ const (
 	validateRuleUUID  = "uuid"
 )
 
+// Schema type constants for goconst compliance
+const schemaTypeObject = schemaTypeObject
+
 // SchemaExtractor extracts OpenAPI schemas from Go structs.
 type SchemaExtractor struct {
 	files     map[string]*ast.File
@@ -69,7 +72,7 @@ func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, e
 		}
 	default:
 		// Fallback to object for unknown types
-		schema = &openapi3.Schema{Type: &openapi3.Types{"object"}}
+		schema = &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 	}
 
 	if err != nil {
@@ -181,9 +184,9 @@ func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
 }
 
 // extractStructSchema extracts schema from a struct type.
-func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec, structType *ast.StructType) (*openapi3.Schema, error) {
+func (e *SchemaExtractor) extractStructSchema(_ *ast.TypeSpec, structType *ast.StructType) (*openapi3.Schema, error) {
 	schema := &openapi3.Schema{
-		Type:       &openapi3.Types{"object"},
+		Type:       &openapi3.Types{schemaTypeObject},
 		Properties: make(openapi3.Schemas),
 	}
 
@@ -220,7 +223,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 	case *ast.Ident:
 		// Check if it's a basic type first
 		schema := goTypeToSchema(t.Name)
-		if schema.Type != nil && (*schema.Type)[0] != "object" {
+		if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
 			return &openapi3.SchemaRef{Value: schema}
 		}
 		// It's a custom type - create a reference
@@ -244,7 +247,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 		valueSchemaRef := e.fieldToSchemaRef(t.Value)
 		return &openapi3.SchemaRef{
 			Value: &openapi3.Schema{
-				Type:                 &openapi3.Types{"object"},
+				Type:                 &openapi3.Types{schemaTypeObject},
 				AdditionalProperties: openapi3.AdditionalProperties{Schema: valueSchemaRef},
 			},
 		}
@@ -256,7 +259,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 
 			// Check if it's a known primitive type (like time.Time)
 			schema := goTypeToSchema(fullName)
-			if schema.Type != nil && (*schema.Type)[0] != "object" {
+			if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
 				return &openapi3.SchemaRef{Value: schema}
 			}
 
@@ -271,7 +274,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 		}
 	}
 
-	return &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}}
+	return &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}}
 }
 
 // fieldToSchema converts a Go type to OpenAPI schema.
@@ -280,14 +283,14 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 	case *ast.Ident:
 		// Check if it's a basic type first
 		schema := goTypeToSchema(t.Name)
-		if schema.Type != nil && (*schema.Type)[0] != "object" {
+		if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
 			return schema
 		}
 		// It's a custom type - check if we know about it
 		if e.findTypeSpec(t.Name) != nil {
 			// Return a placeholder schema with type object
 			// The reference will be created by the caller if needed
-			return &openapi3.Schema{Type: &openapi3.Types{"object"}}
+			return &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 		}
 		return schema
 	case *ast.StarExpr:
@@ -302,7 +305,7 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 	case *ast.MapType:
 		valueSchema := e.fieldToSchema(t.Value)
 		return &openapi3.Schema{
-			Type:                 &openapi3.Types{"object"},
+			Type:                 &openapi3.Types{schemaTypeObject},
 			AdditionalProperties: openapi3.AdditionalProperties{Schema: &openapi3.SchemaRef{Value: valueSchema}},
 		}
 	case *ast.SelectorExpr:
@@ -313,7 +316,7 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 		}
 	}
 
-	return &openapi3.Schema{Type: &openapi3.Types{"object"}}
+	return &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 }
 
 // goTypeToSchema converts a Go type name to OpenAPI schema.
@@ -336,7 +339,7 @@ func goTypeToSchema(goType string) *openapi3.Schema {
 	case "time.Time":
 		return &openapi3.Schema{Type: &openapi3.Types{"string"}, Format: "date-time"}
 	default:
-		return &openapi3.Schema{Type: &openapi3.Types{"object"}}
+		return &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 	}
 }
 
