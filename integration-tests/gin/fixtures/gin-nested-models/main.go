@@ -24,20 +24,20 @@ type Address struct {
 
 // Company represents a company with nested address
 type Company struct {
-	ID        int64     `json:"id" binding:"required"`
-	Name      string    `json:"name" binding:"required"`
-	Address   Address   `json:"address" binding:"required"`
+	ID        int64      `json:"id" binding:"required"`
+	Name      string     `json:"name" binding:"required"`
+	Address   Address    `json:"address" binding:"required"`
 	Employees []Employee `json:"employees"`
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time  `json:"createdAt"`
 }
 
 // Employee represents an employee
 type Employee struct {
-	ID        int64   `json:"id"`
-	Name      string  `json:"name" binding:"required"`
-	Email     string  `json:"email" binding:"required,email"`
-	Department string `json:"department"`
-	Manager   *Employee `json:"manager,omitempty"` // Pointer to another Employee (recursive)
+	ID         int64     `json:"id"`
+	Name       string    `json:"name" binding:"required"`
+	Email      string    `json:"email" binding:"required,email"`
+	Department string    `json:"department"`
+	Manager    *Employee `json:"manager,omitempty"` // Pointer to another Employee (recursive)
 }
 
 // CreateCompanyRequest represents a request to create a company
@@ -66,8 +66,8 @@ type CustomString string
 
 // Metadata contains arbitrary metadata
 type Metadata struct {
-	Tags    []CustomString     `json:"tags"`
-	Extra   map[string]string  `json:"extra"`
+	Tags  []CustomString    `json:"tags"`
+	Extra map[string]string `json:"extra"`
 }
 
 // Resource represents a resource with metadata

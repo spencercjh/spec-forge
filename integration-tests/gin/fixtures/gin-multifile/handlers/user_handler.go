@@ -4,9 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
-
 	"gin-multifile/models"
+	"github.com/gin-gonic/gin"
 )
 
 // ListUsers handles GET /api/users

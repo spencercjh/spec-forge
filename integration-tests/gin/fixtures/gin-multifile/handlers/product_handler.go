@@ -3,15 +3,14 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
-
 	"gin-multifile/models"
+	"github.com/gin-gonic/gin"
 )
 
 // ListProducts handles GET /api/products
 func ListProducts(c *gin.Context) {
 	var query struct {
-		Category string `form:"category"`
+		Category string  `form:"category"`
 		MinPrice float64 `form:"min_price"`
 	}
 

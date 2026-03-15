@@ -144,14 +144,11 @@ func (e *SchemaExtractor) ExtractAllSchemas(typeName string) (openapi3.Schemas, 
 
 // isPrimitiveType checks if a type name is a primitive Go type.
 func isPrimitiveType(name string) bool {
-	primitives := []string{"string", "int", "int32", "int64", "uint", "uint32", "uint64",
-		"float32", "float64", "bool", "byte", "rune", "time.Time"}
-	for _, p := range primitives {
-		if name == p {
-			return true
-		}
+	primitives := []string{
+		"string", "int", "int32", "int64", "uint", "uint32", "uint64",
+		"float32", "float64", "bool", "byte", "rune", "time.Time",
 	}
-	return false
+	return slices.Contains(primitives, name)
 }
 
 // findTypeSpec finds a type definition by name.
@@ -185,7 +182,6 @@ func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
 
 // extractStructSchema extracts schema from a struct type.
 func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec, structType *ast.StructType) (*openapi3.Schema, error) {
-
 	schema := &openapi3.Schema{
 		Type:       &openapi3.Types{"object"},
 		Properties: make(openapi3.Schemas),

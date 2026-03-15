@@ -1,29 +1,20 @@
 //go:build e2e
 
-package e2e_test
+package gin
 
 import (
 	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/spencercjh/spec-forge/cmd"
+	"github.com/spencercjh/spec-forge/integration-tests/helpers"
 )
 
-// GoldenSnapshot represents a golden file snapshot
-type GoldenSnapshot struct {
-	Name     string
-	Path     string // Path in OpenAPI spec (e.g., "paths./api/v1/users.get")
-	File     string // Golden file path
-	Optional bool   // If true, test won't fail if missing (for unstable features)
-}
-
-// Golden snapshots for gin-demo
-// These verify critical semantic properties without checking the entire spec
-var ginDemoGoldenSnapshots = []GoldenSnapshot{
+// goldenSnapshots defines golden file snapshots for semantic stability testing
+var goldenSnapshots = []helpers.GoldenSnapshot{
 	{
 		Name: "User Schema Structure",
 		Path: "components.schemas.User",
@@ -56,9 +47,9 @@ var ginDemoGoldenSnapshots = []GoldenSnapshot{
 	},
 }
 
-// TestE2E_GinDemo_GoldenSnapshots tests against golden files for semantic stability
-func TestE2E_GinDemo_GoldenSnapshots(t *testing.T) {
-	projectPath := "./gin-demo"
+// TestGoldenSnapshots tests against golden files
+func TestGoldenSnapshots(t *testing.T) {
+	projectPath := "./fixtures/gin-demo"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("Gin demo project not found")
@@ -84,7 +75,7 @@ func TestE2E_GinDemo_GoldenSnapshots(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
 	specData, err := os.ReadFile(specFile)
 	if err != nil {
 		t.Fatalf("failed to read spec file: %v", err)
@@ -95,23 +86,20 @@ func TestE2E_GinDemo_GoldenSnapshots(t *testing.T) {
 		t.Fatalf("failed to parse spec JSON: %v", err)
 	}
 
-	goldenDir := "./gin-fixtures/golden"
+	goldenDir := "./fixtures/golden"
 
-	for _, snapshot := range ginDemoGoldenSnapshots {
+	for _, snapshot := range goldenSnapshots {
 		t.Run(snapshot.Name, func(t *testing.T) {
-			// Extract value from spec using path
-			actual := extractFromPath(t, spec, snapshot.Path)
+			actual := helpers.ExtractFromPath(t, spec, snapshot.Path)
 			if actual == nil {
 				t.Fatalf("failed to extract value at path: %s", snapshot.Path)
 			}
 
-			// Format actual value
 			actualJSON, err := json.MarshalIndent(actual, "", "  ")
 			if err != nil {
 				t.Fatalf("failed to marshal actual value: %v", err)
 			}
 
-			// Read golden file
 			goldenPath := filepath.Join(goldenDir, snapshot.File)
 			goldenData, err := os.ReadFile(goldenPath)
 			if err != nil {
@@ -121,7 +109,6 @@ func TestE2E_GinDemo_GoldenSnapshots(t *testing.T) {
 				t.Fatalf("failed to read golden file %s: %v", goldenPath, err)
 			}
 
-			// Parse golden to normalize
 			var golden any
 			if err := json.Unmarshal(goldenData, &golden); err != nil {
 				t.Fatalf("failed to parse golden file: %v", err)
@@ -132,7 +119,6 @@ func TestE2E_GinDemo_GoldenSnapshots(t *testing.T) {
 				t.Fatalf("failed to marshal golden value: %v", err)
 			}
 
-			// Compare
 			if string(actualJSON) != string(goldenJSON) {
 				t.Errorf("Golden snapshot mismatch for %s\nPath: %s\n\nExpected (golden):\n%s\n\nActual:\n%s",
 					snapshot.Name, snapshot.Path, string(goldenJSON), string(actualJSON))
@@ -141,57 +127,9 @@ func TestE2E_GinDemo_GoldenSnapshots(t *testing.T) {
 	}
 }
 
-// extractFromPath extracts a value from a nested map using dot-notation path
-// Supports OpenAPI-style paths like "paths./api/v1/users.get" or "components.schemas.User"
-func extractFromPath(t *testing.T, spec map[string]any, path string) any {
-	t.Helper()
-
-	// Handle paths with API paths like "paths./api/v1/users.get"
-	// by splitting into known prefixes and then the rest
-	var parts []string
-
-	if strings.HasPrefix(path, "paths./") {
-		// Format: paths./api/v1/users.get or paths./api/v1/users/{id}.get
-		// Find the HTTP method suffix (.get, .post, etc.)
-		lastDot := strings.LastIndex(path, ".")
-		if lastDot > 0 {
-			prefix := path[:lastDot] // paths./api/v1/users
-			method := path[lastDot+1:] // get
-
-			// Remove "paths." prefix
-			apiPath := strings.TrimPrefix(prefix, "paths.")
-			parts = []string{"paths", apiPath, method}
-		} else {
-			parts = strings.Split(path, ".")
-		}
-	} else if strings.HasPrefix(path, "components.schemas.") {
-		// Format: components.schemas.User
-		parts = []string{"components", "schemas", strings.TrimPrefix(path, "components.schemas.")}
-	} else {
-		parts = strings.Split(path, ".")
-	}
-
-	current := any(spec)
-
-	for _, part := range parts {
-		if current == nil {
-			return nil
-		}
-
-		switch v := current.(type) {
-		case map[string]any:
-			current = v[part]
-		default:
-			return nil
-		}
-	}
-
-	return current
-}
-
-// TestE2E_GinDemo_CriticalInvariants tests critical semantic invariants that must not change
-func TestE2E_GinDemo_CriticalInvariants(t *testing.T) {
-	projectPath := "./gin-demo"
+// TestCriticalInvariants tests critical semantic invariants
+func TestCriticalInvariants(t *testing.T) {
+	projectPath := "./fixtures/gin-demo"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("Gin demo project not found")
@@ -217,18 +155,19 @@ func TestE2E_GinDemo_CriticalInvariants(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
-	validator := NewSpecValidator(t, specFile)
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
 
 	t.Run("User Schema Must Have Required ID", func(t *testing.T) {
-		validator.ValidateSchemaProperty("User", SchemaPropertyExpectation{
+		validator.ValidateSchemaProperty("User", helpers.SchemaPropertyExpectation{
 			Name: "id",
 			Type: "integer",
 		})
 	})
 
 	t.Run("CreateUserRequest Must Have Required Fields", func(t *testing.T) {
-		components := validator.spec["components"].(map[string]any)
+		spec := validator.GetSpec()
+		components := spec["components"].(map[string]any)
 		schemas := components["schemas"].(map[string]any)
 		createReq := schemas["CreateUserRequest"].(map[string]any)
 		required := createReq["required"].([]any)
@@ -249,7 +188,7 @@ func TestE2E_GinDemo_CriticalInvariants(t *testing.T) {
 	})
 
 	t.Run("PageResult Content Must Be User Array", func(t *testing.T) {
-		validator.ValidateSchemaProperty("PageResult", SchemaPropertyExpectation{
+		validator.ValidateSchemaProperty("PageResult", helpers.SchemaPropertyExpectation{
 			Name:     "content",
 			Type:     "array",
 			ItemType: "User",
@@ -257,13 +196,13 @@ func TestE2E_GinDemo_CriticalInvariants(t *testing.T) {
 	})
 
 	t.Run("Path Param ID Must Be Required", func(t *testing.T) {
-		validator.ValidateParameterDetails("/api/v1/users/{id}", "get", []ParameterExpectation{
+		validator.ValidateParameterDetails("/api/v1/users/{id}", "get", []helpers.ParameterExpectation{
 			{Name: "id", In: "path", Required: true},
 		})
 	})
 
 	t.Run("GET Users Response Must Be PageResult", func(t *testing.T) {
-		validator.ValidateResponseSchema("/api/v1/users", "get", ResponseSchemaExpectation{
+		validator.ValidateResponseSchema("/api/v1/users", "get", helpers.ResponseSchemaExpectation{
 			Code:        "200",
 			ContentType: "application/json",
 			SchemaRef:   "PageResult",
@@ -275,16 +214,14 @@ func TestE2E_GinDemo_CriticalInvariants(t *testing.T) {
 	})
 }
 
-// TestE2E_GinDemo_RegenerateGolden tests to regenerate golden files (not run by default)
-func TestE2E_GinDemo_RegenerateGolden(t *testing.T) {
-	// This test is skipped by default. Run with:
-	// go test -v -tags=e2e ./integration-tests/... -run TestE2E_GinDemo_RegenerateGolden -regenerate
+// TestRegenerateGolden regenerates golden files (run with REGENERATE_GOLDEN=true)
+func TestRegenerateGolden(t *testing.T) {
 	if os.Getenv("REGENERATE_GOLDEN") != "true" {
 		t.Skip("Set REGENERATE_GOLDEN=true to regenerate golden files")
 	}
 
-	projectPath := "./gin-demo"
-	goldenDir := "./gin-fixtures/golden"
+	projectPath := "./fixtures/gin-demo"
+	goldenDir := "./fixtures/golden"
 
 	outputDir := t.TempDir()
 
@@ -306,7 +243,7 @@ func TestE2E_GinDemo_RegenerateGolden(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
 	specData, err := os.ReadFile(specFile)
 	if err != nil {
 		t.Fatalf("failed to read spec file: %v", err)
@@ -317,9 +254,8 @@ func TestE2E_GinDemo_RegenerateGolden(t *testing.T) {
 		t.Fatalf("failed to parse spec JSON: %v", err)
 	}
 
-	// Regenerate each golden file
-	for _, snapshot := range ginDemoGoldenSnapshots {
-		actual := extractFromPath(t, spec, snapshot.Path)
+	for _, snapshot := range goldenSnapshots {
+		actual := helpers.ExtractFromPath(t, spec, snapshot.Path)
 		if actual == nil {
 			t.Logf("Warning: could not extract %s", snapshot.Path)
 			continue
@@ -327,13 +263,11 @@ func TestE2E_GinDemo_RegenerateGolden(t *testing.T) {
 
 		goldenPath := filepath.Join(goldenDir, snapshot.File)
 
-		// Ensure directory exists
 		dir := filepath.Dir(goldenPath)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("failed to create directory %s: %v", dir, err)
 		}
 
-		// Marshal with indentation
 		data, err := json.MarshalIndent(actual, "", "  ")
 		if err != nil {
 			t.Fatalf("failed to marshal: %v", err)

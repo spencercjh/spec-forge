@@ -1,10 +1,9 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
-
 	"gin-multifile/handlers"
 	"gin-multifile/models"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {

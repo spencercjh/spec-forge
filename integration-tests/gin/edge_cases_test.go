@@ -1,6 +1,6 @@
 //go:build e2e
 
-package e2e_test
+package gin
 
 import (
 	"bytes"
@@ -9,18 +9,16 @@ import (
 	"testing"
 
 	"github.com/spencercjh/spec-forge/cmd"
+	"github.com/spencercjh/spec-forge/integration-tests/helpers"
 )
 
-// TestE2E_Gin_Unsupported_WildcardRoutes tests that wildcard routes are handled gracefully
-func TestE2E_Gin_Unsupported_WildcardRoutes(t *testing.T) {
-	projectPath := "./gin-fixtures/gin-unsupported"
+// TestWildcardRoutes tests wildcard route handling
+func TestWildcardRoutes(t *testing.T) {
+	projectPath := "./fixtures/gin-unsupported"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("gin-unsupported fixture not found")
 	}
-
-	// Wildcard route is now handled, and anonymous handlers should work
-	// t.Skip("Skipping: see issue tracker")
 
 	outputDir := t.TempDir()
 
@@ -42,14 +40,11 @@ func TestE2E_Gin_Unsupported_WildcardRoutes(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
-	validator := NewSpecValidator(t, specFile)
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
 
-	// Wildcard routes should be skipped or handled without crashing
-	// The standard health endpoint should still work
 	validator.ValidatePath("/api/health")
 
-	// Should have paths generated (even if some are skipped)
 	pathCount := validator.GetPathCount()
 	if pathCount == 0 {
 		t.Error("expected at least some paths to be generated")
@@ -58,16 +53,13 @@ func TestE2E_Gin_Unsupported_WildcardRoutes(t *testing.T) {
 	t.Logf("Generated %d paths (wildcard routes handled)", pathCount)
 }
 
-// TestE2E_Gin_Unsupported_AnonymousHandlers tests handling of anonymous handlers
-func TestE2E_Gin_Unsupported_AnonymousHandlers(t *testing.T) {
-	projectPath := "./gin-fixtures/gin-anonymous-handler"
+// TestAnonymousHandlers tests anonymous handler handling
+func TestAnonymousHandlers(t *testing.T) {
+	projectPath := "./fixtures/gin-anonymous-handler"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("gin-anonymous-handler fixture not found")
 	}
-
-	// Anonymous handler response should now work
-	// t.Skip("Skipping: see issue tracker")
 
 	outputDir := t.TempDir()
 
@@ -89,11 +81,9 @@ func TestE2E_Gin_Unsupported_AnonymousHandlers(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
-	validator := NewSpecValidator(t, specFile)
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
 
-	// Some paths should be generated even with anonymous handlers
-	// The extractor may skip some, but shouldn't crash
 	pathCount := validator.GetPathCount()
 	if pathCount == 0 {
 		t.Error("expected at least some paths to be generated from anonymous handlers")
@@ -103,9 +93,9 @@ func TestE2E_Gin_Unsupported_AnonymousHandlers(t *testing.T) {
 	t.Logf("Anonymous handlers handled: %d paths generated", pathCount)
 }
 
-// TestE2E_Gin_NestedModels_ComplexTypes tests extraction of complex nested types
-func TestE2E_Gin_NestedModels_ComplexTypes(t *testing.T) {
-	projectPath := "./gin-fixtures/gin-nested-models"
+// TestNestedModels tests extraction of complex nested types
+func TestNestedModels(t *testing.T) {
+	projectPath := "./fixtures/gin-nested-models"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("gin-nested-models fixture not found")
@@ -131,17 +121,16 @@ func TestE2E_Gin_NestedModels_ComplexTypes(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
-	validator := NewSpecValidator(t, specFile)
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
 
-	// Basic validation
-	validator.FullValidation(ValidationConfig{
+	validator.FullValidation(helpers.ValidationConfig{
 		ExpectedPaths: []string{
 			"/companies",
 			"/companies/{id}",
 			"/companies/{id}/employees",
 		},
-		Operations: []OperationConfig{
+		Operations: []helpers.OperationConfig{
 			{
 				Path:                  "/companies",
 				Method:                "get",
@@ -162,15 +151,12 @@ func TestE2E_Gin_NestedModels_ComplexTypes(t *testing.T) {
 		},
 	})
 
-	// Validate nested struct property (Address inside Company)
-	// Address is now properly extracted as a separate schema and referenced
-	validator.ValidateSchemaProperty("Company", SchemaPropertyExpectation{
-		Name:    "address",
-		Ref:     "Address", // Nested struct references Address schema
+	validator.ValidateSchemaProperty("Company", helpers.SchemaPropertyExpectation{
+		Name: "address",
+		Ref:  "Address",
 	})
 
-	// Validate array of structs (Employees)
-	validator.ValidateSchemaProperty("Company", SchemaPropertyExpectation{
+	validator.ValidateSchemaProperty("Company", helpers.SchemaPropertyExpectation{
 		Name:     "employees",
 		Type:     "array",
 		ItemType: "Employee",
@@ -179,9 +165,9 @@ func TestE2E_Gin_NestedModels_ComplexTypes(t *testing.T) {
 	t.Log("Complex nested types handled successfully")
 }
 
-// TestE2E_Gin_Multifile_CrossPackage tests cross-package type resolution
-func TestE2E_Gin_Multifile_CrossPackage(t *testing.T) {
-	projectPath := "./gin-fixtures/gin-multifile"
+// TestMultifileCrossPackage tests cross-package type resolution
+func TestMultifileCrossPackage(t *testing.T) {
+	projectPath := "./fixtures/gin-multifile"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("gin-multifile fixture not found")
@@ -207,11 +193,10 @@ func TestE2E_Gin_Multifile_CrossPackage(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
-	validator := NewSpecValidator(t, specFile)
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
 
-	// Validate cross-package types are resolved
-	validator.FullValidation(ValidationConfig{
+	validator.FullValidation(helpers.ValidationConfig{
 		ExpectedPaths: []string{
 			"/api/users",
 			"/api/users/{id}",
@@ -227,9 +212,9 @@ func TestE2E_Gin_Multifile_CrossPackage(t *testing.T) {
 	t.Log("Cross-package type resolution successful")
 }
 
-// TestE2E_Gin_Basic_Minimal tests minimal single-file extraction
-func TestE2E_Gin_Basic_Minimal(t *testing.T) {
-	projectPath := "./gin-fixtures/gin-basic"
+// TestBasicMinimal tests minimal single-file extraction
+func TestBasicMinimal(t *testing.T) {
+	projectPath := "./fixtures/gin-basic"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("gin-basic fixture not found")
@@ -255,16 +240,15 @@ func TestE2E_Gin_Basic_Minimal(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
-	validator := NewSpecValidator(t, specFile)
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
 
-	// Minimal fixture should have basic CRUD paths
-	validator.FullValidation(ValidationConfig{
+	validator.FullValidation(helpers.ValidationConfig{
 		ExpectedPaths: []string{
 			"/items",
 			"/items/{id}",
 		},
-		Operations: []OperationConfig{
+		Operations: []helpers.OperationConfig{
 			{
 				Path:                  "/items",
 				Method:                "get",
@@ -293,12 +277,10 @@ func TestE2E_Gin_Basic_Minimal(t *testing.T) {
 	t.Log("Basic minimal extraction successful")
 }
 
-// TestE2E_Gin_Malformed_GracefulDegradation tests graceful handling of malformed files
-func TestE2E_Gin_Malformed_GracefulDegradation(t *testing.T) {
-	// Create a temporary directory with a malformed Go file
+// TestMalformedGracefulDegradation tests graceful handling of malformed files
+func TestMalformedGracefulDegradation(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// Create go.mod
 	goMod := `module malformed-test
 
 go 1.24.0
@@ -309,7 +291,6 @@ require github.com/gin-gonic/gin v1.12.0
 		t.Fatalf("failed to write go.mod: %v", err)
 	}
 
-	// Create main.go with valid routes
 	mainGo := `package main
 
 import "github.com/gin-gonic/gin"
@@ -328,12 +309,10 @@ func validHandler(c *gin.Context) {
 		t.Fatalf("failed to write main.go: %v", err)
 	}
 
-	// Create malformed.go with syntax error
 	malformedGo := `package main
 
 import "github.com/gin-gonic/gin"
 
-// This file has syntax errors
 func malformedHandler(c *gin.Context) {
 	c.JSON(200, gin.H{"status": "ok"
 	// Missing closing brace
@@ -357,10 +336,8 @@ func malformedHandler(c *gin.Context) {
 		"--skip-publish",
 	})
 
-	// Should either succeed (gracefully skipping malformed file) or fail with clear error
 	err := rootCmd.Execute()
 	if err != nil {
-		// If it fails, it should provide a clear error message
 		errMsg := stderr.String()
 		if errMsg == "" {
 			t.Error("expected error message for malformed file, got empty stderr")
@@ -370,22 +347,18 @@ func malformedHandler(c *gin.Context) {
 		return
 	}
 
-	// If it succeeds, valid routes should still be extracted
-	specFile := FindSpecFile(t, outputDir, "json")
-	validator := NewSpecValidator(t, specFile)
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
 
-	// Valid handler should still be present
 	validator.ValidatePath("/valid")
 
 	t.Log("Graceful degradation: malformed file handled, valid routes extracted")
 }
 
-// TestE2E_Gin_InvalidStruct_StillGenerates tests partial generation when struct can't be resolved
-func TestE2E_Gin_InvalidStruct_StillGenerates(t *testing.T) {
-	// Create a temporary directory with a struct that can't be resolved
+// TestInvalidStructStillGenerates tests partial generation when struct can't be resolved
+func TestInvalidStructStillGenerates(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// Create go.mod
 	goMod := `module partial-test
 
 go 1.24.0
@@ -396,7 +369,6 @@ require github.com/gin-gonic/gin v1.12.0
 		t.Fatalf("failed to write go.mod: %v", err)
 	}
 
-	// Create main.go with reference to undefined struct
 	mainGo := `package main
 
 import "github.com/gin-gonic/gin"
@@ -417,7 +389,7 @@ func knownHandler(c *gin.Context) {
 }
 
 func unknownHandler(c *gin.Context) {
-	var req UnknownRequest // This type doesn't exist
+	var req UnknownRequest
 	c.ShouldBindJSON(&req)
 	c.JSON(200, gin.H{"status": "ok"})
 }
@@ -441,19 +413,15 @@ func unknownHandler(c *gin.Context) {
 		"--skip-publish",
 	})
 
-	// Should succeed and generate partial spec
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("expected graceful handling of unknown types, got error: %v\nstderr: %s", err, stderr.String())
 	}
 
-	specFile := FindSpecFile(t, outputDir, "json")
-	validator := NewSpecValidator(t, specFile)
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
 
-	// Known type should be in schemas
 	validator.ValidateSchemas([]string{"KnownType"})
-
-	// Both paths should exist
 	validator.ValidatePaths([]string{"/known", "/unknown"})
 
 	t.Log("Partial generation successful: valid paths generated despite unknown types")
