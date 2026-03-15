@@ -19,9 +19,7 @@ func TestE2E_Gin_Unsupported_WildcardRoutes(t *testing.T) {
 		t.Skip("gin-unsupported fixture not found")
 	}
 
-	// TODO: Fix wildcard route handling - currently fails validation
-	// "invalid paths: operation GET /api/files/*filepath must define exactly all path parameters (missing: [filepath])"
-	t.Skip("Skipping: wildcard routes need proper handling - see issue tracker")
+	// Wildcard route handling should now work
 
 	outputDir := t.TempDir()
 
