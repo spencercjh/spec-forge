@@ -1,0 +1,38 @@
+{
+  "operationId": "createUser",
+  "requestBody": {
+    "content": {
+      "application/json": {
+        "schema": {
+          "$ref": "#/components/schemas/CreateUserRequest"
+        }
+      }
+    }
+  },
+  "responses": {
+    "201": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "description": "HTTP 201 response"
+    },
+    "400": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/ApiResponse"
+          }
+        }
+      },
+      "description": "HTTP 400 response"
+    },
+    "default": {
+      "description": ""
+    }
+  },
+  "summary": "createUser"
+}

@@ -1,0 +1,29 @@
+{
+  "operationId": "listUsers",
+  "responses": {
+    "200": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/PageResult"
+          }
+        }
+      },
+      "description": "HTTP 200 response"
+    },
+    "400": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/ApiResponse"
+          }
+        }
+      },
+      "description": "HTTP 400 response"
+    },
+    "default": {
+      "description": ""
+    }
+  },
+  "summary": "listUsers"
+}

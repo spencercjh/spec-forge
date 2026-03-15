@@ -1,0 +1,50 @@
+{
+  "operationId": "getUserByID",
+  "parameters": [
+    {
+      "description": "Path parameter",
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "description": "HTTP 200 response"
+    },
+    "400": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/ApiResponse"
+          }
+        }
+      },
+      "description": "HTTP 400 response"
+    },
+    "404": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/ApiResponse"
+          }
+        }
+      },
+      "description": "HTTP 404 response"
+    },
+    "default": {
+      "description": ""
+    }
+  },
+  "summary": "getUserByID"
+}
