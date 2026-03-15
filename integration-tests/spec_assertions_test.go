@@ -314,6 +314,253 @@ func (v *SpecValidator) ValidateParameters(path, method string, expectedParams [
 	}
 }
 
+// ParameterExpectation defines expected parameter properties
+type ParameterExpectation struct {
+	Name     string
+	In       string // path, query, header, formData
+	Required bool
+	Type     string // string, integer, boolean, etc.
+}
+
+// ValidateParameterDetails validates parameter details including 'in' location and 'required'
+func (v *SpecValidator) ValidateParameterDetails(path, method string, expectations []ParameterExpectation) {
+	v.t.Helper()
+
+	operation := v.ValidateOperation(path, method)
+	if operation == nil {
+		return
+	}
+
+	params, ok := operation["parameters"].([]any)
+	if !ok {
+		v.t.Errorf("expected parameters for %s %s", method, path)
+		return
+	}
+
+	paramMap := make(map[string]map[string]any)
+	for _, p := range params {
+		param, ok := p.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, ok := param["name"].(string)
+		if ok {
+			paramMap[name] = param
+		}
+	}
+
+	for _, exp := range expectations {
+		param, exists := paramMap[exp.Name]
+		if !exists {
+			v.t.Errorf("expected parameter %s for %s %s", exp.Name, method, path)
+			continue
+		}
+
+		// Validate 'in' location
+		if exp.In != "" {
+			paramIn, ok := param["in"].(string)
+			if !ok || paramIn != exp.In {
+				v.t.Errorf("expected parameter %s to have in=%s, got %s", exp.Name, exp.In, paramIn)
+			} else {
+				v.t.Logf("  parameter %s in=%s: OK", exp.Name, exp.In)
+			}
+		}
+
+		// Validate 'required'
+		if exp.Required {
+			required, ok := param["required"].(bool)
+			if !ok || !required {
+				v.t.Errorf("expected parameter %s to be required", exp.Name)
+			} else {
+				v.t.Logf("  parameter %s required=true: OK", exp.Name)
+			}
+		}
+	}
+}
+
+// ValidateRequestBodySchema validates that request body references the expected schema
+func (v *SpecValidator) ValidateRequestBodySchema(path, method, expectedSchema string) {
+	v.t.Helper()
+
+	operation := v.ValidateOperation(path, method)
+	if operation == nil {
+		return
+	}
+
+	requestBody, ok := operation["requestBody"].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected requestBody for %s %s", method, path)
+		return
+	}
+
+	content, ok := requestBody["content"].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected content in requestBody for %s %s", method, path)
+		return
+	}
+
+	// Check all content types for schema reference
+	for contentType, mediaType := range content {
+		mediaTypeMap, ok := mediaType.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		schema, ok := mediaTypeMap["schema"].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		schemaRef, ok := schema["$ref"].(string)
+		if ok {
+			expectedRef := "#/components/schemas/" + expectedSchema
+			if schemaRef == expectedRef {
+				v.t.Logf("  requestBody schema ref %s: OK (content-type: %s)", expectedSchema, contentType)
+				return
+			}
+		}
+	}
+
+	v.t.Errorf("expected requestBody to reference schema %s for %s %s", expectedSchema, method, path)
+}
+
+// SchemaPropertyExpectation defines expected schema property
+type SchemaPropertyExpectation struct {
+	Name     string
+	Type     string
+	ItemType string // For array types, the item schema reference
+}
+
+// ValidateSchemaProperty validates a specific schema property
+func (v *SpecValidator) ValidateSchemaProperty(schemaName string, prop SchemaPropertyExpectation) {
+	v.t.Helper()
+
+	components, ok := v.spec["components"].(map[string]any)
+	if !ok {
+		v.t.Error("expected components section")
+		return
+	}
+
+	schemas, ok := components["schemas"].(map[string]any)
+	if !ok {
+		v.t.Error("expected components.schemas section")
+		return
+	}
+
+	schema, ok := schemas[schemaName].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected schema %s not found", schemaName)
+		return
+	}
+
+	properties, ok := schema["properties"].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected properties in schema %s", schemaName)
+		return
+	}
+
+	propData, ok := properties[prop.Name].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected property %s in schema %s", prop.Name, schemaName)
+		return
+	}
+
+	// Validate type
+	if prop.Type != "" {
+		propType, ok := propData["type"].(string)
+		if !ok || propType != prop.Type {
+			v.t.Errorf("expected property %s to have type=%s, got %s", prop.Name, prop.Type, propType)
+		} else {
+			v.t.Logf("  schema %s.%s type=%s: OK", schemaName, prop.Name, prop.Type)
+		}
+	}
+
+	// For array types, validate items
+	if prop.Type == "array" && prop.ItemType != "" {
+		items, ok := propData["items"].(map[string]any)
+		if !ok {
+			v.t.Errorf("expected items for array property %s", prop.Name)
+			return
+		}
+
+		itemRef, ok := items["$ref"].(string)
+		if ok {
+			expectedRef := "#/components/schemas/" + prop.ItemType
+			if itemRef == expectedRef {
+				v.t.Logf("  schema %s.%s items=$ref:%s: OK", schemaName, prop.Name, prop.ItemType)
+			} else {
+				v.t.Errorf("expected array items to reference %s, got %s", expectedRef, itemRef)
+			}
+		}
+	}
+}
+
+// ResponseSchemaExpectation defines expected response schema structure
+type ResponseSchemaExpectation struct {
+	Code       string
+	ContentType string
+	SchemaRef  string // Expected schema reference (e.g., "User", "ApiResponse")
+}
+
+// ValidateResponseSchema validates response has proper schema reference
+func (v *SpecValidator) ValidateResponseSchema(path, method string, exp ResponseSchemaExpectation) {
+	v.t.Helper()
+
+	operation := v.ValidateOperation(path, method)
+	if operation == nil {
+		return
+	}
+
+	responses, ok := operation["responses"].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected responses for %s %s", method, path)
+		return
+	}
+
+	response, ok := responses[exp.Code].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected response code %s for %s %s", exp.Code, method, path)
+		return
+	}
+
+	content, ok := response["content"].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected content for response %s %s %s", method, path, exp.Code)
+		return
+	}
+
+	mediaType, ok := content[exp.ContentType].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected content type %s for response %s %s %s", exp.ContentType, method, path, exp.Code)
+		return
+	}
+
+	schema, ok := mediaType["schema"].(map[string]any)
+	if !ok {
+		v.t.Errorf("expected schema for response %s %s %s", method, path, exp.Code)
+		return
+	}
+
+	schemaRef, ok := schema["$ref"].(string)
+	if !ok {
+		// Check if it's an inline object schema
+		schemaType, typeOk := schema["type"].(string)
+		if typeOk && schemaType == "object" {
+			v.t.Logf("  response %s schema type=object (inline): OK", exp.Code)
+			return
+		}
+		v.t.Errorf("expected schema reference or object type for response %s %s %s", method, path, exp.Code)
+		return
+	}
+
+	expectedRef := "#/components/schemas/" + exp.SchemaRef
+	if schemaRef == expectedRef {
+		v.t.Logf("  response %s schema=$ref:%s: OK", exp.Code, exp.SchemaRef)
+	} else {
+		v.t.Errorf("expected response schema %s, got %s", expectedRef, schemaRef)
+	}
+}
+
 // ValidateSchemas validates that expected schemas exist in components
 func (v *SpecValidator) ValidateSchemas(expectedSchemas []string) {
 	v.t.Helper()

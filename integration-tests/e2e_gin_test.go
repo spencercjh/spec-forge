@@ -107,6 +107,56 @@ func TestE2E_GinDemo_Generate(t *testing.T) {
 		},
 	})
 
+	// === Semantic Validation ===
+	t.Log("=== Semantic Validation ===")
+
+	// 1. GET /api/v1/users should have query params: page, size, username
+	validator.ValidateParameterDetails("/api/v1/users", "get", []ParameterExpectation{
+		{Name: "page", In: "query", Required: false},
+		{Name: "size", In: "query", Required: false},
+		{Name: "username", In: "query", Required: false},
+	})
+
+	// 2. POST /api/v1/users requestBody should reference CreateUserRequest
+	validator.ValidateRequestBodySchema("/api/v1/users", "post", "CreateUserRequest")
+
+	// 3. GET /api/v1/users/{id} id parameter should be in=path and required=true
+	validator.ValidateParameterDetails("/api/v1/users/{id}", "get", []ParameterExpectation{
+		{Name: "id", In: "path", Required: true},
+	})
+
+	// 4. PageResult.content should be array of User
+	validator.ValidateSchemaProperty("PageResult", SchemaPropertyExpectation{
+		Name:     "content",
+		Type:     "array",
+		ItemType: "User",
+	})
+
+	// 5. UpdateProfileRequest form parameters should be properly mapped
+	validator.ValidateParameterDetails("/api/v1/users/{id}/profile", "post", []ParameterExpectation{
+		{Name: "id", In: "path", Required: true},
+		{Name: "fullName", In: "query", Required: false},
+		{Name: "email", In: "query", Required: false},
+		{Name: "age", In: "query", Required: false},
+	})
+
+	// 6. Response schemas should be properly defined (not just status codes)
+	validator.ValidateResponseSchema("/api/v1/users", "post", ResponseSchemaExpectation{
+		Code:        "201",
+		ContentType: "application/json",
+		SchemaRef:   "ApiResponse",
+	})
+	validator.ValidateResponseSchema("/api/v1/users", "post", ResponseSchemaExpectation{
+		Code:        "400",
+		ContentType: "application/json",
+		SchemaRef:   "ApiResponse",
+	})
+	validator.ValidateResponseSchema("/api/v1/users/{id}", "get", ResponseSchemaExpectation{
+		Code:        "404",
+		ContentType: "application/json",
+		SchemaRef:   "ApiResponse",
+	})
+
 	t.Log("All validations passed!")
 }
 
