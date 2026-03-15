@@ -1,5 +1,31 @@
 {
   "operationId": "listUsers",
+  "parameters": [
+    {
+      "description": "Query parameter",
+      "in": "query",
+      "name": "page",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "description": "Query parameter",
+      "in": "query",
+      "name": "size",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "description": "Query parameter",
+      "in": "query",
+      "name": "username",
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
   "responses": {
     "200": {
       "content": {

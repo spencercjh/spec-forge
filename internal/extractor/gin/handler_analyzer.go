@@ -549,7 +549,8 @@ func (a *HandlerAnalyzer) extractResponse(call *ast.CallExpr, info *HandlerInfo,
 	}
 	statusCode := extractStatusCode(call.Args[0])
 	if goType == "" {
-		goType = extractTypeFromResponse(call.Args[1], varTypeMap)
+		// Pass status code to determine if we should unwrap Data field
+		goType = extractTypeFromResponseWithStatus(call.Args[1], varTypeMap, statusCode)
 	}
 	if goType != "" {
 		slog.Debug("Extracted response type", "status", statusCode, "type", goType)
@@ -645,7 +646,18 @@ func statusCodeFromName(name string) int {
 	return 200
 }
 
-// extractTypeFromResponse extracts type from response argument.
+// extractTypeFromResponseWithStatus extracts type from response argument considering HTTP status code.
+// For success responses (200-299), it extracts the Data field type from wrapper types.
+// For error responses (>= 400), it returns the wrapper type itself.
+func extractTypeFromResponseWithStatus(expr ast.Expr, varTypeMap map[string]string, statusCode int) string {
+	return extractTypeFromResponseInternal(expr, varTypeMap, statusCode, true)
+}
+
+// extractTypeFromResponse extracts type from response argument (backward compatible).
+func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string {
+	return extractTypeFromResponseInternal(expr, varTypeMap, 200, false)
+}
+
 // isGenericMapType checks if a type is a generic map type (gin.H, map[string]any, etc.)
 // These types should have their Data field extracted rather than using the type itself.
 func isGenericMapType(typeName string) bool {
@@ -655,7 +667,8 @@ func isGenericMapType(typeName string) bool {
 		typeName == "H"
 }
 
-func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string {
+// extractTypeFromResponseInternal is the internal implementation with full control.
+func extractTypeFromResponseInternal(expr ast.Expr, varTypeMap map[string]string, statusCode int, useStatus bool) string {
 	switch e := expr.(type) {
 	case *ast.Ident:
 		// If it's a variable, try to get its actual type from the map
@@ -674,18 +687,22 @@ func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string
 			}
 		}
 
-		// If it's a wrapper type (e.g., ApiResponse), return the wrapper type
-		// rather than extracting from Data field
-		if typeName != "" && !isGenericMapType(typeName) {
+		// Determine if this is a success response (2xx) or error response (>= 400)
+		isSuccess := !useStatus || (statusCode >= 200 && statusCode < 300)
+
+		// For error responses with wrapper types, return the wrapper type
+		// For success responses OR generic types, try to extract from Data field
+		if !isSuccess && typeName != "" && !isGenericMapType(typeName) {
+			// Error response with concrete wrapper type - return wrapper
 			return typeName
 		}
 
-		// For generic types (gin.H, map[string]any), try to extract from Data field
+		// Try to extract from Data field for success responses or generic types
 		for _, elt := range e.Elts {
 			if kv, ok := elt.(*ast.KeyValueExpr); ok {
 				if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "Data" {
 					// Found Data field, recursively extract its type
-					dataType := extractTypeFromResponse(kv.Value, varTypeMap)
+					dataType := extractTypeFromResponseInternal(kv.Value, varTypeMap, statusCode, useStatus)
 					if dataType != "" {
 						return dataType
 					}
@@ -693,7 +710,7 @@ func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string
 			}
 		}
 
-		// Return the type name if we have it (even for generic types without Data field)
+		// Return the type name if we have it (fallback)
 		if typeName != "" {
 			return typeName
 		}
@@ -713,7 +730,7 @@ func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string
 	case *ast.UnaryExpr:
 		// &variable -> dereference and get the type
 		if e.Op == token.AND {
-			return extractTypeFromResponse(e.X, varTypeMap)
+			return extractTypeFromResponseInternal(e.X, varTypeMap, statusCode, useStatus)
 		}
 	}
 	return ""

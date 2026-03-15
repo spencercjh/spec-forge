@@ -189,6 +189,18 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 	}
 
 	if handlerInfo == nil {
+		// Add default response for handlers we couldn't analyze
+		operation.Responses = openapi3.NewResponses()
+		desc := "Success"
+		operation.Responses.Set("200", &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Description: &desc,
+			},
+		})
+
+		// Extract path parameters from the route path
+		operation.Parameters = g.extractPathParamsFromRoute(route.FullPath)
+
 		return operation
 	}
 
@@ -383,6 +395,42 @@ func setOperationForMethod(pathItem *openapi3.PathItem, method string, operation
 	case "OPTIONS":
 		pathItem.Options = operation
 	}
+}
+
+// extractPathParamsFromRoute extracts path parameters from a route path.
+// For example, "/users/{id}" returns a parameter for "id".
+func (g *Generator) extractPathParamsFromRoute(path string) openapi3.Parameters {
+	var params openapi3.Parameters
+
+	// Find all {param} patterns in the path
+	for i := 0; i < len(path); i++ {
+		if path[i] == '{' {
+			// Find the closing brace
+			end := strings.Index(path[i:], "}")
+			if end == -1 {
+				continue
+			}
+			end += i
+
+			// Extract parameter name
+			paramName := path[i+1 : end]
+
+			// Add the path parameter
+			params = append(params, &openapi3.ParameterRef{
+				Value: &openapi3.Parameter{
+					Name:        paramName,
+					In:          "path",
+					Required:    true,
+					Description: "Path parameter",
+					Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				},
+			})
+
+			i = end
+		}
+	}
+
+	return params
 }
 
 // writeOutput writes the OpenAPI document to file.

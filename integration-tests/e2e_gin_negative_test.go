@@ -19,7 +19,8 @@ func TestE2E_Gin_Unsupported_WildcardRoutes(t *testing.T) {
 		t.Skip("gin-unsupported fixture not found")
 	}
 
-	// Wildcard route handling should now work
+	// Wildcard route is now handled, and anonymous handlers should work
+	// t.Skip("Skipping: see issue tracker")
 
 	outputDir := t.TempDir()
 
@@ -65,9 +66,8 @@ func TestE2E_Gin_Unsupported_AnonymousHandlers(t *testing.T) {
 		t.Skip("gin-anonymous-handler fixture not found")
 	}
 
-	// TODO: Fix anonymous handler response generation - currently produces invalid response
-	// "invalid operation POST: value of responses must be an object"
-	t.Skip("Skipping: anonymous handler responses need proper handling - see issue tracker")
+	// Anonymous handler response should now work
+	// t.Skip("Skipping: see issue tracker")
 
 	outputDir := t.TempDir()
 

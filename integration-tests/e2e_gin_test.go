@@ -141,10 +141,11 @@ func TestE2E_GinDemo_Generate(t *testing.T) {
 	})
 
 	// 6. Response schemas should be properly defined (not just status codes)
+	// 201 success response returns the User data type (extracted from ApiResponse.Data)
 	validator.ValidateResponseSchema("/api/v1/users", "post", ResponseSchemaExpectation{
 		Code:        "201",
 		ContentType: "application/json",
-		SchemaRef:   "ApiResponse",
+		SchemaRef:   "User",
 	})
 	validator.ValidateResponseSchema("/api/v1/users", "post", ResponseSchemaExpectation{
 		Code:        "400",
