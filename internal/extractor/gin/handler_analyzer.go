@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"log/slog"
+	"strings"
 )
 
 // HandlerAnalyzer analyzes Gin handler functions.
@@ -268,16 +269,127 @@ func (a *HandlerAnalyzer) extractBodyType(call *ast.CallExpr, info *HandlerInfo,
 }
 
 // extractQueryBinding handles ShouldBindQuery by extracting query parameters from struct tags.
-// For now, we track that this is a query binding so the generator can handle it properly.
 func (a *HandlerAnalyzer) extractQueryBinding(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
 	if len(call.Args) < 1 {
 		return
 	}
-	if typeName := extractTypeFromArg(call.Args[0], varTypeMap); typeName != "" {
-		info.BodyType = typeName
-		info.BindingSrc = BindingSourceQuery
-		slog.Debug("Extracted query binding type", "type", typeName)
+	typeName := extractTypeFromArg(call.Args[0], varTypeMap)
+	if typeName == "" {
+		return
 	}
+
+	info.BodyType = typeName
+	info.BindingSrc = BindingSourceQuery
+	slog.Debug("Extracted query binding type", "type", typeName)
+
+	// Expand struct form tags into query parameters
+	queryParams := a.extractQueryParamsFromType(typeName)
+	info.QueryParams = append(info.QueryParams, queryParams...)
+}
+
+// extractQueryParamsFromType extracts query parameters from a struct type's form tags.
+func (a *HandlerAnalyzer) extractQueryParamsFromType(typeName string) []ParamInfo {
+	var params []ParamInfo
+
+	typeSpec := a.findTypeSpec(typeName)
+	if typeSpec == nil {
+		return params
+	}
+
+	structType, ok := typeSpec.Type.(*ast.StructType)
+	if !ok {
+		return params
+	}
+
+	for _, field := range structType.Fields.List {
+		if len(field.Names) == 0 {
+			continue
+		}
+
+		fieldName := field.Names[0].Name
+		paramName := fieldName
+		isRequired := false
+
+		if field.Tag != nil {
+			tag := strings.Trim(field.Tag.Value, "`")
+
+			// Check form tag first, then json tag as fallback
+			if formTag := extractTagValue(tag, "form"); formTag != "" {
+				parts := strings.Split(formTag, ",")
+				if parts[0] != "" {
+					paramName = parts[0]
+				}
+			} else if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
+				parts := strings.Split(jsonTag, ",")
+				if parts[0] != "" && parts[0] != "-" {
+					paramName = parts[0]
+				}
+			}
+
+			// Check binding tag for required
+			if bindingTag := extractTagValue(tag, "binding"); bindingTag != "" {
+				if strings.Contains(bindingTag, "required") {
+					isRequired = true
+				}
+			}
+		}
+
+		if paramName == "" || paramName == "-" {
+			continue
+		}
+
+		goType := a.extractGoTypeName(field.Type)
+
+		params = append(params, ParamInfo{
+			Name:     paramName,
+			GoType:   goType,
+			Required: isRequired,
+		})
+	}
+
+	return params
+}
+
+// extractGoTypeName extracts the Go type name from an AST expression.
+func (a *HandlerAnalyzer) extractGoTypeName(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.StarExpr:
+		return a.extractGoTypeName(t.X)
+	case *ast.ArrayType:
+		return "array"
+	case *ast.SelectorExpr:
+		if x, ok := t.X.(*ast.Ident); ok {
+			return x.Name + "." + t.Sel.Name
+		}
+	}
+	return "string"
+}
+
+// findTypeSpec finds a type definition by name.
+func (a *HandlerAnalyzer) findTypeSpec(name string) *ast.TypeSpec {
+	// Check cache first
+	if cached, ok := a.typeCache[name]; ok {
+		return cached
+	}
+
+	for _, file := range a.files {
+		for _, decl := range file.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if ok && typeSpec.Name.Name == name {
+					a.typeCache[name] = typeSpec
+					return typeSpec
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // extractFormParam extracts form parameter from c.PostForm() or c.DefaultPostForm() call.
