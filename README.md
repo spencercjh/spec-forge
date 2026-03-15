@@ -125,17 +125,6 @@ OPENAI_API_KEY="your-api-key" spec-forge enrich ./openapi.json \
 | [Hertz](https://github.com/cloudwego/hertz)                                                                             | Go             | 🚧 Coming soon | [docs](./docs/hertz.md)                     |
 | [Kitex](https://github.com/cloudwego/kitex)                                                                             | Go             | 🚧 Coming soon | [docs](./docs/kitex.md)                     |
 
-## Framework-Specific Usage
-
-See the detailed documentation for each framework:
-
-- [Spring Boot](./docs/spring-boot.md)
-- [Gin](./docs/gin.md) — Zero annotations required, AST-based analysis
-- [go-zero](./docs/go-zero.md)
-- [gRPC (protoc)](./docs/grpc-protoc.md) — Native protoc with `protoc-gen-connect-openapi`
-- [Hertz](./docs/hertz.md) — Coming soon
-- [Kitex](./docs/kitex.md) — Coming soon
-
 ## Configuration
 
 Create `.spec-forge.yaml` in your project root:
