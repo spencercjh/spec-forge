@@ -64,11 +64,12 @@ func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, e
 		// Type alias (e.g., type CustomString string)
 		schema = goTypeToSchema(underlying.Name)
 	case *ast.ArrayType:
-		// Type alias for array (e.g., type IDs []int)
-		itemSchema := e.fieldToSchema(underlying.Elt)
+		// Type alias for array (e.g., type IDs []int or type Users []User)
+		// Use fieldToSchemaRef to preserve $ref for custom element types
+		itemSchemaRef := e.fieldToSchemaRef(underlying.Elt)
 		schema = &openapi3.Schema{
 			Type:  &openapi3.Types{"array"},
-			Items: &openapi3.SchemaRef{Value: itemSchema},
+			Items: itemSchemaRef,
 		}
 	default:
 		// Fallback to object for unknown types
