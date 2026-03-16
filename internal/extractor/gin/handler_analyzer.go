@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+const (
+	goTypeString = "string"
+)
+
 // HandlerAnalyzer analyzes Gin handler functions.
 type HandlerAnalyzer struct {
 	fset      *token.FileSet
@@ -222,7 +226,7 @@ func inferTypeFromVarName(varName string) string {
 
 	// Try to capitalize first letter (heuristic)
 	// e.g., "pageResult" -> "PageResult"
-	if varName != "" && varName[0] >= 'a' && varName[0] <= 'z' {
+	if varName[0] >= 'a' && varName[0] <= 'z' {
 		return string(varName[0]-'a'+'A') + varName[1:]
 	}
 
@@ -277,7 +281,7 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 	case "JSON", "XML", "YAML":
 		a.extractResponse(call, info, varTypeMap, "")
 	case "String":
-		a.extractResponse(call, info, varTypeMap, "string")
+		a.extractResponse(call, info, varTypeMap, goTypeString)
 	case "Data":
 		a.extractResponse(call, info, varTypeMap, "binary")
 	case "Redirect":
@@ -293,7 +297,7 @@ func (a *HandlerAnalyzer) extractParam(call *ast.CallExpr, info *HandlerInfo) {
 	if name := extractStringLiteral(call.Args[0]); name != "" {
 		info.PathParams = append(info.PathParams, ParamInfo{
 			Name:     name,
-			GoType:   "string",
+			GoType:   goTypeString,
 			Required: true,
 		})
 	}
@@ -309,7 +313,7 @@ func (a *HandlerAnalyzer) extractQueryParam(call *ast.CallExpr, info *HandlerInf
 		// Mark query params as optional (required=false) unless explicit validation exists
 		info.QueryParams = append(info.QueryParams, ParamInfo{
 			Name:     name,
-			GoType:   "string",
+			GoType:   goTypeString,
 			Required: false,
 		})
 	}
@@ -323,7 +327,7 @@ func (a *HandlerAnalyzer) extractHeaderParam(call *ast.CallExpr, info *HandlerIn
 	if name := extractStringLiteral(call.Args[0]); name != "" {
 		info.HeaderParams = append(info.HeaderParams, ParamInfo{
 			Name:     name,
-			GoType:   "string",
+			GoType:   goTypeString,
 			Required: false,
 		})
 	}
@@ -447,7 +451,7 @@ func (a *HandlerAnalyzer) extractGoTypeName(expr ast.Expr) string {
 			return x.Name + "." + t.Sel.Name
 		}
 	}
-	return "string"
+	return goTypeString
 }
 
 // findTypeSpec finds a type definition by name.
@@ -483,7 +487,7 @@ func (a *HandlerAnalyzer) extractFormParam(call *ast.CallExpr, info *HandlerInfo
 	if name := extractStringLiteral(call.Args[0]); name != "" {
 		info.FormParams = append(info.FormParams, ParamInfo{
 			Name:     name,
-			GoType:   "string",
+			GoType:   goTypeString,
 			Required: required,
 		})
 	}
