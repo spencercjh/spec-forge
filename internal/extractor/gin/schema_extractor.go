@@ -61,7 +61,14 @@ func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, e
 	case *ast.StructType:
 		schema, err = e.extractStructSchema(typeSpec, underlying)
 	case *ast.Ident:
-		// Type alias (e.g., type CustomString string)
+		// Type alias (e.g., type CustomString string or type UserID User)
+		// Check if it's an alias to a known custom type first
+		if e.findTypeSpec(underlying.Name) != nil {
+			// It's an alias to another custom type - create a reference
+			ref := "#/components/schemas/" + underlying.Name
+			return &openapi3.SchemaRef{Ref: ref}, nil
+		}
+		// Otherwise treat as primitive type alias
 		schema = goTypeToSchema(underlying.Name)
 	case *ast.ArrayType:
 		// Type alias for array (e.g., type IDs []int or type Users []User)
