@@ -68,7 +68,7 @@ func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, e
 		// Use fieldToSchemaRef to preserve $ref for custom element types
 		itemSchemaRef := e.fieldToSchemaRef(underlying.Elt)
 		schema = &openapi3.Schema{
-			Type:  &openapi3.Types{"array"},
+			Type:  &openapi3.Types{goTypeArray},
 			Items: itemSchemaRef,
 		}
 	default:
@@ -149,7 +149,7 @@ func (e *SchemaExtractor) ExtractAllSchemas(typeName string) (openapi3.Schemas, 
 // isPrimitiveType checks if a type name is a primitive Go type.
 func isPrimitiveType(name string) bool {
 	primitives := []string{
-		"string", "int", "int32", "int64", "uint", "uint32", "uint64",
+		goTypeString, "int", "int32", "int64", "uint", "uint32", "uint64",
 		"float32", "float64", "bool", "byte", "rune", "time.Time",
 	}
 	return slices.Contains(primitives, name)
@@ -240,7 +240,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 		itemSchemaRef := e.fieldToSchemaRef(t.Elt)
 		return &openapi3.SchemaRef{
 			Value: &openapi3.Schema{
-				Type:  &openapi3.Types{"array"},
+				Type:  &openapi3.Types{goTypeArray},
 				Items: itemSchemaRef,
 			},
 		}
@@ -300,7 +300,7 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 	case *ast.ArrayType:
 		itemSchema := e.fieldToSchema(t.Elt)
 		return &openapi3.Schema{
-			Type:  &openapi3.Types{"array"},
+			Type:  &openapi3.Types{goTypeArray},
 			Items: &openapi3.SchemaRef{Value: itemSchema},
 		}
 	case *ast.MapType:
@@ -323,8 +323,8 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 // goTypeToSchema converts a Go type name to OpenAPI schema.
 func goTypeToSchema(goType string) *openapi3.Schema {
 	switch goType {
-	case "string":
-		return &openapi3.Schema{Type: &openapi3.Types{"string"}}
+	case goTypeString:
+		return &openapi3.Schema{Type: &openapi3.Types{goTypeString}}
 	case "int", "int32":
 		return &openapi3.Schema{Type: &openapi3.Types{"integer"}, Format: "int32"}
 	case "int64":
@@ -338,7 +338,7 @@ func goTypeToSchema(goType string) *openapi3.Schema {
 	case "bool":
 		return &openapi3.Schema{Type: &openapi3.Types{"boolean"}}
 	case "time.Time":
-		return &openapi3.Schema{Type: &openapi3.Types{"string"}, Format: "date-time"}
+		return &openapi3.Schema{Type: &openapi3.Types{goTypeString}, Format: "date-time"}
 	default:
 		return &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 	}

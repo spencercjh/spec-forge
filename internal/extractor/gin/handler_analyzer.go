@@ -10,6 +10,7 @@ import (
 
 const (
 	goTypeString = "string"
+	goTypeArray  = "array"
 )
 
 // HandlerAnalyzer analyzes Gin handler functions.
@@ -477,7 +478,7 @@ func (a *HandlerAnalyzer) extractGoTypeName(expr ast.Expr) string {
 	case *ast.StarExpr:
 		return a.extractGoTypeName(t.X)
 	case *ast.ArrayType:
-		return "array"
+		return goTypeArray
 	case *ast.SelectorExpr:
 		if x, ok := t.X.(*ast.Ident); ok {
 			return x.Name + "." + t.Sel.Name
