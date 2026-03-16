@@ -421,9 +421,9 @@ func (v *SpecValidator) logSummary() {
 func FindSpecFile(t *testing.T, dir, format string) string {
 	t.Helper()
 
-	ext := ".json"
+	exts := []string{".json"}
 	if format == "yaml" || format == "yml" {
-		ext = ".yaml"
+		exts = []string{".yaml", ".yml"}
 	}
 
 	// Look for openapi.{ext} or any {ext} file
@@ -436,8 +436,10 @@ func FindSpecFile(t *testing.T, dir, format string) string {
 		if entry.IsDir() {
 			continue
 		}
-		if strings.HasSuffix(entry.Name(), ext) {
-			return filepath.Join(dir, entry.Name())
+		for _, ext := range exts {
+			if strings.HasSuffix(entry.Name(), ext) {
+				return filepath.Join(dir, entry.Name())
+			}
 		}
 	}
 
