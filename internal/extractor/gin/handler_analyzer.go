@@ -488,23 +488,38 @@ func (a *HandlerAnalyzer) extractGoTypeName(expr ast.Expr) string {
 }
 
 // findTypeSpec finds a type definition by name.
+// Supports both local types ("User") and cross-package types ("models.User").
 func (a *HandlerAnalyzer) findTypeSpec(name string) *ast.TypeSpec {
 	// Check cache first
 	if cached, ok := a.typeCache[name]; ok {
 		return cached
 	}
 
-	for _, file := range a.files {
-		for _, decl := range file.Decls {
-			genDecl, ok := decl.(*ast.GenDecl)
-			if !ok || genDecl.Tok != token.TYPE {
-				continue
-			}
-			for _, spec := range genDecl.Specs {
-				typeSpec, ok := spec.(*ast.TypeSpec)
-				if ok && typeSpec.Name.Name == name {
-					a.typeCache[name] = typeSpec
-					return typeSpec
+	// For cross-package references (e.g., "models.User"), try to find by short name
+	shortName := name
+	if idx := strings.LastIndex(name, "."); idx != -1 {
+		shortName = name[idx+1:]
+	}
+
+	// Try both full name and short name
+	namesToTry := []string{name}
+	if shortName != name {
+		namesToTry = append(namesToTry, shortName)
+	}
+
+	for _, tryName := range namesToTry {
+		for _, file := range a.files {
+			for _, decl := range file.Decls {
+				genDecl, ok := decl.(*ast.GenDecl)
+				if !ok || genDecl.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range genDecl.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if ok && typeSpec.Name.Name == tryName {
+						a.typeCache[name] = typeSpec
+						return typeSpec
+					}
 				}
 			}
 		}
