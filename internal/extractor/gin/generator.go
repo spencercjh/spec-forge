@@ -337,21 +337,6 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 
 // buildRequestBody builds the request body or form parameters based on binding source.
 func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo *HandlerInfo, schemas openapi3.Schemas) {
-	// Handle form parameters (application/x-www-form-urlencoded)
-	if len(handlerInfo.FormParams) > 0 {
-		for _, param := range handlerInfo.FormParams {
-			operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{
-				Value: &openapi3.Parameter{
-					Name:        param.Name,
-					In:          "query",
-					Required:    param.Required,
-					Description: "Form parameter",
-					Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
-				},
-			})
-		}
-	}
-
 	// Handle file upload parameters (multipart/form-data)
 	if len(handlerInfo.FileParams) > 0 {
 		content := make(openapi3.Content)
@@ -411,6 +396,22 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 		return
 	case BindingSourceForm:
 		contentType = "application/x-www-form-urlencoded"
+		// For form binding, build schema from form params to use correct field names
+		if len(handlerInfo.FormParams) > 0 {
+			formSchema := &openapi3.Schema{
+				Type:       &openapi3.Types{"object"},
+				Properties: make(openapi3.Schemas),
+			}
+			for _, param := range handlerInfo.FormParams {
+				formSchema.Properties[param.Name] = &openapi3.SchemaRef{
+					Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+				}
+				if param.Required {
+					formSchema.Required = append(formSchema.Required, param.Name)
+				}
+			}
+			schemaRef = &openapi3.SchemaRef{Value: formSchema}
+		}
 	}
 
 	operation.RequestBody = &openapi3.RequestBodyRef{

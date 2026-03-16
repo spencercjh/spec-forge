@@ -125,10 +125,8 @@ func TestGenerate(t *testing.T) {
 
 	validator.ValidateParameterDetails("/api/v1/users/{id}/profile", "post", []helpers.ParameterExpectation{
 		{Name: "id", In: "path", Required: true},
-		{Name: "fullName", In: "query", Required: false},
-		{Name: "email", In: "query", Required: false},
-		{Name: "age", In: "query", Required: false},
 	})
+	// Form parameters are now in requestBody, not query parameters
 
 	validator.ValidateResponseSchema("/api/v1/users", "post", helpers.ResponseSchemaExpectation{
 		Code:        "201",
