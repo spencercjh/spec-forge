@@ -344,6 +344,7 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 			Type:       &openapi3.Types{"object"},
 			Properties: make(openapi3.Schemas),
 		}
+		// Add file parameters
 		for _, param := range handlerInfo.FileParams {
 			schema.Properties[param.Name] = &openapi3.SchemaRef{
 				Value: &openapi3.Schema{
@@ -353,6 +354,18 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 			}
 			if param.Required {
 				schema.Required = append(schema.Required, param.Name)
+			}
+		}
+		// Also include form parameters if present (for mixed form-data)
+		for _, param := range handlerInfo.FormParams {
+			// Only add if not already added as file param
+			if _, exists := schema.Properties[param.Name]; !exists {
+				schema.Properties[param.Name] = &openapi3.SchemaRef{
+					Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+				}
+				if param.Required {
+					schema.Required = append(schema.Required, param.Name)
+				}
 			}
 		}
 		content["multipart/form-data"] = &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: schema}}
