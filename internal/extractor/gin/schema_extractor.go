@@ -20,7 +20,7 @@ const (
 )
 
 // Schema type constants for goconst compliance
-const schemaTypeObject = schemaTypeObject
+const schemaTypeObject = "object"
 
 // SchemaExtractor extracts OpenAPI schemas from Go structs.
 type SchemaExtractor struct {

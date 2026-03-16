@@ -362,6 +362,16 @@ func (a *HandlerAnalyzer) extractQueryBinding(call *ast.CallExpr, info *HandlerI
 
 // extractQueryParamsFromType extracts query parameters from a struct type's form tags.
 func (a *HandlerAnalyzer) extractQueryParamsFromType(typeName string) []ParamInfo {
+	return a.extractParamsFromType(typeName)
+}
+
+// extractFormParamsFromType extracts form parameters from a struct type's form tags.
+func (a *HandlerAnalyzer) extractFormParamsFromType(typeName string) []ParamInfo {
+	return a.extractParamsFromType(typeName)
+}
+
+// extractParamsFromType extracts parameters from a struct type's tags.
+func (a *HandlerAnalyzer) extractParamsFromType(typeName string) []ParamInfo {
 	var params []ParamInfo
 
 	typeSpec := a.findTypeSpec(typeName)
@@ -393,70 +403,6 @@ func (a *HandlerAnalyzer) extractQueryParamsFromType(typeName string) []ParamInf
 					paramName = parts[0]
 				}
 			} else if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
-				parts := strings.Split(jsonTag, ",")
-				if parts[0] != "" && parts[0] != "-" {
-					paramName = parts[0]
-				}
-			}
-
-			// Check binding tag for required
-			if bindingTag := extractTagValue(tag, "binding"); bindingTag != "" {
-				if strings.Contains(bindingTag, "required") {
-					isRequired = true
-				}
-			}
-		}
-
-		if paramName == "" || paramName == "-" {
-			continue
-		}
-
-		goType := a.extractGoTypeName(field.Type)
-
-		params = append(params, ParamInfo{
-			Name:     paramName,
-			GoType:   goType,
-			Required: isRequired,
-		})
-	}
-
-	return params
-}
-
-// extractFormParamsFromType extracts form parameters from a struct type's form tags.
-func (a *HandlerAnalyzer) extractFormParamsFromType(typeName string) []ParamInfo {
-	var params []ParamInfo
-
-	typeSpec := a.findTypeSpec(typeName)
-	if typeSpec == nil {
-		return params
-	}
-
-	structType, ok := typeSpec.Type.(*ast.StructType)
-	if !ok {
-		return params
-	}
-
-	for _, field := range structType.Fields.List {
-		if len(field.Names) == 0 {
-			continue
-		}
-
-		fieldName := field.Names[0].Name
-		paramName := fieldName
-		isRequired := false
-
-		if field.Tag != nil {
-			tag := strings.Trim(field.Tag.Value, "`")
-
-			// Check form tag
-			if formTag := extractTagValue(tag, "form"); formTag != "" {
-				parts := strings.Split(formTag, ",")
-				if parts[0] != "" {
-					paramName = parts[0]
-				}
-			} else if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
-				// Fallback to json tag
 				parts := strings.Split(jsonTag, ",")
 				if parts[0] != "" && parts[0] != "-" {
 					paramName = parts[0]
@@ -668,11 +614,6 @@ func extractTypeFromResponseWithStatus(expr ast.Expr, varTypeMap map[string]stri
 	return extractTypeFromResponseInternal(expr, varTypeMap, statusCode, true)
 }
 
-// extractTypeFromResponse extracts type from response argument (backward compatible).
-func extractTypeFromResponse(expr ast.Expr, varTypeMap map[string]string) string {
-	return extractTypeFromResponseInternal(expr, varTypeMap, 200, false)
-}
-
 // isGenericMapType checks if a type is a generic map type (gin.H, map[string]any, etc.)
 // These types should have their Data field extracted rather than using the type itself.
 func isGenericMapType(typeName string) bool {
@@ -692,60 +633,90 @@ func extractTypeFromResponseInternal(expr ast.Expr, varTypeMap map[string]string
 		}
 		return e.Name
 	case *ast.CompositeLit:
-		// First extract the composite literal type itself
-		var typeName string
-		if ident, ok := e.Type.(*ast.Ident); ok {
-			typeName = ident.Name
-		} else if sel, ok := e.Type.(*ast.SelectorExpr); ok {
-			if x, ok := sel.X.(*ast.Ident); ok {
-				typeName = x.Name + "." + sel.Sel.Name
-			}
-		}
-
-		// Determine if this is a success response (2xx) or error response (>= 400)
-		isSuccess := !useStatus || (statusCode >= 200 && statusCode < 300)
-
-		// For error responses with wrapper types, return the wrapper type
-		// For success responses OR generic types, try to extract from Data field
-		if !isSuccess && typeName != "" && !isGenericMapType(typeName) {
-			// Error response with concrete wrapper type - return wrapper
-			return typeName
-		}
-
-		// Try to extract from Data field for success responses or generic types
-		for _, elt := range e.Elts {
-			if kv, ok := elt.(*ast.KeyValueExpr); ok {
-				if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "Data" {
-					// Found Data field, recursively extract its type
-					dataType := extractTypeFromResponseInternal(kv.Value, varTypeMap, statusCode, useStatus)
-					if dataType != "" {
-						return dataType
-					}
-				}
-			}
-		}
-
-		// Return the type name if we have it (fallback)
-		if typeName != "" {
-			return typeName
-		}
+		return extractTypeFromCompositeLit(e, varTypeMap, statusCode, useStatus)
 	case *ast.CallExpr:
-		// gin.H or similar
-		if sel, ok := e.Fun.(*ast.SelectorExpr); ok {
-			if sel.Sel.Name == "H" {
-				return ginHType
-			}
-		}
-		// Could be a function call that returns a type, try to extract from return type
-		if ident, ok := e.Fun.(*ast.Ident); ok {
-			if actualType, ok := varTypeMap[ident.Name]; ok {
-				return actualType
-			}
-		}
+		return extractTypeFromCallExpr(e, varTypeMap)
 	case *ast.UnaryExpr:
 		// &variable -> dereference and get the type
 		if e.Op == token.AND {
 			return extractTypeFromResponseInternal(e.X, varTypeMap, statusCode, useStatus)
+		}
+	}
+	return ""
+}
+
+// extractTypeFromCompositeLit extracts type from a composite literal expression.
+func extractTypeFromCompositeLit(e *ast.CompositeLit, varTypeMap map[string]string, statusCode int, useStatus bool) string {
+	// First extract the composite literal type itself
+	typeName := extractTypeNameFromExpr(e.Type)
+
+	// Determine if this is a success response (2xx) or error response (>= 400)
+	isSuccess := !useStatus || (statusCode >= 200 && statusCode < 300)
+
+	// For error responses with wrapper types, return the wrapper type
+	// For success responses OR generic types, try to extract from Data field
+	if !isSuccess && typeName != "" && !isGenericMapType(typeName) {
+		// Error response with concrete wrapper type - return wrapper
+		return typeName
+	}
+
+	// Try to extract from Data field for success responses or generic types
+	if dataType := extractDataFieldType(e.Elts, varTypeMap, statusCode, useStatus); dataType != "" {
+		return dataType
+	}
+
+	// Return the type name if we have it (fallback)
+	if typeName != "" {
+		return typeName
+	}
+	return ""
+}
+
+// extractTypeNameFromExpr extracts the type name from an AST expression.
+func extractTypeNameFromExpr(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		if x, ok := t.X.(*ast.Ident); ok {
+			return x.Name + "." + t.Sel.Name
+		}
+	}
+	return ""
+}
+
+// extractDataFieldType extracts type from Data field in composite literal elements.
+func extractDataFieldType(elts []ast.Expr, varTypeMap map[string]string, statusCode int, useStatus bool) string {
+	for _, elt := range elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+		key, ok := kv.Key.(*ast.Ident)
+		if !ok || key.Name != "Data" {
+			continue
+		}
+		// Found Data field, recursively extract its type
+		dataType := extractTypeFromResponseInternal(kv.Value, varTypeMap, statusCode, useStatus)
+		if dataType != "" {
+			return dataType
+		}
+	}
+	return ""
+}
+
+// extractTypeFromCallExpr extracts type from a call expression.
+func extractTypeFromCallExpr(e *ast.CallExpr, varTypeMap map[string]string) string {
+	// gin.H or similar
+	if sel, ok := e.Fun.(*ast.SelectorExpr); ok {
+		if sel.Sel.Name == "H" {
+			return ginHType
+		}
+	}
+	// Could be a function call that returns a type, try to extract from return type
+	if ident, ok := e.Fun.(*ast.Ident); ok {
+		if actualType, ok := varTypeMap[ident.Name]; ok {
+			return actualType
 		}
 	}
 	return ""

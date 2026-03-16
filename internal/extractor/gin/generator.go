@@ -451,30 +451,31 @@ func (g *Generator) extractPathParamsFromRoute(path string) openapi3.Parameters 
 
 	// Find all {param} patterns in the path
 	for i := 0; i < len(path); i++ {
-		if path[i] == '{' {
-			// Find the closing brace
-			end := strings.Index(path[i:], "}")
-			if end == -1 {
-				continue
-			}
-			end += i
-
-			// Extract parameter name
-			paramName := path[i+1 : end]
-
-			// Add the path parameter
-			params = append(params, &openapi3.ParameterRef{
-				Value: &openapi3.Parameter{
-					Name:        paramName,
-					In:          "path",
-					Required:    true,
-					Description: "Path parameter",
-					Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
-				},
-			})
-
-			i = end
+		if path[i] != '{' {
+			continue
 		}
+		// Find the closing brace
+		end := strings.Index(path[i:], "}")
+		if end == -1 {
+			continue
+		}
+		end += i
+
+		// Extract parameter name
+		paramName := path[i+1 : end]
+
+		// Add the path parameter
+		params = append(params, &openapi3.ParameterRef{
+			Value: &openapi3.Parameter{
+				Name:        paramName,
+				In:          "path",
+				Required:    true,
+				Description: "Path parameter",
+				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+			},
+		})
+
+		i = end
 	}
 
 	return params
