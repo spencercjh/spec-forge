@@ -4,6 +4,7 @@ package helpers
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -436,7 +437,7 @@ func FindSpecFile(t *testing.T, dir, format string) string {
 			continue
 		}
 		if strings.HasSuffix(entry.Name(), ext) {
-			return dir + "/" + entry.Name()
+			return filepath.Join(dir, entry.Name())
 		}
 	}
 
