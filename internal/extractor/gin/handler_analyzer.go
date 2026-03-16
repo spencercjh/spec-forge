@@ -76,14 +76,14 @@ func (a *HandlerAnalyzer) hasFormContext(fn *ast.FuncDecl) bool {
 	// Check function comments for form-related keywords
 	if fn.Doc != nil {
 		for _, comment := range fn.Doc.List {
-			if strings.Contains(strings.ToLower(comment.Text), "form") {
+			if isFormRelatedWord(comment.Text) {
 				return true
 			}
 		}
 	}
 
 	// Check function name for form-related keywords
-	if strings.Contains(strings.ToLower(fn.Name.Name), "form") {
+	if isFormRelatedWord(fn.Name.Name) {
 		return true
 	}
 
@@ -108,6 +108,38 @@ func (a *HandlerAnalyzer) hasFormContext(fn *ast.FuncDecl) bool {
 	}
 
 	return false
+}
+
+// isFormRelatedWord checks if text contains form-related words as whole words.
+// This prevents false positives like "performAction", "platform", "information".
+func isFormRelatedWord(text string) bool {
+	lower := strings.ToLower(text)
+
+	// Define whole-word patterns to match
+	patterns := []string{"form", "formdata", "form-data", "multipart"}
+
+	for _, pattern := range patterns {
+		// Check for pattern preceded by start of string or non-letter
+		// and followed by end of string or non-letter
+		for i := 0; i <= len(lower)-len(pattern); i++ {
+			if lower[i:i+len(pattern)] == pattern {
+				// Check prefix (start of string or non-letter)
+				prefixOK := i == 0 || !isLetter(lower[i-1])
+				// Check suffix (end of string or non-letter)
+				suffixOK := i+len(pattern) == len(lower) || !isLetter(lower[i+len(pattern)])
+				if prefixOK && suffixOK {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// isLetter checks if a byte is a letter (a-z).
+func isLetter(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
 // buildVarTypeMap builds a map of variable names to their types.
