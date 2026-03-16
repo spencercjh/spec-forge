@@ -686,6 +686,11 @@ func extractTypeFromCompositeLit(e *ast.CompositeLit, varTypeMap map[string]stri
 	// First extract the composite literal type itself
 	typeName := extractTypeNameFromExpr(e.Type)
 
+	// Normalize gin.H to ginHType for consistency
+	if typeName == "gin.H" || typeName == "H" {
+		typeName = ginHType
+	}
+
 	// Determine if this is a success response (2xx) or error response (>= 400)
 	isSuccess := !useStatus || (statusCode >= 200 && statusCode < 300)
 
