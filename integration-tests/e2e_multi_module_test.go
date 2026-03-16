@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/spencercjh/spec-forge/cmd"
+	"github.com/spencercjh/spec-forge/integration-tests/helpers"
 )
 
 // TestE2E_MavenMultiModule_Generate tests the generate flow for a Maven multi-module project.
@@ -49,7 +50,7 @@ func TestE2E_MavenMultiModule_Generate(t *testing.T) {
 	}
 
 	// Find the generated spec file
-	specFile := FindSpecFile(t, outputDir, "json")
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
 
 	// Perform comprehensive spec validation
 	// Note: springdoc without annotations can generate:
@@ -60,26 +61,25 @@ func TestE2E_MavenMultiModule_Generate(t *testing.T) {
 	// - Multiple response codes (only 200 from return type)
 	// - Response content types (generates */* instead of application/json)
 	// - Explicit error responses (404, 400, etc.)
-	validator := NewSpecValidator(t, specFile)
-	validator.FullValidation(ValidationConfig{
+	validator := helpers.NewSpecValidator(t, specFile)
+	validator.FullValidation(helpers.ValidationConfig{
 		ExpectedPaths: []string{
 			"/api/v1/users",
 			"/api/v1/users/{id}",
 			"/api/v1/users/{id}/profile",
 			"/api/v1/users/upload",
 		},
-		Operations: []OperationConfig{
+		Operations: []helpers.OperationConfig{
 			{
 				Path:            "/api/v1/users",
 				Method:          "get",
 				WantOperationID: true,
-				ExpectedParams:  []string{"page", "size", "username"},
 			},
 			{
 				Path:            "/api/v1/users",
 				Method:          "post",
 				WantOperationID: true,
-				WantRequestBody: "application/json",
+				WantRequestBody: "User",
 			},
 			{
 				Path:            "/api/v1/users/{id}",
@@ -103,6 +103,13 @@ func TestE2E_MavenMultiModule_Generate(t *testing.T) {
 			"User",
 			"FileUploadResult",
 		},
+	})
+
+	// Validate query parameters for GET /api/v1/users
+	validator.ValidateParameterDetails("/api/v1/users", "get", []helpers.ParameterExpectation{
+		{Name: "page", In: "query", Required: false},
+		{Name: "size", In: "query", Required: false},
+		{Name: "username", In: "query", Required: false},
 	})
 
 	t.Logf("Successfully generated spec from multi-module project at: %s", specFile)
@@ -146,7 +153,7 @@ func TestE2E_GradleMultiModule_Generate(t *testing.T) {
 	}
 
 	// Find the generated spec file
-	specFile := FindSpecFile(t, outputDir, "json")
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
 
 	// Perform comprehensive spec validation
 	// Note: springdoc without annotations can generate:
@@ -157,26 +164,25 @@ func TestE2E_GradleMultiModule_Generate(t *testing.T) {
 	// - Multiple response codes (only 200 from return type)
 	// - Response content types (generates */* instead of application/json)
 	// - Explicit error responses (404, 400, etc.)
-	validator := NewSpecValidator(t, specFile)
-	validator.FullValidation(ValidationConfig{
+	validator := helpers.NewSpecValidator(t, specFile)
+	validator.FullValidation(helpers.ValidationConfig{
 		ExpectedPaths: []string{
 			"/api/v1/users",
 			"/api/v1/users/{id}",
 			"/api/v1/users/{id}/profile",
 			"/api/v1/users/upload",
 		},
-		Operations: []OperationConfig{
+		Operations: []helpers.OperationConfig{
 			{
 				Path:            "/api/v1/users",
 				Method:          "get",
 				WantOperationID: true,
-				ExpectedParams:  []string{"page", "size", "username"},
 			},
 			{
 				Path:            "/api/v1/users",
 				Method:          "post",
 				WantOperationID: true,
-				WantRequestBody: "application/json",
+				WantRequestBody: "User",
 			},
 			{
 				Path:            "/api/v1/users/{id}",
@@ -200,6 +206,13 @@ func TestE2E_GradleMultiModule_Generate(t *testing.T) {
 			"User",
 			"FileUploadResult",
 		},
+	})
+
+	// Validate query parameters for GET /api/v1/users
+	validator.ValidateParameterDetails("/api/v1/users", "get", []helpers.ParameterExpectation{
+		{Name: "page", In: "query", Required: false},
+		{Name: "size", In: "query", Required: false},
+		{Name: "username", In: "query", Required: false},
 	})
 
 	t.Logf("Successfully generated spec from Gradle multi-module project at: %s", specFile)

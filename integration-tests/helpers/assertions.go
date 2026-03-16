@@ -449,6 +449,28 @@ func (v *SpecValidator) LogSummary() {
 	v.logSummary()
 }
 
+// ValidateOperationFields validates operation fields exist
+func (v *SpecValidator) ValidateOperationFields(path, method string, wantOperationID, wantSummary bool) {
+	v.t.Helper()
+
+	operation := v.ValidateOperation(path, method)
+	if operation == nil {
+		return
+	}
+
+	if wantOperationID {
+		if operationID, ok := operation["operationId"].(string); !ok || operationID == "" {
+			v.t.Errorf("expected operationId for %s %s", method, path)
+		}
+	}
+
+	if wantSummary {
+		if summary, ok := operation["summary"].(string); !ok || summary == "" {
+			v.t.Errorf("expected summary for %s %s", method, path)
+		}
+	}
+}
+
 // ExtractFromPath extracts a value from a nested map using dot-notation path
 // Supports OpenAPI-style paths like "paths./api/v1/users.get" or "components.schemas.User"
 func ExtractFromPath(t *testing.T, spec map[string]any, path string) any {

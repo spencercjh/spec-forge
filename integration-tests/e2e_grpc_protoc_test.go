@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/spencercjh/spec-forge/cmd"
+	"github.com/spencercjh/spec-forge/integration-tests/helpers"
 )
 
 // TestE2E_GrpcProtoc_Generate tests the generate flow for a gRPC-protoc project.
@@ -51,7 +52,7 @@ func TestE2E_GrpcProtoc_Generate(t *testing.T) {
 	}
 
 	// Find the generated spec file
-	specFile := FindSpecFile(t, outputDir, "yaml")
+	specFile := helpers.FindSpecFile(t, outputDir, "yaml")
 	if specFile == "" {
 		t.Log("no spec file found - protoc tools may not be available")
 		return
@@ -82,7 +83,7 @@ func TestE2E_GrpcProtoc_Generate(t *testing.T) {
 	}
 
 	// Perform comprehensive spec validation using the validator
-	validator := NewSpecValidator(t, specFile)
+	validator := helpers.NewSpecValidator(t, specFile)
 	validator.ValidateOpenAPIVersion()
 	validator.ValidateInfo()
 
