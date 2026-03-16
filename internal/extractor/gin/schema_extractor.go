@@ -345,14 +345,27 @@ func goTypeToSchema(goType string) *openapi3.Schema {
 }
 
 // applyTags processes struct tags and updates schema.
-// Returns the final property name (may be different from fieldName due to json tag).
-// Returns empty string if the field should be skipped (json:"-").
+// Returns the final property name (may be different from fieldName due to json/form tag).
+// Returns empty string if the field should be skipped (json:"-" or form:"-").
 func (e *SchemaExtractor) applyTags(schemaRef *openapi3.SchemaRef, tag, fieldName string, parentSchema *openapi3.Schema) string {
 	propertyName := fieldName
 	isOmitEmpty := false
 
-	// Parse json tag
-	if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
+	// Parse form tag first (for form binding support), then fall back to json tag
+	if formTag := extractTagValue(tag, "form"); formTag != "" {
+		parts := strings.Split(formTag, ",")
+		// Handle form:"-" - skip field entirely
+		if parts[0] == "-" {
+			return ""
+		}
+		if parts[0] != "" {
+			propertyName = parts[0]
+		}
+		// Check for omitempty in form tag
+		if slices.Contains(parts[1:], "omitempty") {
+			isOmitEmpty = true
+		}
+	} else if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
 		parts := strings.Split(jsonTag, ",")
 		// Handle json:"-" - skip field entirely
 		if parts[0] == "-" {
