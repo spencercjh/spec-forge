@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -79,22 +80,51 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 	slog.DebugContext(ctx, "Extracting schemas")
 	schemaExtractor := NewSchemaExtractor(parser.files)
 	schemas := make(openapi3.Schemas)
+
+	// KNOWN LIMITATION: Schema name collision
+	// We use short names (e.g., "User" instead of "models.User") for schema keys.
+	// If multiple packages define types with the same name (e.g., models.User and dto.User),
+	// the last one extracted will overwrite previous ones, producing incorrect $refs.
+	//
+	// This is a trade-off for readability - OpenAPI specs with short names are cleaner.
+	// In practice, this rarely causes issues as most projects use distinct type names.
+	//
+	// TODO: If this becomes a real issue, implement collision detection and use
+	// prefixed names (e.g., "models_User") only when conflicts are detected.
 	for _, handlerInfo := range handlerInfos {
 		if handlerInfo.BodyType != "" && handlerInfo.BodyType != ginHType {
-			if schema, extractErr := schemaExtractor.ExtractSchema(handlerInfo.BodyType); extractErr == nil {
-				schemas[handlerInfo.BodyType] = schema
-				slog.DebugContext(ctx, "Extracted request body schema", "type", handlerInfo.BodyType)
+			extractedSchemas, extractErr := schemaExtractor.ExtractAllSchemas(handlerInfo.BodyType)
+			if extractErr == nil {
+				for name, schema := range extractedSchemas {
+					// Use short name (without package prefix) for schema key
+					// NOTE: See KNOWN LIMITATION above about potential name collisions
+					shortName := name
+					if idx := strings.LastIndex(name, "."); idx != -1 {
+						shortName = name[idx+1:]
+					}
+					schemas[shortName] = schema
+				}
+				slog.DebugContext(ctx, "Extracted request body schemas", "type", handlerInfo.BodyType, "count", len(extractedSchemas))
 			} else {
-				slog.WarnContext(ctx, "Failed to extract schema", "type", handlerInfo.BodyType, "error", extractErr)
+				slog.WarnContext(ctx, "Failed to extract schemas", "type", handlerInfo.BodyType, "error", extractErr)
 			}
 		}
 		for _, resp := range handlerInfo.Responses {
 			if resp.GoType != "" && resp.GoType != ginHType {
-				if schema, extractErr := schemaExtractor.ExtractSchema(resp.GoType); extractErr == nil {
-					schemas[resp.GoType] = schema
-					slog.DebugContext(ctx, "Extracted response schema", "type", resp.GoType)
+				extractedSchemas, extractErr := schemaExtractor.ExtractAllSchemas(resp.GoType)
+				if extractErr == nil {
+					for name, schema := range extractedSchemas {
+						// Use short name (without package prefix) for schema key
+						// NOTE: See KNOWN LIMITATION above about potential name collisions
+						shortName := name
+						if idx := strings.LastIndex(name, "."); idx != -1 {
+							shortName = name[idx+1:]
+						}
+						schemas[shortName] = schema
+					}
+					slog.DebugContext(ctx, "Extracted response schemas", "type", resp.GoType, "count", len(extractedSchemas))
 				} else {
-					slog.WarnContext(ctx, "Failed to extract schema", "type", resp.GoType, "error", extractErr)
+					slog.WarnContext(ctx, "Failed to extract schemas", "type", resp.GoType, "error", extractErr)
 				}
 			}
 		}
@@ -121,14 +151,39 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 }
 
 // findHandlerDecl finds a handler function declaration by name.
+// Supports both local handlers ("getUser") and cross-package handlers ("handlers.GetUser").
+//
+// KNOWN LIMITATION: Cross-package handler references (e.g., "handlers.GetUser") are
+// resolved by searching for the function name only across all parsed files. If multiple
+// packages define the same function name, this may resolve to the wrong handler.
+//
+// TODO: Consider using Route.HandlerFile to constrain the search, or incorporate
+// import/package info when matching for more accurate cross-package resolution.
 func (g *Generator) findHandlerDecl(name string, files map[string]*ast.File) *ast.FuncDecl {
 	if name == "" {
 		return nil
 	}
-	for _, file := range files {
-		for _, decl := range file.Decls {
-			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == name {
-				return fn
+
+	// Check if it's a cross-package reference (e.g., "handlers.GetUser")
+	parts := strings.Split(name, ".")
+	if len(parts) == 2 {
+		// Cross-package handler: packageName.FunctionName
+		// Try to find by function name only since we can't easily resolve imports
+		funcName := parts[1]
+		for _, file := range files {
+			for _, decl := range file.Decls {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == funcName {
+					return fn
+				}
+			}
+		}
+	} else {
+		// Local handler: just search by name
+		for _, file := range files {
+			for _, decl := range file.Decls {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == name {
+					return fn
+				}
 			}
 		}
 	}
@@ -189,6 +244,18 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 	}
 
 	if handlerInfo == nil {
+		// Add default response for handlers we couldn't analyze
+		operation.Responses = openapi3.NewResponses()
+		desc := "Success"
+		operation.Responses.Set("200", &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Description: &desc,
+			},
+		})
+
+		// Extract path parameters from the route path
+		operation.Parameters = g.extractPathParamsFromRoute(route.FullPath)
+
 		return operation
 	}
 
@@ -251,16 +318,23 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 				response.Content["application/json"] = &openapi3.MediaType{
 					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
 				}
-			} else if _, exists := schemas[resp.GoType]; exists {
-				response.Content["application/json"] = &openapi3.MediaType{
-					Schema: &openapi3.SchemaRef{
-						Ref: "#/components/schemas/" + resp.GoType,
-					},
-				}
 			} else {
-				// Fallback to generic object if schema not found
-				response.Content["application/json"] = &openapi3.MediaType{
-					Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
+				// Use short name (without package prefix) for schema lookup and $ref
+				shortName := resp.GoType
+				if idx := strings.LastIndex(resp.GoType, "."); idx != -1 {
+					shortName = resp.GoType[idx+1:]
+				}
+				if _, exists := schemas[shortName]; exists {
+					response.Content["application/json"] = &openapi3.MediaType{
+						Schema: &openapi3.SchemaRef{
+							Ref: "#/components/schemas/" + shortName,
+						},
+					}
+				} else {
+					// Fallback to generic object if schema not found
+					response.Content["application/json"] = &openapi3.MediaType{
+						Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}},
+					}
 				}
 			}
 		}
@@ -284,21 +358,6 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 
 // buildRequestBody builds the request body or form parameters based on binding source.
 func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo *HandlerInfo, schemas openapi3.Schemas) {
-	// Handle form parameters (application/x-www-form-urlencoded)
-	if len(handlerInfo.FormParams) > 0 {
-		for _, param := range handlerInfo.FormParams {
-			operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{
-				Value: &openapi3.Parameter{
-					Name:        param.Name,
-					In:          "query",
-					Required:    param.Required,
-					Description: "Form parameter",
-					Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
-				},
-			})
-		}
-	}
-
 	// Handle file upload parameters (multipart/form-data)
 	if len(handlerInfo.FileParams) > 0 {
 		content := make(openapi3.Content)
@@ -306,6 +365,7 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 			Type:       &openapi3.Types{"object"},
 			Properties: make(openapi3.Schemas),
 		}
+		// Add file parameters
 		for _, param := range handlerInfo.FileParams {
 			schema.Properties[param.Name] = &openapi3.SchemaRef{
 				Value: &openapi3.Schema{
@@ -315,6 +375,18 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 			}
 			if param.Required {
 				schema.Required = append(schema.Required, param.Name)
+			}
+		}
+		// Also include form parameters if present (for mixed form-data)
+		for _, param := range handlerInfo.FormParams {
+			// Only add if not already added as file param
+			if _, exists := schema.Properties[param.Name]; !exists {
+				schema.Properties[param.Name] = &openapi3.SchemaRef{
+					Value: GoTypeToSchema(param.GoType),
+				}
+				if param.Required {
+					schema.Required = append(schema.Required, param.Name)
+				}
 			}
 		}
 		content["multipart/form-data"] = &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: schema}}
@@ -332,9 +404,15 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 		return
 	}
 
+	// Use short name (without package prefix) for schema lookup and $ref
+	shortBodyType := handlerInfo.BodyType
+	if idx := strings.LastIndex(handlerInfo.BodyType, "."); idx != -1 {
+		shortBodyType = handlerInfo.BodyType[idx+1:]
+	}
+
 	var schemaRef *openapi3.SchemaRef
-	if _, exists := schemas[handlerInfo.BodyType]; exists {
-		schemaRef = &openapi3.SchemaRef{Ref: "#/components/schemas/" + handlerInfo.BodyType}
+	if _, exists := schemas[shortBodyType]; exists {
+		schemaRef = &openapi3.SchemaRef{Ref: "#/components/schemas/" + shortBodyType}
 	} else {
 		// Fallback to generic object if schema not found
 		schemaRef = &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}}
@@ -352,6 +430,22 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 		return
 	case BindingSourceForm:
 		contentType = "application/x-www-form-urlencoded"
+		// For form binding, build schema from form params to use correct field names
+		if len(handlerInfo.FormParams) > 0 {
+			formSchema := &openapi3.Schema{
+				Type:       &openapi3.Types{"object"},
+				Properties: make(openapi3.Schemas),
+			}
+			for _, param := range handlerInfo.FormParams {
+				formSchema.Properties[param.Name] = &openapi3.SchemaRef{
+					Value: GoTypeToSchema(param.GoType),
+				}
+				if param.Required {
+					formSchema.Required = append(formSchema.Required, param.Name)
+				}
+			}
+			schemaRef = &openapi3.SchemaRef{Value: formSchema}
+		}
 	}
 
 	operation.RequestBody = &openapi3.RequestBodyRef{
@@ -368,21 +462,58 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 // setOperationForMethod sets the operation for the given HTTP method.
 func setOperationForMethod(pathItem *openapi3.PathItem, method string, operation *openapi3.Operation) {
 	switch method {
-	case "GET":
+	case http.MethodGet:
 		pathItem.Get = operation
-	case "POST":
+	case http.MethodPost:
 		pathItem.Post = operation
-	case "PUT":
+	case http.MethodPut:
 		pathItem.Put = operation
-	case "DELETE":
+	case http.MethodDelete:
 		pathItem.Delete = operation
-	case "PATCH":
+	case http.MethodPatch:
 		pathItem.Patch = operation
-	case "HEAD":
+	case http.MethodHead:
 		pathItem.Head = operation
-	case "OPTIONS":
+	case http.MethodOptions:
 		pathItem.Options = operation
 	}
+}
+
+// extractPathParamsFromRoute extracts path parameters from a route path.
+// For example, "/users/{id}" returns a parameter for "id".
+func (g *Generator) extractPathParamsFromRoute(path string) openapi3.Parameters {
+	var params openapi3.Parameters
+
+	// Find all {param} patterns in the path
+	for i := 0; i < len(path); i++ {
+		if path[i] != '{' {
+			continue
+		}
+		// Find the closing brace
+		end := strings.Index(path[i:], "}")
+		if end == -1 {
+			continue
+		}
+		end += i
+
+		// Extract parameter name
+		paramName := path[i+1 : end]
+
+		// Add the path parameter
+		params = append(params, &openapi3.ParameterRef{
+			Value: &openapi3.Parameter{
+				Name:        paramName,
+				In:          "path",
+				Required:    true,
+				Description: "Path parameter",
+				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+			},
+		})
+
+		i = end
+	}
+
+	return params
 }
 
 // writeOutput writes the OpenAPI document to file.

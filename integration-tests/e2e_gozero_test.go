@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/spencercjh/spec-forge/cmd"
+	"github.com/spencercjh/spec-forge/integration-tests/helpers"
 )
 
 // TestE2E_GoZero_Generate tests the generate flow for a go-zero project.
@@ -51,14 +52,14 @@ func TestE2E_GoZero_Generate(t *testing.T) {
 	}
 
 	// Find the generated spec file
-	specFile := FindSpecFile(t, outputDir, "yaml")
+	specFile := helpers.FindSpecFile(t, outputDir, "yaml")
 	if specFile == "" {
 		t.Log("no spec file found - goctl may not be available")
 		return
 	}
 
 	// Perform comprehensive spec validation
-	validator := NewSpecValidator(t, specFile)
+	validator := helpers.NewSpecValidator(t, specFile)
 	validator.ValidateOpenAPIVersion()
 	validator.ValidateInfo()
 

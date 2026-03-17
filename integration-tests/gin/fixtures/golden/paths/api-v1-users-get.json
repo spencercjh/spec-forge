@@ -1,0 +1,55 @@
+{
+  "operationId": "listUsers",
+  "parameters": [
+    {
+      "description": "Query parameter",
+      "in": "query",
+      "name": "page",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "description": "Query parameter",
+      "in": "query",
+      "name": "size",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "description": "Query parameter",
+      "in": "query",
+      "name": "username",
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/PageResult"
+          }
+        }
+      },
+      "description": "HTTP 200 response"
+    },
+    "400": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/ApiResponse"
+          }
+        }
+      },
+      "description": "HTTP 400 response"
+    },
+    "default": {
+      "description": ""
+    }
+  },
+  "summary": "listUsers"
+}

@@ -1,6 +1,6 @@
 //go:build e2e
 
-package e2e_test
+package gin
 
 import (
 	"bytes"
@@ -10,27 +10,25 @@ import (
 	"testing"
 
 	"github.com/spencercjh/spec-forge/cmd"
+	"github.com/spencercjh/spec-forge/integration-tests/helpers"
 )
 
-func TestE2E_GinDemo_Generate(t *testing.T) {
-	projectPath := "./gin-demo"
+// TestGenerate tests basic generation from gin-demo
+func TestGenerate(t *testing.T) {
+	projectPath := "./fixtures/gin-demo"
 
-	// Check if project exists
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("Gin demo project not found")
 	}
 
-	// Check if go.mod exists
 	goModPath := filepath.Join(projectPath, "go.mod")
 	if _, err := os.Stat(goModPath); os.IsNotExist(err) {
 		t.Skip("go.mod not found, skipping test")
 	}
 
-	// Create temp output directory
 	outputDir := t.TempDir()
 
 	rootCmd := cmd.NewRootCommand()
-
 	var stdout, stderr bytes.Buffer
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&stderr)
@@ -48,19 +46,16 @@ func TestE2E_GinDemo_Generate(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	// Find the generated spec file
-	specFile := FindSpecFile(t, outputDir, "json")
-
-	// Perform comprehensive spec validation
-	validator := NewSpecValidator(t, specFile)
-	validator.FullValidation(ValidationConfig{
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
+	validator.FullValidation(helpers.ValidationConfig{
 		ExpectedPaths: []string{
 			"/api/v1/users",
 			"/api/v1/users/{id}",
 			"/api/v1/users/{id}/profile",
 			"/api/v1/users/upload",
 		},
-		Operations: []OperationConfig{
+		Operations: []helpers.OperationConfig{
 			{
 				Path:                    "/api/v1/users",
 				Method:                  "get",
@@ -73,7 +68,7 @@ func TestE2E_GinDemo_Generate(t *testing.T) {
 				Method:                "post",
 				WantOperationID:       true,
 				ExpectedResponseCodes: []string{"201", "400"},
-				WantRequestBody:       "application/json",
+				WantRequestBody:       "CreateUserRequest",
 			},
 			{
 				Path:                  "/api/v1/users/{id}",
@@ -107,22 +102,62 @@ func TestE2E_GinDemo_Generate(t *testing.T) {
 		},
 	})
 
+	// Semantic validations
+	t.Log("=== Semantic Validation ===")
+
+	validator.ValidateParameterDetails("/api/v1/users", "get", []helpers.ParameterExpectation{
+		{Name: "page", In: "query", Required: false},
+		{Name: "size", In: "query", Required: false},
+		{Name: "username", In: "query", Required: false},
+	})
+
+	validator.ValidateRequestBodySchema("/api/v1/users", "post", "CreateUserRequest")
+
+	validator.ValidateParameterDetails("/api/v1/users/{id}", "get", []helpers.ParameterExpectation{
+		{Name: "id", In: "path", Required: true},
+	})
+
+	validator.ValidateSchemaProperty("PageResult", helpers.SchemaPropertyExpectation{
+		Name:     "content",
+		Type:     "array",
+		ItemType: "User",
+	})
+
+	validator.ValidateParameterDetails("/api/v1/users/{id}/profile", "post", []helpers.ParameterExpectation{
+		{Name: "id", In: "path", Required: true},
+	})
+	// Form parameters are now in requestBody, not query parameters
+
+	validator.ValidateResponseSchema("/api/v1/users", "post", helpers.ResponseSchemaExpectation{
+		Code:        "201",
+		ContentType: "application/json",
+		SchemaRef:   "User",
+	})
+	validator.ValidateResponseSchema("/api/v1/users", "post", helpers.ResponseSchemaExpectation{
+		Code:        "400",
+		ContentType: "application/json",
+		SchemaRef:   "ApiResponse",
+	})
+	validator.ValidateResponseSchema("/api/v1/users/{id}", "get", helpers.ResponseSchemaExpectation{
+		Code:        "404",
+		ContentType: "application/json",
+		SchemaRef:   "ApiResponse",
+	})
+
 	t.Log("All validations passed!")
 }
 
-func TestE2E_GinDemo_JSONFormat(t *testing.T) {
-	projectPath := "./gin-demo"
+// TestJSONFormat tests JSON output format
+func TestJSONFormat(t *testing.T) {
+	projectPath := "./fixtures/gin-demo"
 
-	// Check if project exists
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("Gin demo project not found")
 	}
 
-	// Create temp output directory
 	outputDir := t.TempDir()
 
 	rootCmd := cmd.NewRootCommand()
-
 	var stdout, stderr bytes.Buffer
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&stderr)
@@ -140,7 +175,6 @@ func TestE2E_GinDemo_JSONFormat(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	// Find the generated spec file
 	entries, err := os.ReadDir(outputDir)
 	if err != nil {
 		t.Fatalf("failed to read output directory: %v", err)
@@ -158,7 +192,6 @@ func TestE2E_GinDemo_JSONFormat(t *testing.T) {
 		t.Fatal("no JSON spec file found in output directory")
 	}
 
-	// Verify JSON content
 	specData, err := os.ReadFile(specFile)
 	if err != nil {
 		t.Fatalf("failed to read spec file: %v", err)
@@ -169,7 +202,6 @@ func TestE2E_GinDemo_JSONFormat(t *testing.T) {
 		t.Fatalf("failed to parse spec JSON: %v", err)
 	}
 
-	// Verify basic structure
 	if spec["openapi"] == nil {
 		t.Error("expected openapi field in spec")
 	}
@@ -183,7 +215,6 @@ func TestE2E_GinDemo_JSONFormat(t *testing.T) {
 		t.Fatal("expected paths to be an object")
 	}
 
-	// Verify expected paths exist
 	expectedPaths := []string{
 		"/api/v1/users",
 		"/api/v1/users/{id}",
@@ -200,18 +231,15 @@ func TestE2E_GinDemo_JSONFormat(t *testing.T) {
 	t.Log("JSON format test passed!")
 }
 
-// TestE2E_GinDemo_DefaultOutput tests the generator's behavior when OutputDir
-// is set to the project path.
-func TestE2E_GinDemo_DefaultOutput(t *testing.T) {
-	projectPath := "./gin-demo"
+// TestDefaultOutput tests output to project directory
+func TestDefaultOutput(t *testing.T) {
+	projectPath := "./fixtures/gin-demo"
 
-	// Check if project exists
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		t.Skip("Gin demo project not found")
 	}
 
 	rootCmd := cmd.NewRootCommand()
-
 	var stdout, stderr bytes.Buffer
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&stderr)
@@ -229,13 +257,11 @@ func TestE2E_GinDemo_DefaultOutput(t *testing.T) {
 		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
 	}
 
-	// Verify output is in project root
 	expectedPath := filepath.Join(projectPath, "openapi.yaml")
 	if _, err := os.Stat(expectedPath); err != nil {
 		t.Fatalf("spec file not found at expected path: %s", expectedPath)
 	}
 
-	// Cleanup
 	_ = os.Remove(expectedPath)
 
 	t.Logf("Spec correctly output to project root: %s", expectedPath)

@@ -1,0 +1,27 @@
+{
+  "properties": {
+    "content": {
+      "items": {
+        "$ref": "#/components/schemas/User"
+      },
+      "type": "array"
+    },
+    "pageNumber": {
+      "format": "int32",
+      "type": "integer"
+    },
+    "pageSize": {
+      "format": "int32",
+      "type": "integer"
+    },
+    "total": {
+      "format": "int64",
+      "type": "integer"
+    },
+    "totalPages": {
+      "format": "int32",
+      "type": "integer"
+    }
+  },
+  "type": "object"
+}

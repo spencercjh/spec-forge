@@ -3,6 +3,7 @@ package enricher
 import (
 	"context"
 	"log/slog"
+	"net/http"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -106,13 +107,13 @@ func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContex
 				method string
 				op     *openapi3.Operation
 			}{
-				{"GET", pathItem.Get},
-				{"POST", pathItem.Post},
-				{"PUT", pathItem.Put},
-				{"DELETE", pathItem.Delete},
-				{"PATCH", pathItem.Patch},
-				{"HEAD", pathItem.Head},
-				{"OPTIONS", pathItem.Options},
+				{http.MethodGet, pathItem.Get},
+				{http.MethodPost, pathItem.Post},
+				{http.MethodPut, pathItem.Put},
+				{http.MethodDelete, pathItem.Delete},
+				{http.MethodPatch, pathItem.Patch},
+				{http.MethodHead, pathItem.Head},
+				{http.MethodOptions, pathItem.Options},
 			}
 
 			for _, item := range operations {
@@ -174,11 +175,11 @@ func collectParametersFromSpec(spec *openapi3.T, collector *processor.SpecCollec
 			method string
 			op     *openapi3.Operation
 		}{
-			{"GET", pathItem.Get},
-			{"POST", pathItem.Post},
-			{"PUT", pathItem.Put},
-			{"DELETE", pathItem.Delete},
-			{"PATCH", pathItem.Patch},
+			{http.MethodGet, pathItem.Get},
+			{http.MethodPost, pathItem.Post},
+			{http.MethodPut, pathItem.Put},
+			{http.MethodDelete, pathItem.Delete},
+			{http.MethodPatch, pathItem.Patch},
 		}
 
 		for _, item := range operations {

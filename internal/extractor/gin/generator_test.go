@@ -157,6 +157,69 @@ func main() {
 	}
 }
 
+// TestFormParamsTypeMapping tests that FormParams preserve their GoType in schema generation
+// Fix for: FormParams lose type information (hard-coded as string)
+func TestFormParamsTypeMapping(t *testing.T) {
+	tests := []struct {
+		name           string
+		param          ParamInfo
+		expectedType   string
+		expectedFormat string
+	}{
+		{
+			name:         "string param",
+			param:        ParamInfo{Name: "username", GoType: "string", Required: true},
+			expectedType: "string",
+		},
+		{
+			name:           "int param",
+			param:          ParamInfo{Name: "age", GoType: "int", Required: false},
+			expectedType:   "integer",
+			expectedFormat: "int32",
+		},
+		{
+			name:           "int64 param",
+			param:          ParamInfo{Name: "id", GoType: "int64", Required: true},
+			expectedType:   "integer",
+			expectedFormat: "int64",
+		},
+		{
+			name:           "float64 param",
+			param:          ParamInfo{Name: "score", GoType: "float64", Required: false},
+			expectedType:   "number",
+			expectedFormat: "double",
+		},
+		{
+			name:         "bool param",
+			param:        ParamInfo{Name: "active", GoType: "bool", Required: true},
+			expectedType: "boolean",
+		},
+		{
+			name:           "time.Time param",
+			param:          ParamInfo{Name: "created", GoType: "time.Time", Required: false},
+			expectedType:   "string",
+			expectedFormat: "date-time",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schema := GoTypeToSchema(tt.param.GoType)
+			if schema == nil || schema.Type == nil {
+				t.Fatalf("expected schema type, got nil")
+			}
+
+			if (*schema.Type)[0] != tt.expectedType {
+				t.Errorf("expected type %s, got %s", tt.expectedType, (*schema.Type)[0])
+			}
+
+			if tt.expectedFormat != "" && schema.Format != tt.expectedFormat {
+				t.Errorf("expected format %s, got %s", tt.expectedFormat, schema.Format)
+			}
+		})
+	}
+}
+
 func TestSetOperationForMethod(t *testing.T) {
 	tests := []struct {
 		method string

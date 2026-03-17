@@ -196,16 +196,19 @@ func (p *ASTParser) parseRouteCall(file string, call *ast.CallExpr) *Route {
 		return nil
 	}
 
-	// Extract path
+	// Extract path (can be empty string for group root)
 	path := extractStringLiteral(call.Args[0])
-	if path == "" {
-		return nil
-	}
+	// Note: path can be "" for group routes like r.Group("/api").GET("", handler)
 
 	// Check if this is a group route
 	fullPath := path
 	if group, ok := p.groups[routerVar.Name]; ok {
 		fullPath = group.BasePath + path
+	}
+
+	// If fullPath is empty after all processing, skip this route
+	if fullPath == "" {
+		return nil
 	}
 
 	// Convert Gin path format (:id) to OpenAPI path format ({id})
@@ -233,10 +236,10 @@ func isHTTPMethod(s string) bool {
 	return false
 }
 
-// convertPathFormat converts Gin path format (:param) to OpenAPI path format ({param}).
+// convertPathFormat converts Gin path format (:param, *wildcard) to OpenAPI path format ({param}).
 func convertPathFormat(path string) string {
-	// Replace :param with {param}
-	// Handle patterns like :id, :userId, etc.
+	// Replace :param with {param} and /*wildcard with {wildcard}
+	// Handle patterns like :id, :userId, /*filepath, etc.
 	var result strings.Builder
 	for i := 0; i < len(path); i++ {
 		if path[i] == ':' {
@@ -247,6 +250,21 @@ func convertPathFormat(path string) string {
 			}
 			if j > i+1 {
 				// Convert :param to {param}
+				result.WriteByte('{')
+				result.WriteString(path[i+1 : j])
+				result.WriteByte('}')
+				i = j - 1
+			} else {
+				result.WriteByte(path[i])
+			}
+		} else if path[i] == '*' && i+1 < len(path) {
+			// Handle wildcard parameter like /*filepath
+			// Convert /*filepath to {filepath}
+			j := i + 1
+			for j < len(path) && isValidParamChar(path[j]) {
+				j++
+			}
+			if j > i+1 {
 				result.WriteByte('{')
 				result.WriteString(path[i+1 : j])
 				result.WriteByte('}')

@@ -19,6 +19,9 @@ const (
 	validateRuleUUID  = "uuid"
 )
 
+// Schema type constants for goconst compliance
+const schemaTypeObject = "object"
+
 // SchemaExtractor extracts OpenAPI schemas from Go structs.
 type SchemaExtractor struct {
 	files     map[string]*ast.File
@@ -50,31 +53,195 @@ func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, e
 		return nil, fmt.Errorf("type %s not found", typeName)
 	}
 
-	// Extract schema from struct
-	schema, err := e.extractStructSchema(typeSpec)
+	// Extract schema based on underlying type
+	var schema *openapi3.Schema
+	var err error
+
+	switch underlying := typeSpec.Type.(type) {
+	case *ast.StructType:
+		schema, err = e.extractStructSchema(typeSpec, underlying)
+	case *ast.Ident:
+		// Type alias (e.g., type CustomString string or type UserID User)
+		// Check if it's an alias to a known custom type first
+		if e.findTypeSpec(underlying.Name) != nil {
+			// It's an alias to another custom type - create a reference
+			ref := "#/components/schemas/" + underlying.Name
+			return &openapi3.SchemaRef{Ref: ref}, nil
+		}
+		// Otherwise treat as primitive type alias
+		schema = GoTypeToSchema(underlying.Name)
+	case *ast.ArrayType:
+		// Type alias for array (e.g., type IDs []int or type Users []User)
+		// Use fieldToSchemaRef to preserve $ref for custom element types
+		itemSchemaRef := e.fieldToSchemaRef(underlying.Elt)
+		schema = &openapi3.Schema{
+			Type:  &openapi3.Types{goTypeArray},
+			Items: itemSchemaRef,
+		}
+	case *ast.SelectorExpr:
+		// Type alias to imported type (e.g., type MyTime time.Time)
+		// Use fieldToSchemaRef to handle it consistently with struct fields
+		return e.fieldToSchemaRef(underlying), nil
+	default:
+		// Fallback to object for unknown types
+		schema = &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
+	}
+
 	if err != nil {
-		slog.Error("Failed to extract struct schema", "type", typeName, "error", err)
+		slog.Error("Failed to extract schema", "type", typeName, "error", err)
 		return nil, err
 	}
 
 	ref := &openapi3.SchemaRef{Value: schema}
 	e.typeCache[typeName] = ref
-	slog.Debug("Extracted schema", "type", typeName, "properties", len(schema.Properties))
+	slog.Debug("Extracted schema", "type", typeName)
 	return ref, nil
 }
 
+// ExtractAllSchemas extracts a type and all its nested referenced types.
+// This ensures that when Company is extracted, Address (if referenced) is also extracted.
+func (e *SchemaExtractor) ExtractAllSchemas(typeName string) (openapi3.Schemas, error) {
+	schemas := make(openapi3.Schemas)
+	visited := make(map[string]bool)
+
+	var extractRecursive func(string) error
+	extractRecursive = func(name string) error {
+		// Skip already visited or builtin types
+		if visited[name] {
+			return nil
+		}
+		visited[name] = true
+
+		// Skip primitive types
+		if isPrimitiveType(name) {
+			return nil
+		}
+
+		// Extract this type
+		schemaRef, err := e.ExtractSchema(name)
+		if err != nil {
+			// Log warning but continue - type might be from external package
+			slog.Warn("Failed to extract nested schema", "type", name, "error", err)
+			return nil
+		}
+
+		schemas[name] = schemaRef
+
+		// Find and extract all referenced types from this schema
+		// Handle both inline schemas (Value != nil) and $ref-only schemas
+		return e.extractRefsFromSchemaRef(schemaRef, extractRecursive)
+	}
+
+	if err := extractRecursive(typeName); err != nil {
+		return nil, err
+	}
+
+	return schemas, nil
+}
+
+// extractRefsFromSchema recursively extracts all $ref references from a schema.
+// It handles Properties, Items, AdditionalProperties, and composition keywords.
+func (e *SchemaExtractor) extractRefsFromSchema(schema *openapi3.Schema, extractFunc func(string) error) error {
+	if schema == nil {
+		return nil
+	}
+
+	// Check Properties
+	for _, propRef := range schema.Properties {
+		if err := e.extractRefsFromSchemaRef(propRef, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	// Check Items (arrays)
+	if schema.Items != nil {
+		if err := e.extractRefsFromSchemaRef(schema.Items, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	// Check AdditionalProperties (maps)
+	if schema.AdditionalProperties.Schema != nil {
+		if err := e.extractRefsFromSchemaRef(schema.AdditionalProperties.Schema, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	// Check composition keywords
+	for _, ref := range schema.AllOf {
+		if err := e.extractRefsFromSchemaRef(ref, extractFunc); err != nil {
+			return err
+		}
+	}
+	for _, ref := range schema.OneOf {
+		if err := e.extractRefsFromSchemaRef(ref, extractFunc); err != nil {
+			return err
+		}
+	}
+	for _, ref := range schema.AnyOf {
+		if err := e.extractRefsFromSchemaRef(ref, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// extractRefsFromSchemaRef extracts $ref from a schema reference and recursively processes inline schemas.
+func (e *SchemaExtractor) extractRefsFromSchemaRef(schemaRef *openapi3.SchemaRef, extractFunc func(string) error) error {
+	if schemaRef == nil {
+		return nil
+	}
+
+	// If it has a $ref, extract it
+	if schemaRef.Ref != "" {
+		refName := strings.TrimPrefix(schemaRef.Ref, "#/components/schemas/")
+		if err := extractFunc(refName); err != nil {
+			return err
+		}
+	}
+
+	// Also process the inline schema if present
+	if schemaRef.Value != nil {
+		if err := e.extractRefsFromSchema(schemaRef.Value, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// isPrimitiveType checks if a type name is a primitive Go type.
+func isPrimitiveType(name string) bool {
+	primitives := []string{
+		goTypeString, "int", "int32", "int64", "uint", "uint32", "uint64",
+		"float32", "float64", "bool", "byte", "rune", "time.Time",
+	}
+	return slices.Contains(primitives, name)
+}
+
 // findTypeSpec finds a type definition by name.
+// Supports both local types ("User") and cross-package types ("models.User").
 func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
-	for _, file := range e.files {
-		for _, decl := range file.Decls {
-			genDecl, ok := decl.(*ast.GenDecl)
-			if !ok || genDecl.Tok != token.TYPE {
-				continue
-			}
-			for _, spec := range genDecl.Specs {
-				typeSpec, ok := spec.(*ast.TypeSpec)
-				if ok && typeSpec.Name.Name == name {
-					return typeSpec
+	// For cross-package references (e.g., "models.User"), try to find by short name
+	shortName := name
+	if idx := strings.LastIndex(name, "."); idx != -1 {
+		shortName = name[idx+1:]
+	}
+
+	// Try full name first, then short name
+	for _, tryName := range []string{name, shortName} {
+		for _, file := range e.files {
+			for _, decl := range file.Decls {
+				genDecl, ok := decl.(*ast.GenDecl)
+				if !ok || genDecl.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range genDecl.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if ok && typeSpec.Name.Name == tryName {
+						return typeSpec
+					}
 				}
 			}
 		}
@@ -83,14 +250,9 @@ func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
 }
 
 // extractStructSchema extracts schema from a struct type.
-func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec) (*openapi3.Schema, error) {
-	structType, ok := typeSpec.Type.(*ast.StructType)
-	if !ok {
-		return nil, fmt.Errorf("type %s is not a struct", typeSpec.Name.Name)
-	}
-
+func (e *SchemaExtractor) extractStructSchema(_ *ast.TypeSpec, structType *ast.StructType) (*openapi3.Schema, error) {
 	schema := &openapi3.Schema{
-		Type:       &openapi3.Types{"object"},
+		Type:       &openapi3.Types{schemaTypeObject},
 		Properties: make(openapi3.Schemas),
 	}
 
@@ -126,8 +288,8 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 	switch t := expr.(type) {
 	case *ast.Ident:
 		// Check if it's a basic type first
-		schema := goTypeToSchema(t.Name)
-		if schema.Type != nil && (*schema.Type)[0] != "object" {
+		schema := GoTypeToSchema(t.Name)
+		if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
 			return &openapi3.SchemaRef{Value: schema}
 		}
 		// It's a custom type - create a reference
@@ -143,7 +305,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 		itemSchemaRef := e.fieldToSchemaRef(t.Elt)
 		return &openapi3.SchemaRef{
 			Value: &openapi3.Schema{
-				Type:  &openapi3.Types{"array"},
+				Type:  &openapi3.Types{goTypeArray},
 				Items: itemSchemaRef,
 			},
 		}
@@ -151,19 +313,35 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 		valueSchemaRef := e.fieldToSchemaRef(t.Value)
 		return &openapi3.SchemaRef{
 			Value: &openapi3.Schema{
-				Type:                 &openapi3.Types{"object"},
+				Type:                 &openapi3.Types{schemaTypeObject},
 				AdditionalProperties: openapi3.AdditionalProperties{Schema: valueSchemaRef},
 			},
 		}
 	case *ast.SelectorExpr:
-		// Package qualified type (e.g., time.Time)
+		// Package qualified type (e.g., time.Time, models.User)
 		if x, ok := t.X.(*ast.Ident); ok {
 			fullName := x.Name + "." + t.Sel.Name
-			return &openapi3.SchemaRef{Value: goTypeToSchema(fullName)}
+			shortName := t.Sel.Name
+
+			// Check if it's a known primitive type (like time.Time)
+			schema := GoTypeToSchema(fullName)
+			if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
+				return &openapi3.SchemaRef{Value: schema}
+			}
+
+			// It's a custom type - try to find it and create a reference
+			// Try both full name (models.User) and short name (User)
+			if e.findTypeSpec(fullName) != nil || e.findTypeSpec(shortName) != nil {
+				// Use short name for schema reference
+				// NOTE: This can cause collisions. See generator.go for details.
+				ref := "#/components/schemas/" + shortName
+				return &openapi3.SchemaRef{Ref: ref}
+			}
+			return &openapi3.SchemaRef{Value: schema}
 		}
 	}
 
-	return &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"object"}}}
+	return &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}}
 }
 
 // fieldToSchema converts a Go type to OpenAPI schema.
@@ -171,15 +349,15 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 	switch t := expr.(type) {
 	case *ast.Ident:
 		// Check if it's a basic type first
-		schema := goTypeToSchema(t.Name)
-		if schema.Type != nil && (*schema.Type)[0] != "object" {
+		schema := GoTypeToSchema(t.Name)
+		if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
 			return schema
 		}
 		// It's a custom type - check if we know about it
 		if e.findTypeSpec(t.Name) != nil {
 			// Return a placeholder schema with type object
 			// The reference will be created by the caller if needed
-			return &openapi3.Schema{Type: &openapi3.Types{"object"}}
+			return &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 		}
 		return schema
 	case *ast.StarExpr:
@@ -188,31 +366,31 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 	case *ast.ArrayType:
 		itemSchema := e.fieldToSchema(t.Elt)
 		return &openapi3.Schema{
-			Type:  &openapi3.Types{"array"},
+			Type:  &openapi3.Types{goTypeArray},
 			Items: &openapi3.SchemaRef{Value: itemSchema},
 		}
 	case *ast.MapType:
 		valueSchema := e.fieldToSchema(t.Value)
 		return &openapi3.Schema{
-			Type:                 &openapi3.Types{"object"},
+			Type:                 &openapi3.Types{schemaTypeObject},
 			AdditionalProperties: openapi3.AdditionalProperties{Schema: &openapi3.SchemaRef{Value: valueSchema}},
 		}
 	case *ast.SelectorExpr:
 		// Package qualified type (e.g., time.Time)
 		if x, ok := t.X.(*ast.Ident); ok {
 			fullName := x.Name + "." + t.Sel.Name
-			return goTypeToSchema(fullName)
+			return GoTypeToSchema(fullName)
 		}
 	}
 
-	return &openapi3.Schema{Type: &openapi3.Types{"object"}}
+	return &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 }
 
-// goTypeToSchema converts a Go type name to OpenAPI schema.
-func goTypeToSchema(goType string) *openapi3.Schema {
+// GoTypeToSchema converts a Go type name to OpenAPI schema.
+func GoTypeToSchema(goType string) *openapi3.Schema {
 	switch goType {
-	case "string":
-		return &openapi3.Schema{Type: &openapi3.Types{"string"}}
+	case goTypeString:
+		return &openapi3.Schema{Type: &openapi3.Types{goTypeString}}
 	case "int", "int32":
 		return &openapi3.Schema{Type: &openapi3.Types{"integer"}, Format: "int32"}
 	case "int64":
@@ -226,21 +404,34 @@ func goTypeToSchema(goType string) *openapi3.Schema {
 	case "bool":
 		return &openapi3.Schema{Type: &openapi3.Types{"boolean"}}
 	case "time.Time":
-		return &openapi3.Schema{Type: &openapi3.Types{"string"}, Format: "date-time"}
+		return &openapi3.Schema{Type: &openapi3.Types{goTypeString}, Format: "date-time"}
 	default:
-		return &openapi3.Schema{Type: &openapi3.Types{"object"}}
+		return &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 	}
 }
 
 // applyTags processes struct tags and updates schema.
-// Returns the final property name (may be different from fieldName due to json tag).
-// Returns empty string if the field should be skipped (json:"-").
+// Returns the final property name (may be different from fieldName due to json/form tag).
+// Returns empty string if the field should be skipped (json:"-" or form:"-").
 func (e *SchemaExtractor) applyTags(schemaRef *openapi3.SchemaRef, tag, fieldName string, parentSchema *openapi3.Schema) string {
 	propertyName := fieldName
 	isOmitEmpty := false
 
-	// Parse json tag
-	if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
+	// Parse form tag first (for form binding support), then fall back to json tag
+	if formTag := extractTagValue(tag, "form"); formTag != "" {
+		parts := strings.Split(formTag, ",")
+		// Handle form:"-" - skip field entirely
+		if parts[0] == "-" {
+			return ""
+		}
+		if parts[0] != "" {
+			propertyName = parts[0]
+		}
+		// Check for omitempty in form tag
+		if slices.Contains(parts[1:], "omitempty") {
+			isOmitEmpty = true
+		}
+	} else if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
 		parts := strings.Split(jsonTag, ",")
 		// Handle json:"-" - skip field entirely
 		if parts[0] == "-" {
