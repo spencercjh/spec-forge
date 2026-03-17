@@ -124,22 +124,9 @@ func (e *SchemaExtractor) ExtractAllSchemas(typeName string) (openapi3.Schemas, 
 		schemas[name] = schemaRef
 
 		// Find and extract all referenced types from this schema
-		if schemaRef.Value != nil && schemaRef.Value.Properties != nil {
-			for _, propRef := range schemaRef.Value.Properties {
-				if propRef.Ref != "" {
-					// Extract the type name from $ref (e.g., "#/components/schemas/Address" -> "Address")
-					refName := strings.TrimPrefix(propRef.Ref, "#/components/schemas/")
-					if err := extractRecursive(refName); err != nil {
-						return err
-					}
-				}
-				// Also check array items
-				if propRef.Value != nil && propRef.Value.Items != nil && propRef.Value.Items.Ref != "" {
-					refName := strings.TrimPrefix(propRef.Value.Items.Ref, "#/components/schemas/")
-					if err := extractRecursive(refName); err != nil {
-						return err
-					}
-				}
+		if schemaRef.Value != nil {
+			if err := e.extractRefsFromSchema(schemaRef.Value, extractRecursive); err != nil {
+				return err
 			}
 		}
 
@@ -151,6 +138,78 @@ func (e *SchemaExtractor) ExtractAllSchemas(typeName string) (openapi3.Schemas, 
 	}
 
 	return schemas, nil
+}
+
+// extractRefsFromSchema recursively extracts all $ref references from a schema.
+// It handles Properties, Items, AdditionalProperties, and composition keywords.
+func (e *SchemaExtractor) extractRefsFromSchema(schema *openapi3.Schema, extractFunc func(string) error) error {
+	if schema == nil {
+		return nil
+	}
+
+	// Check Properties
+	for _, propRef := range schema.Properties {
+		if err := e.extractRefsFromSchemaRef(propRef, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	// Check Items (arrays)
+	if schema.Items != nil {
+		if err := e.extractRefsFromSchemaRef(schema.Items, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	// Check AdditionalProperties (maps)
+	if schema.AdditionalProperties.Schema != nil {
+		if err := e.extractRefsFromSchemaRef(schema.AdditionalProperties.Schema, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	// Check composition keywords
+	for _, ref := range schema.AllOf {
+		if err := e.extractRefsFromSchemaRef(ref, extractFunc); err != nil {
+			return err
+		}
+	}
+	for _, ref := range schema.OneOf {
+		if err := e.extractRefsFromSchemaRef(ref, extractFunc); err != nil {
+			return err
+		}
+	}
+	for _, ref := range schema.AnyOf {
+		if err := e.extractRefsFromSchemaRef(ref, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// extractRefsFromSchemaRef extracts $ref from a schema reference and recursively processes inline schemas.
+func (e *SchemaExtractor) extractRefsFromSchemaRef(schemaRef *openapi3.SchemaRef, extractFunc func(string) error) error {
+	if schemaRef == nil {
+		return nil
+	}
+
+	// If it has a $ref, extract it
+	if schemaRef.Ref != "" {
+		refName := strings.TrimPrefix(schemaRef.Ref, "#/components/schemas/")
+		if err := extractFunc(refName); err != nil {
+			return err
+		}
+	}
+
+	// Also process the inline schema if present
+	if schemaRef.Value != nil {
+		if err := e.extractRefsFromSchema(schemaRef.Value, extractFunc); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // isPrimitiveType checks if a type name is a primitive Go type.
