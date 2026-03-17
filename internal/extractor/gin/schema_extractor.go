@@ -334,6 +334,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 			// Try both full name (models.User) and short name (User)
 			if e.findTypeSpec(fullName) != nil || e.findTypeSpec(shortName) != nil {
 				// Use short name for schema reference
+				// NOTE: This can cause collisions. See generator.go for details.
 				ref := "#/components/schemas/" + shortName
 				return &openapi3.SchemaRef{Ref: ref}
 			}

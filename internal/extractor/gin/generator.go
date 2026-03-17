@@ -85,6 +85,9 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 			if extractErr == nil {
 				for name, schema := range extractedSchemas {
 					// Use short name (without package prefix) for schema key
+					// NOTE: This can cause collisions if multiple packages define the same type name
+					// (e.g., models.User vs dto.User). Consider using normalizeSchemaName() for
+					// disambiguation if this becomes an issue in practice.
 					shortName := name
 					if idx := strings.LastIndex(name, "."); idx != -1 {
 						shortName = name[idx+1:]
@@ -102,6 +105,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 				if extractErr == nil {
 					for name, schema := range extractedSchemas {
 						// Use short name (without package prefix) for schema key
+						// See note above about potential collisions
 						shortName := name
 						if idx := strings.LastIndex(name, "."); idx != -1 {
 							shortName = name[idx+1:]
