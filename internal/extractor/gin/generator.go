@@ -79,15 +79,24 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 	slog.DebugContext(ctx, "Extracting schemas")
 	schemaExtractor := NewSchemaExtractor(parser.files)
 	schemas := make(openapi3.Schemas)
+
+	// KNOWN LIMITATION: Schema name collision
+	// We use short names (e.g., "User" instead of "models.User") for schema keys.
+	// If multiple packages define types with the same name (e.g., models.User and dto.User),
+	// the last one extracted will overwrite previous ones, producing incorrect $refs.
+	//
+	// This is a trade-off for readability - OpenAPI specs with short names are cleaner.
+	// In practice, this rarely causes issues as most projects use distinct type names.
+	//
+	// TODO: If this becomes a real issue, implement collision detection and use
+	// prefixed names (e.g., "models_User") only when conflicts are detected.
 	for _, handlerInfo := range handlerInfos {
 		if handlerInfo.BodyType != "" && handlerInfo.BodyType != ginHType {
 			extractedSchemas, extractErr := schemaExtractor.ExtractAllSchemas(handlerInfo.BodyType)
 			if extractErr == nil {
 				for name, schema := range extractedSchemas {
 					// Use short name (without package prefix) for schema key
-					// NOTE: This can cause collisions if multiple packages define the same type name
-					// (e.g., models.User vs dto.User). Consider using normalizeSchemaName() for
-					// disambiguation if this becomes an issue in practice.
+					// NOTE: See KNOWN LIMITATION above about potential name collisions
 					shortName := name
 					if idx := strings.LastIndex(name, "."); idx != -1 {
 						shortName = name[idx+1:]
@@ -105,7 +114,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 				if extractErr == nil {
 					for name, schema := range extractedSchemas {
 						// Use short name (without package prefix) for schema key
-						// See note above about potential collisions
+						// NOTE: See KNOWN LIMITATION above about potential name collisions
 						shortName := name
 						if idx := strings.LastIndex(name, "."); idx != -1 {
 							shortName = name[idx+1:]
@@ -142,6 +151,13 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 
 // findHandlerDecl finds a handler function declaration by name.
 // Supports both local handlers ("getUser") and cross-package handlers ("handlers.GetUser").
+//
+// KNOWN LIMITATION: Cross-package handler references (e.g., "handlers.GetUser") are
+// resolved by searching for the function name only across all parsed files. If multiple
+// packages define the same function name, this may resolve to the wrong handler.
+//
+// TODO: Consider using Route.HandlerFile to constrain the search, or incorporate
+// import/package info when matching for more accurate cross-package resolution.
 func (g *Generator) findHandlerDecl(name string, files map[string]*ast.File) *ast.FuncDecl {
 	if name == "" {
 		return nil
