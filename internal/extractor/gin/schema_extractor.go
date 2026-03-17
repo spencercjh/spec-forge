@@ -78,6 +78,10 @@ func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, e
 			Type:  &openapi3.Types{goTypeArray},
 			Items: itemSchemaRef,
 		}
+	case *ast.SelectorExpr:
+		// Type alias to imported type (e.g., type MyTime time.Time)
+		// Use fieldToSchemaRef to handle it consistently with struct fields
+		return e.fieldToSchemaRef(underlying), nil
 	default:
 		// Fallback to object for unknown types
 		schema = &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
@@ -124,13 +128,8 @@ func (e *SchemaExtractor) ExtractAllSchemas(typeName string) (openapi3.Schemas, 
 		schemas[name] = schemaRef
 
 		// Find and extract all referenced types from this schema
-		if schemaRef.Value != nil {
-			if err := e.extractRefsFromSchema(schemaRef.Value, extractRecursive); err != nil {
-				return err
-			}
-		}
-
-		return nil
+		// Handle both inline schemas (Value != nil) and $ref-only schemas
+		return e.extractRefsFromSchemaRef(schemaRef, extractRecursive)
 	}
 
 	if err := extractRecursive(typeName); err != nil {

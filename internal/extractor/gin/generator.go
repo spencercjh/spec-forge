@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -461,19 +462,19 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 // setOperationForMethod sets the operation for the given HTTP method.
 func setOperationForMethod(pathItem *openapi3.PathItem, method string, operation *openapi3.Operation) {
 	switch method {
-	case "GET":
+	case http.MethodGet:
 		pathItem.Get = operation
-	case "POST":
+	case http.MethodPost:
 		pathItem.Post = operation
-	case "PUT":
+	case http.MethodPut:
 		pathItem.Put = operation
-	case "DELETE":
+	case http.MethodDelete:
 		pathItem.Delete = operation
-	case "PATCH":
+	case http.MethodPatch:
 		pathItem.Patch = operation
-	case "HEAD":
+	case http.MethodHead:
 		pathItem.Head = operation
-	case "OPTIONS":
+	case http.MethodOptions:
 		pathItem.Options = operation
 	}
 }
