@@ -382,7 +382,7 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 			// Only add if not already added as file param
 			if _, exists := schema.Properties[param.Name]; !exists {
 				schema.Properties[param.Name] = &openapi3.SchemaRef{
-					Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+					Value: GoTypeToSchema(param.GoType),
 				}
 				if param.Required {
 					schema.Required = append(schema.Required, param.Name)
@@ -438,7 +438,7 @@ func (g *Generator) buildRequestBody(operation *openapi3.Operation, handlerInfo 
 			}
 			for _, param := range handlerInfo.FormParams {
 				formSchema.Properties[param.Name] = &openapi3.SchemaRef{
-					Value: &openapi3.Schema{Type: &openapi3.Types{"string"}},
+					Value: GoTypeToSchema(param.GoType),
 				}
 				if param.Required {
 					formSchema.Required = append(formSchema.Required, param.Name)

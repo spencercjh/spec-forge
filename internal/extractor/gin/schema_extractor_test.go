@@ -81,7 +81,7 @@ func TestGoTypeToSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.goType, func(t *testing.T) {
-			schema := goTypeToSchema(tt.goType)
+			schema := GoTypeToSchema(tt.goType)
 			if schema.Type == nil || len(*schema.Type) == 0 || (*schema.Type)[0] != tt.expectedType {
 				t.Errorf("expected type %s, got %v", tt.expectedType, schema.Type)
 			}

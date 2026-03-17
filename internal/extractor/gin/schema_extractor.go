@@ -69,7 +69,7 @@ func (e *SchemaExtractor) ExtractSchema(typeName string) (*openapi3.SchemaRef, e
 			return &openapi3.SchemaRef{Ref: ref}, nil
 		}
 		// Otherwise treat as primitive type alias
-		schema = goTypeToSchema(underlying.Name)
+		schema = GoTypeToSchema(underlying.Name)
 	case *ast.ArrayType:
 		// Type alias for array (e.g., type IDs []int or type Users []User)
 		// Use fieldToSchemaRef to preserve $ref for custom element types
@@ -288,7 +288,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 	switch t := expr.(type) {
 	case *ast.Ident:
 		// Check if it's a basic type first
-		schema := goTypeToSchema(t.Name)
+		schema := GoTypeToSchema(t.Name)
 		if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
 			return &openapi3.SchemaRef{Value: schema}
 		}
@@ -324,7 +324,7 @@ func (e *SchemaExtractor) fieldToSchemaRef(expr ast.Expr) *openapi3.SchemaRef {
 			shortName := t.Sel.Name
 
 			// Check if it's a known primitive type (like time.Time)
-			schema := goTypeToSchema(fullName)
+			schema := GoTypeToSchema(fullName)
 			if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
 				return &openapi3.SchemaRef{Value: schema}
 			}
@@ -349,7 +349,7 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 	switch t := expr.(type) {
 	case *ast.Ident:
 		// Check if it's a basic type first
-		schema := goTypeToSchema(t.Name)
+		schema := GoTypeToSchema(t.Name)
 		if schema.Type != nil && (*schema.Type)[0] != schemaTypeObject {
 			return schema
 		}
@@ -379,15 +379,15 @@ func (e *SchemaExtractor) fieldToSchema(expr ast.Expr) *openapi3.Schema {
 		// Package qualified type (e.g., time.Time)
 		if x, ok := t.X.(*ast.Ident); ok {
 			fullName := x.Name + "." + t.Sel.Name
-			return goTypeToSchema(fullName)
+			return GoTypeToSchema(fullName)
 		}
 	}
 
 	return &openapi3.Schema{Type: &openapi3.Types{schemaTypeObject}}
 }
 
-// goTypeToSchema converts a Go type name to OpenAPI schema.
-func goTypeToSchema(goType string) *openapi3.Schema {
+// GoTypeToSchema converts a Go type name to OpenAPI schema.
+func GoTypeToSchema(goType string) *openapi3.Schema {
 	switch goType {
 	case goTypeString:
 		return &openapi3.Schema{Type: &openapi3.Types{goTypeString}}
