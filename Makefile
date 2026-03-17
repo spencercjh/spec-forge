@@ -42,7 +42,7 @@ deps:
 
 test:
 	@echo "Running tests..."
-	$(GOTEST) -v -coverprofile=coverage.out ./...
+	$(GOTEST) -race -v -coverprofile=coverage.out ./...
 	@echo "Tests complete"
 
 # Run end-to-end tests (tests CLI via Cobra ExecuteContext)
@@ -97,7 +97,7 @@ verify: deps
 	@echo "Checking formatting produced no changes..."
 	@git diff --exit-code
 	$(GOLINT) run ./...
-	$(GOTEST) -v -coverprofile=coverage.out ./...
+	$(GOTEST) -race -v -coverprofile=coverage.out ./...
 	@echo "All checks passed!"
 
 help:

@@ -52,7 +52,7 @@ func (p *GradleParser) ParseString(content string) (*model.Project, error) {
 func (p *GradleParser) GetSpringBootVersion(project *model.Project) string {
 	// Check plugins block for spring-boot
 	for _, plugin := range project.Plugins {
-		if plugin.ID == "org.springframework.boot" || plugin.ID == "spring-boot" {
+		if plugin.ID == springBootGroupID || plugin.ID == "spring-boot" {
 			if plugin.Version != "" {
 				return plugin.Version
 			}
@@ -104,7 +104,7 @@ func (p *GradleParser) HasSpringdocPlugin(project *model.Project) bool {
 // HasSpringBootPlugin checks if build.gradle has the Spring Boot plugin.
 func (p *GradleParser) HasSpringBootPlugin(project *model.Project) bool {
 	for _, plugin := range project.Plugins {
-		if plugin.ID == "org.springframework.boot" || plugin.ID == "spring-boot" {
+		if plugin.ID == springBootGroupID || plugin.ID == "spring-boot" {
 			return true
 		}
 	}
