@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
@@ -15,11 +16,11 @@ type mockProvider struct {
 	response     string
 	responseFunc func() (string, error)
 	err          error
-	called       int
+	called       atomic.Int32
 }
 
 func (m *mockProvider) Generate(ctx context.Context, p string) (string, error) {
-	m.called++
+	m.called.Add(1)
 	if m.responseFunc != nil {
 		return m.responseFunc()
 	}
@@ -62,8 +63,8 @@ func TestBatchProcessor_ProcessBatch(t *testing.T) {
 		t.Fatalf("ProcessBatch() error = %v", err)
 	}
 
-	if mock.called != 1 {
-		t.Errorf("provider called %d times, want 1", mock.called)
+	if mock.called.Load() != 1 {
+		t.Errorf("provider called %d times, want 1", mock.called.Load())
 	}
 
 	// The SetValue should have been called with the full response
@@ -141,8 +142,8 @@ func TestConcurrentProcessor_ProcessAll(t *testing.T) {
 		t.Fatalf("ProcessAll() error = %v", err)
 	}
 
-	if mock.called != 2 {
-		t.Errorf("provider called %d times, want 2", mock.called)
+	if mock.called.Load() != 2 {
+		t.Errorf("provider called %d times, want 2", mock.called.Load())
 	}
 }
 
