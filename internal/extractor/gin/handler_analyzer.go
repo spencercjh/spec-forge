@@ -285,7 +285,7 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 	case "Param":
 		a.extractParam(call, info)
 	case "Query", "DefaultQuery":
-		a.extractQueryParam(call, info, method == "Query")
+		a.extractQueryParam(call, info)
 	case "GetHeader":
 		a.extractHeaderParam(call, info)
 	case "ShouldBindJSON", "BindJSON":
@@ -337,7 +337,7 @@ func (a *HandlerAnalyzer) extractParam(call *ast.CallExpr, info *HandlerInfo) {
 }
 
 // extractQueryParam extracts query parameter from c.Query() or c.DefaultQuery() call.
-func (a *HandlerAnalyzer) extractQueryParam(call *ast.CallExpr, info *HandlerInfo, _ bool) {
+func (a *HandlerAnalyzer) extractQueryParam(call *ast.CallExpr, info *HandlerInfo) {
 	if len(call.Args) < 1 {
 		return
 	}
