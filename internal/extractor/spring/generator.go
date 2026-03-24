@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/executor"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
@@ -88,14 +89,18 @@ func (e *Extractor) Name() string {
 
 // Detect analyzes a project and returns its information if it's a Spring Boot project.
 func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
-	return e.detector.Detect(projectPath)
+	info, err := e.detector.Detect(projectPath)
+	if err != nil {
+		return nil, forgeerrors.DetectError("spring project detection failed", err)
+	}
+	return info, nil
 }
 
 // Patch prepares the Spring Boot project for OpenAPI spec generation.
 func (e *Extractor) Patch(projectPath string, opts *extractor.PatchOptions) (*extractor.PatchResult, error) {
 	springResult, err := e.patcher.Patch(projectPath, opts)
 	if err != nil {
-		return nil, err
+		return nil, forgeerrors.PatchError("spring project patching failed", err)
 	}
 	// Convert spring.PatchResult to extractor.PatchResult
 	return &extractor.PatchResult{
@@ -109,7 +114,11 @@ func (e *Extractor) Patch(projectPath string, opts *extractor.PatchOptions) (*ex
 
 // Generate produces the OpenAPI spec from the Spring Boot project.
 func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
-	return e.generator.Generate(ctx, projectPath, info, opts)
+	result, err := e.generator.Generate(ctx, projectPath, info, opts)
+	if err != nil {
+		return nil, forgeerrors.GenerateError("spring spec generation failed", err)
+	}
+	return result, nil
 }
 
 // Restore restores the original project files after generation.

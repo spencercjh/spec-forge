@@ -11,6 +11,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
@@ -39,11 +40,11 @@ func (p *ReadMePublisher) Name() string {
 // The API key is passed via README_API_KEY environment variable to avoid leaking in process listings.
 func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *PublishOptions) (*PublishResult, error) {
 	if spec == nil {
-		return nil, errors.New("spec is nil")
+		return nil, forgeerrors.PublishError("spec is nil", nil)
 	}
 
 	if opts == nil || opts.ReadMe == nil {
-		return nil, errors.New("readme options are required")
+		return nil, forgeerrors.PublishError("readme options are required", nil)
 	}
 
 	// Resolve API key from options or environment variable
@@ -52,13 +53,13 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 		apiKey = os.Getenv("README_API_KEY")
 	}
 	if apiKey == "" {
-		return nil, errors.New("readme API key is required (set --readme-api-key flag or README_API_KEY env var)")
+		return nil, forgeerrors.ConfigError("readme API key is required (set --readme-api-key flag or README_API_KEY env var)", nil)
 	}
 
 	// Create temp file for the spec
 	tmpDir, err := os.MkdirTemp("", "spec-forge-readme-*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+		return nil, forgeerrors.SystemError("failed to create temp directory", err)
 	}
 	defer func(path string) {
 		_ = os.RemoveAll(path)
@@ -74,11 +75,11 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 	tmpFile := filepath.Join(tmpDir, "openapi."+format)
 	data, err := p.marshalSpec(spec, format)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal spec: %w", err)
+		return nil, forgeerrors.SystemError("failed to marshal spec", err)
 	}
 
 	if writeErr := os.WriteFile(tmpFile, data, 0o600); writeErr != nil {
-		return nil, fmt.Errorf("failed to write temp file: %w", writeErr)
+		return nil, forgeerrors.SystemError("failed to write temp file", writeErr)
 	}
 
 	// Build rdme command args (without API key)
@@ -193,7 +194,10 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 	// Handle command not found
 	//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
 	if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
-		return fmt.Errorf("rdme CLI not found: %w\nTo install rdme, run: npm install -g rdme", err)
+		return forgeerrors.PublishError(
+			fmt.Sprintf("rdme CLI not found: %v\nTo install rdme, run: npm install -g rdme", err),
+			err,
+		)
 	}
 
 	// Handle command failure - include output for debugging
@@ -203,7 +207,10 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 		if cmdFailed.Stderr != "" {
 			output += "\n" + cmdFailed.Stderr
 		}
-		return fmt.Errorf("rdme command failed: %w\noutput: %s", err, strings.TrimSpace(output))
+		return forgeerrors.PublishError(
+			fmt.Sprintf("rdme command failed: %v\noutput: %s", err, strings.TrimSpace(output)),
+			err,
+		)
 	}
 
 	// Other errors (timeout, etc.)
@@ -213,9 +220,12 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 			output += "\n" + result.Stderr
 		}
 		if output != "" {
-			return fmt.Errorf("rdme command failed: %w\noutput: %s", err, strings.TrimSpace(output))
+			return forgeerrors.PublishError(
+				fmt.Sprintf("rdme command failed: %v\noutput: %s", err, strings.TrimSpace(output)),
+				err,
+			)
 		}
 	}
 
-	return fmt.Errorf("rdme command failed: %w", err)
+	return forgeerrors.PublishError(fmt.Sprintf("rdme command failed: %v", err), err)
 }
