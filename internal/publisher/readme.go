@@ -40,11 +40,11 @@ func (p *ReadMePublisher) Name() string {
 // The API key is passed via README_API_KEY environment variable to avoid leaking in process listings.
 func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *PublishOptions) (*PublishResult, error) {
 	if spec == nil {
-		return nil, forgeerrors.PublishError("spec is nil", nil)
+		return nil, forgeerrors.SystemError("spec is nil", nil)
 	}
 
 	if opts == nil || opts.ReadMe == nil {
-		return nil, forgeerrors.PublishError("readme options are required", nil)
+		return nil, forgeerrors.ConfigError("readme options are required", nil)
 	}
 
 	// Resolve API key from options or environment variable
@@ -191,10 +191,10 @@ func (p *ReadMePublisher) buildLocation(opts *ReadMeOptions) string {
 
 // wrapExecuteError wraps executor errors with appropriate context.
 func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteResult) error {
-	// Handle command not found
+	// Handle command not found - rdme not installed is a system/tooling issue
 	//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
 	if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
-		return forgeerrors.PublishError(
+		return forgeerrors.SystemError(
 			"rdme CLI not found; to install rdme, run: npm install -g rdme",
 			err,
 		)
