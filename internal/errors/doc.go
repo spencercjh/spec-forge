@@ -37,7 +37,8 @@
 //
 //	hint := forgeerrors.RecoveryHint(forgeerrors.CodeConfig)
 //	// or from an error:
-//	if fe, ok := err.(*forgeerrors.Error); ok {
+//	var fe *forgeerrors.Error
+//	if errors.As(err, &fe) {
 //	    fmt.Println(fe.Hint())
 //	}
 package errors
