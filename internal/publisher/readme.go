@@ -195,7 +195,7 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 	//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
 	if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
 		return forgeerrors.PublishError(
-			fmt.Sprintf("rdme CLI not found: %v\nTo install rdme, run: npm install -g rdme", err),
+			"rdme CLI not found; to install rdme, run: npm install -g rdme",
 			err,
 		)
 	}
@@ -207,10 +207,14 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 		if cmdFailed.Stderr != "" {
 			output += "\n" + cmdFailed.Stderr
 		}
-		return forgeerrors.PublishError(
-			fmt.Sprintf("rdme command failed: %v\noutput: %s", err, strings.TrimSpace(output)),
-			err,
-		)
+		trimmed := strings.TrimSpace(output)
+		if trimmed != "" {
+			return forgeerrors.PublishError(
+				fmt.Sprintf("rdme command failed; output: %s", trimmed),
+				err,
+			)
+		}
+		return forgeerrors.PublishError("rdme command failed", err)
 	}
 
 	// Other errors (timeout, etc.)
@@ -219,13 +223,13 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 		if result.Stderr != "" {
 			output += "\n" + result.Stderr
 		}
-		if output != "" {
+		if trimmed := strings.TrimSpace(output); trimmed != "" {
 			return forgeerrors.PublishError(
-				fmt.Sprintf("rdme command failed: %v\noutput: %s", err, strings.TrimSpace(output)),
+				fmt.Sprintf("rdme command failed; output: %s", trimmed),
 				err,
 			)
 		}
 	}
 
-	return forgeerrors.PublishError(fmt.Sprintf("rdme command failed: %v", err), err)
+	return forgeerrors.PublishError("rdme command failed", err)
 }

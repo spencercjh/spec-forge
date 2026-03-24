@@ -137,8 +137,6 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 		var msg string
 		if combined != "" {
 			msg = fmt.Sprintf("command '%s' failed with exit code %d:\n%s", opts.Command, result.ExitCode, combined)
-		} else if err != nil {
-			msg = fmt.Sprintf("command '%s' failed with exit code %d (no output): %v", opts.Command, result.ExitCode, err)
 		} else {
 			msg = fmt.Sprintf("command '%s' failed with exit code %d (no output)", opts.Command, result.ExitCode)
 		}
