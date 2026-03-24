@@ -95,7 +95,8 @@ if forgeerrors.IsRetryable(err) {
 
 ```go
 // From an error
-if fe, ok := err.(*forgeerrors.Error); ok {
+var fe *forgeerrors.Error
+if errors.As(err, &fe) {
     fmt.Println("Hint:", fe.Hint())
 }
 
