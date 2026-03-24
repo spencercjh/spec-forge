@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -37,7 +38,8 @@ func Execute() {
 // printHintAndExit prints a recovery hint (if the error is classified) and exits
 // with an appropriate exit code.
 func printHintAndExit(err error) {
-	if fe, ok := err.(*forgeerrors.Error); ok {
+	var fe *forgeerrors.Error
+	if errors.As(err, &fe) {
 		hint := fe.Hint()
 		if hint != "" {
 			fmt.Fprintf(os.Stderr, "Hint: %s\n", hint)

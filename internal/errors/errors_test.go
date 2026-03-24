@@ -55,6 +55,26 @@ func TestError_WithContext(t *testing.T) {
 	}
 }
 
+func TestError_WithContext_Chaining(t *testing.T) {
+	err := New(CodeDetect, "not found", nil).
+		WithContext("path", "/some/path").
+		WithContext("tool", "mvn").
+		WithContext("extra", 42)
+
+	if err.Context["path"] != "/some/path" {
+		t.Errorf("expected path = %q, got %q", "/some/path", err.Context["path"])
+	}
+	if err.Context["tool"] != "mvn" {
+		t.Errorf("expected tool = %q, got %q", "mvn", err.Context["tool"])
+	}
+	if err.Context["extra"] != 42 {
+		t.Errorf("expected extra = 42, got %v", err.Context["extra"])
+	}
+	if err.Code != CodeDetect {
+		t.Errorf("chaining should preserve Code, got %q", err.Code)
+	}
+}
+
 func TestError_Hint(t *testing.T) {
 	err := DetectError("no build file", nil)
 	hint := err.Hint()
@@ -117,6 +137,11 @@ func TestGetCode(t *testing.T) {
 	if got := GetCode(plain); got != "" {
 		t.Errorf("GetCode(plain) = %q, want empty string", got)
 	}
+
+	// nil error
+	if got := GetCode(nil); got != "" {
+		t.Errorf("GetCode(nil) = %q, want empty string", got)
+	}
 }
 
 func TestIsRetryable(t *testing.T) {
@@ -138,6 +163,7 @@ func TestIsRetryable(t *testing.T) {
 		GenerateError("build failed", nil),
 		ValidateError("invalid spec", nil),
 		errors.New("plain error"),
+		nil,
 	}
 	for _, err := range notRetryable {
 		if IsRetryable(err) {
@@ -167,5 +193,33 @@ func TestConvenienceConstructors(t *testing.T) {
 				t.Errorf("Code = %q, want %q", tt.err.Code, tt.wantCode)
 			}
 		})
+	}
+}
+
+// TestCrossPackageErrorChain verifies that error classification works when
+// errors are wrapped by outer packages using fmt.Errorf("%w", ...).
+func TestCrossPackageErrorChain(t *testing.T) {
+	inner := SystemError("command timed out", nil)
+
+	// Simulate wrapping by an outer package
+	outer := fmt.Errorf("extractor failed: %w", inner)
+
+	if !IsCode(outer, CodeSystem) {
+		t.Error("IsCode should find SYSTEM code through fmt.Errorf wrapping")
+	}
+	if GetCode(outer) != CodeSystem {
+		t.Errorf("GetCode = %q, want %q", GetCode(outer), CodeSystem)
+	}
+	if !IsRetryable(outer) {
+		t.Error("IsRetryable should return true for SYSTEM code through wrapping")
+	}
+
+	// errors.As should also work through the chain
+	var fe *Error
+	if !errors.As(outer, &fe) {
+		t.Error("errors.As should find *Error through wrapping")
+	}
+	if fe.Code != CodeSystem {
+		t.Errorf("errors.As found code = %q, want %q", fe.Code, CodeSystem)
 	}
 }

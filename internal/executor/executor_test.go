@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 )
 
 func TestExecutor_Execute_Success(t *testing.T) {
@@ -68,6 +70,44 @@ func TestExecutor_Execute_Timeout(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected timeout error")
+	}
+
+	// Timeout errors should be classified as SYSTEM
+	if !forgeerrors.IsCode(err, forgeerrors.CodeSystem) {
+		t.Errorf("expected timeout error to have SYSTEM code, got: %v (code=%q)", err, forgeerrors.GetCode(err))
+	}
+	if !forgeerrors.IsRetryable(err) {
+		t.Error("timeout error should be retryable")
+	}
+
+	// Timeout errors should have a recovery hint
+	var fe *forgeerrors.Error
+	if errors.As(err, &fe) && fe.Hint() == "" {
+		t.Error("timeout error should have a non-empty recovery hint")
+	}
+}
+
+func TestExecutor_Execute_Canceled(t *testing.T) {
+	executor := NewExecutor()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	_, err := executor.Execute(ctx, &ExecuteOptions{
+		Command: "sleep",
+		Args:    []string{"10"},
+	})
+
+	if err == nil {
+		t.Fatal("expected cancellation error")
+	}
+
+	// Cancellation errors should be classified as SYSTEM
+	if !forgeerrors.IsCode(err, forgeerrors.CodeSystem) {
+		t.Errorf("expected cancellation error to have SYSTEM code, got: %v (code=%q)", err, forgeerrors.GetCode(err))
+	}
+	if !forgeerrors.IsRetryable(err) {
+		t.Error("cancellation error should be retryable")
 	}
 }
 

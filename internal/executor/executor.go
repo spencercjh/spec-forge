@@ -92,9 +92,15 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 	// Check if context was canceled/timed out
 	if ctx.Err() != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return result, fmt.Errorf("command '%s' timed out after %v", opts.Command, timeout)
+			return result, forgeerrors.SystemError(
+				fmt.Sprintf("command '%s' timed out after %v", opts.Command, timeout),
+				ctx.Err(),
+			)
 		}
-		return result, fmt.Errorf("command '%s' canceled: %w", opts.Command, ctx.Err())
+		return result, forgeerrors.SystemError(
+			fmt.Sprintf("command '%s' canceled", opts.Command),
+			ctx.Err(),
+		)
 	}
 
 	// Get exit code
