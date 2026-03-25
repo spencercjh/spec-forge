@@ -36,9 +36,8 @@
 // Recovery hints:
 //
 //	hint := forgeerrors.RecoveryHint(forgeerrors.CodeConfig)
-//	// or from an error:
-//	var fe *forgeerrors.Error
-//	if errors.As(err, &fe) {
+//	// or from an error (Go 1.26+):
+//	if fe, ok := errors.AsType[*forgeerrors.Error](err); ok {
 //	    fmt.Println(fe.Hint())
 //	}
 package errors
