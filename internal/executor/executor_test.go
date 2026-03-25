@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -178,4 +179,64 @@ func TestExecutor_Execute_DefaultTimeout(t *testing.T) {
 	if result.ExitCode != 0 {
 		t.Errorf("expected exit code 0, got %d", result.ExitCode)
 	}
+}
+
+func TestExecutor_Execute_EnvReplaceMode(t *testing.T) {
+	executor := NewExecutor()
+
+	t.Run("no custom env inherits parent", func(t *testing.T) {
+		// Use env to verify parent PATH is inherited without assuming it's non-empty
+		result, err := executor.Execute(context.Background(), &ExecuteOptions{
+			Command: "env",
+			Args:    []string{},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(result.Stdout, "PATH=") {
+			t.Error("expected PATH to exist and be inherited from parent environment")
+		}
+	})
+
+	t.Run("EnvReplaceMode=false (default) appends to parent", func(t *testing.T) {
+		// Default behavior: custom vars are appended to parent environment
+		result, err := executor.Execute(context.Background(), &ExecuteOptions{
+			Command:        "env",
+			Args:           []string{},
+			Env:            []string{"CUSTOM_VAR=test_value"},
+			EnvReplaceMode: false, // default - append to parent
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Verify custom var is set
+		if !strings.Contains(result.Stdout, "CUSTOM_VAR=test_value") {
+			t.Errorf("expected CUSTOM_VAR to be set, got: %s", result.Stdout)
+		}
+		// Verify PATH still exists (parent env inherited)
+		if !strings.Contains(result.Stdout, "PATH=") {
+			t.Errorf("expected PATH to exist (parent env inherited), got: %s", result.Stdout)
+		}
+	})
+
+	t.Run("EnvReplaceMode=true replaces parent", func(t *testing.T) {
+		// In replace mode, only the provided env vars should exist
+		result, err := executor.Execute(context.Background(), &ExecuteOptions{
+			Command:        "env",
+			Args:           []string{},
+			Env:            []string{"CUSTOM_VAR=isolated"},
+			EnvReplaceMode: true, // explicit replace - isolate from parent
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Verify custom var is set (unconditionally assert)
+		if !strings.Contains(result.Stdout, "CUSTOM_VAR=isolated") {
+			t.Errorf("expected CUSTOM_VAR to be set, got: %s", result.Stdout)
+		}
+		// In replace mode, PATH should NOT exist
+		if strings.Contains(result.Stdout, "PATH=") {
+			t.Errorf("expected PATH to NOT exist (parent env replaced), got: %s", result.Stdout)
+		}
+	})
 }

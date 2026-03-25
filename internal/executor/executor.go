@@ -21,11 +21,10 @@ type ExecuteOptions struct {
 	Args       []string      // Command arguments
 	WorkingDir string        // Working directory for the command
 	Timeout    time.Duration // Execution timeout (default: 5 minutes)
-	Env        []string      // Environment variables (replaces entire env if set)
-	// EnvAppendMode determines how Env is applied:
-	// - false (default): Env replaces the entire environment (useful for security-sensitive vars)
-	// - true: Env is appended to the current environment
-	EnvAppendMode bool
+	Env        []string      // Environment variables to add to parent environment
+	// EnvReplaceMode determines whether Env completely replaces the parent environment.
+	// - false (default): Env is appended to parent environment, preserving proxy settings etc	// - true: Env completely replaces parent environment (useful for isolation/security-sensitive scenarios)
+	EnvReplaceMode bool
 }
 
 // ExecuteResult contains the result of command execution.
@@ -70,13 +69,18 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 		cmd.Dir = opts.WorkingDir
 	}
 
-	if len(opts.Env) > 0 {
-		if opts.EnvAppendMode {
-			cmd.Env = append(cmd.Environ(), opts.Env...)
-		} else {
-			cmd.Env = opts.Env
-		}
+	// Configure environment variables based on EnvReplaceMode:
+	// - Append mode (default): Start with current environment and append opts.Env,
+	//   preserving proxy settings etc	// - Replace mode (EnvReplaceMode=true): Use only opts.Env,
+	//   completely replacing the parent environment
+	// - No opts.Env specified: inherit full parent environment (cmd.Env left nil)
+	if len(opts.Env) > 0 && !opts.EnvReplaceMode {
+		cmd.Env = append(cmd.Environ(), opts.Env...)
+	} else if len(opts.Env) > 0 {
+		cmd.Env = opts.Env
 	}
+	// Note: when opts.Env is empty, we don't set cmd.Env explicitly,
+	// exec.Cmd will automatically inherit the parent environment
 
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
