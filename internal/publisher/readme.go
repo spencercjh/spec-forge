@@ -11,6 +11,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
@@ -39,11 +40,11 @@ func (p *ReadMePublisher) Name() string {
 // The API key is passed via README_API_KEY environment variable to avoid leaking in process listings.
 func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *PublishOptions) (*PublishResult, error) {
 	if spec == nil {
-		return nil, errors.New("spec is nil")
+		return nil, forgeerrors.ValidateError("spec is nil", nil)
 	}
 
 	if opts == nil || opts.ReadMe == nil {
-		return nil, errors.New("readme options are required")
+		return nil, forgeerrors.ConfigError("readme options are required", nil)
 	}
 
 	// Resolve API key from options or environment variable
@@ -52,13 +53,13 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 		apiKey = os.Getenv("README_API_KEY")
 	}
 	if apiKey == "" {
-		return nil, errors.New("readme API key is required (set --readme-api-key flag or README_API_KEY env var)")
+		return nil, forgeerrors.ConfigError("readme API key is required (set --readme-api-key flag or README_API_KEY env var)", nil)
 	}
 
 	// Create temp file for the spec
 	tmpDir, err := os.MkdirTemp("", "spec-forge-readme-*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+		return nil, forgeerrors.SystemError("failed to create temp directory", err)
 	}
 	defer func(path string) {
 		_ = os.RemoveAll(path)
@@ -74,11 +75,11 @@ func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *P
 	tmpFile := filepath.Join(tmpDir, "openapi."+format)
 	data, err := p.marshalSpec(spec, format)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal spec: %w", err)
+		return nil, forgeerrors.SystemError("failed to marshal spec", err)
 	}
 
 	if writeErr := os.WriteFile(tmpFile, data, 0o600); writeErr != nil {
-		return nil, fmt.Errorf("failed to write temp file: %w", writeErr)
+		return nil, forgeerrors.SystemError("failed to write temp file", writeErr)
 	}
 
 	// Build rdme command args (without API key)
@@ -190,32 +191,47 @@ func (p *ReadMePublisher) buildLocation(opts *ReadMeOptions) string {
 
 // wrapExecuteError wraps executor errors with appropriate context.
 func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteResult) error {
-	// Handle command not found
-	//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
+	// Handle command not found - rdme not installed is a system/tooling issue
+	//nolint:errcheck // Go 1.26's errors.AsType returns (T, bool), not error - errcheck false positive
 	if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
-		return fmt.Errorf("rdme CLI not found: %w\nTo install rdme, run: npm install -g rdme", err)
+		return forgeerrors.SystemError(
+			"rdme CLI not found; to install rdme, run: npm install -g rdme",
+			err,
+		)
 	}
 
-	// Handle command failure - include output for debugging
-	//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
+	// Handle command failure - preserve SYSTEM classification from executor
+	// (CommandFailedError already embeds a SYSTEM-classified error via Unwrap)
 	if cmdFailed, ok := errors.AsType[*executor.CommandFailedError](err); ok {
-		output := cmdFailed.Stdout
-		if cmdFailed.Stderr != "" {
-			output += "\n" + cmdFailed.Stderr
+		if trimmed := combineOutput(cmdFailed.Stdout, cmdFailed.Stderr); trimmed != "" {
+			// Wrap with additional context but preserve original SYSTEM classification
+			return fmt.Errorf("rdme command failed; output: %s: %w", trimmed, err)
 		}
-		return fmt.Errorf("rdme command failed: %w\noutput: %s", err, strings.TrimSpace(output))
+		return fmt.Errorf("rdme command failed: %w", err)
 	}
 
-	// Other errors (timeout, etc.)
+	// Other errors (timeout, cancellation, etc.) - preserve existing classification
+	// (e.g. SYSTEM for timeout/cancellation errors from executor.Execute)
+	//nolint:errcheck // Go 1.26's errors.AsType returns (T, bool), not error - errcheck false positive
+	if _, ok := errors.AsType[*forgeerrors.Error](err); ok {
+		return err
+	}
+
+	// Unknown error with result output - classify as PUBLISH (genuine publishing failure)
 	if result != nil {
-		output := result.Stdout
-		if result.Stderr != "" {
-			output += "\n" + result.Stderr
-		}
-		if output != "" {
-			return fmt.Errorf("rdme command failed: %w\noutput: %s", err, strings.TrimSpace(output))
+		if trimmed := combineOutput(result.Stdout, result.Stderr); trimmed != "" {
+			return forgeerrors.PublishError("rdme command failed; output: "+trimmed, err)
 		}
 	}
 
-	return fmt.Errorf("rdme command failed: %w", err)
+	return forgeerrors.PublishError("rdme command failed", err)
+}
+
+// combineOutput combines stdout and stderr into a single trimmed string.
+func combineOutput(stdout, stderr string) string {
+	output := stdout
+	if stderr != "" {
+		output += "\n" + stderr
+	}
+	return strings.TrimSpace(output)
 }

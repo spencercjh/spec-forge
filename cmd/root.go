@@ -2,11 +2,15 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -27,7 +31,31 @@ func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
 		slog.Error("command failed", "error", err)
-		os.Exit(1)
+		printHintAndExit(err)
+	}
+}
+
+// printHintAndExit prints a recovery hint (if the error is classified) and exits
+// with an appropriate exit code.
+func printHintAndExit(err error) {
+	if fe, ok := errors.AsType[*forgeerrors.Error](err); ok {
+		hint := fe.Hint()
+		if hint != "" {
+			fmt.Fprintf(os.Stderr, "Hint: %s\n", hint)
+		}
+		os.Exit(exitCodeForCode(fe.Code))
+	}
+	os.Exit(1)
+}
+
+// exitCodeForCode maps an error category code to a shell exit code.
+// User / configuration errors use exit code 2; all other errors use 1.
+func exitCodeForCode(code string) int {
+	switch code {
+	case forgeerrors.CodeConfig, forgeerrors.CodeDetect, forgeerrors.CodePatch:
+		return 2
+	default:
+		return 1
 	}
 }
 

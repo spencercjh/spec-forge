@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 )
 
 // ErrUnknownPublisher is returned when an unknown publisher type is requested.
@@ -77,8 +79,8 @@ func NewPublisher(destType string) (Publisher, error) {
 	case publisherReadme:
 		return NewReadMePublisher(), nil
 	case "":
-		return nil, errors.New("publish target is required (e.g., readme)")
+		return nil, forgeerrors.ConfigError("publish target is required (e.g., readme)", nil)
 	default:
-		return nil, fmt.Errorf("%w: %q", ErrUnknownPublisher, destType)
+		return nil, forgeerrors.ConfigError(fmt.Sprintf("unknown publisher type: %q", destType), ErrUnknownPublisher)
 	}
 }

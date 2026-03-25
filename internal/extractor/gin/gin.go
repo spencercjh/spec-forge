@@ -4,6 +4,7 @@ package gin
 import (
 	"context"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
@@ -48,7 +49,12 @@ func (e *Extractor) Name() string {
 // Detect implements extractor.Extractor.Detect.
 func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	e.ensureInitialized()
-	return e.detector.Detect(projectPath)
+	info, err := e.detector.Detect(projectPath)
+	if err != nil {
+		// Detector already returns DETECT-classified errors; avoid double-wrapping
+		return nil, err
+	}
+	return info, nil
 }
 
 // Patch implements extractor.Extractor.Patch.
@@ -60,13 +66,21 @@ func (e *Extractor) Patch(projectPath string, opts *extractor.PatchOptions) (*ex
 		BuildTool:     "gomodules",
 		FrameworkData: &Info{HasGin: true},
 	}
-	return e.patcher.Patch(context.Background(), projectPath, info, opts)
+	result, err := e.patcher.Patch(context.Background(), projectPath, info, opts)
+	if err != nil {
+		return nil, forgeerrors.PatchError("gin project patching failed", err)
+	}
+	return result, nil
 }
 
 // Generate implements extractor.Extractor.Generate.
 func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
 	e.ensureInitialized()
-	return e.generator.Generate(ctx, projectPath, info, opts)
+	result, err := e.generator.Generate(ctx, projectPath, info, opts)
+	if err != nil {
+		return nil, forgeerrors.GenerateError("gin spec generation failed", err)
+	}
+	return result, nil
 }
 
 // Restore implements extractor.Extractor.Restore.

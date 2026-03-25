@@ -4,13 +4,13 @@ package grpcprotoc
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
@@ -45,7 +45,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
 		slog.Error("failed to resolve project path", "path", projectPath, "error", err)
-		return nil, fmt.Errorf("failed to resolve path: %w", err)
+		return nil, forgeerrors.DetectError("failed to resolve path", err)
 	}
 	slog.Debug("resolved absolute path", "path", absPath)
 
@@ -53,10 +53,10 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	if _, statErr := os.Stat(absPath); statErr != nil {
 		if os.IsNotExist(statErr) {
 			slog.Error("project path does not exist", "path", absPath)
-			return nil, fmt.Errorf("project path does not exist: %s", absPath)
+			return nil, forgeerrors.DetectError("project path does not exist: "+absPath, nil)
 		}
 		slog.Error("failed to check project path", "path", absPath, "error", statErr)
-		return nil, fmt.Errorf("failed to check project path: %w", statErr)
+		return nil, forgeerrors.DetectError("failed to check project path", statErr)
 	}
 
 	// Check for buf.yaml - reject buf-managed projects
@@ -70,7 +70,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	protoFiles, err := d.findProtoFiles(absPath)
 	if err != nil {
 		slog.Error("failed to find .proto files", "path", absPath, "error", err)
-		return nil, fmt.Errorf("failed to find .proto files: %w", err)
+		return nil, forgeerrors.DetectError("failed to find .proto files", err)
 	}
 	slog.Debug("found .proto files", "count", len(protoFiles), "files", protoFiles)
 

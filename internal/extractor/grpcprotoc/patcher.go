@@ -4,10 +4,10 @@ package grpcprotoc
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
@@ -92,12 +92,12 @@ func (p *Patcher) checkProtoc(ctx context.Context) (string, error) {
 		//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
 		if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
 			slog.Error("protoc not found", "error", err)
-			return "", fmt.Errorf("%w", ErrProtocNotInstalled)
+			return "", forgeerrors.PatchError(ErrProtocNotInstalled.Error(), err)
 		}
 
 		// Command failed (non-zero exit code)
 		slog.Error("protoc version check failed", "error", err)
-		return "", fmt.Errorf("protoc version check failed: %w", err)
+		return "", forgeerrors.PatchError("protoc version check failed", err)
 	}
 
 	version := strings.TrimSpace(result.Stdout)
@@ -118,12 +118,12 @@ func (p *Patcher) checkProtocGenConnectOpenAPI(ctx context.Context) (string, err
 		//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
 		if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
 			slog.Error("protoc-gen-connect-openapi not found", "error", err)
-			return "", fmt.Errorf("%w", ErrProtocGenConnectOpenAPINotInstalled)
+			return "", forgeerrors.PatchError(ErrProtocGenConnectOpenAPINotInstalled.Error(), err)
 		}
 
 		// Command failed (non-zero exit code)
 		slog.Error("protoc-gen-connect-openapi version check failed", "error", err)
-		return "", fmt.Errorf("protoc-gen-connect-openapi version check failed: %w", err)
+		return "", forgeerrors.PatchError("protoc-gen-connect-openapi version check failed", err)
 	}
 
 	version := strings.TrimSpace(result.Stdout)

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 )
 
 func TestExecutor_Execute_Success(t *testing.T) {
@@ -21,7 +23,7 @@ func TestExecutor_Execute_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := executor.Execute(context.Background(), &ExecuteOptions{
+			result, err := executor.Execute(t.Context(), &ExecuteOptions{
 				Command: tt.command,
 				Args:    tt.args,
 			})
@@ -39,7 +41,7 @@ func TestExecutor_Execute_Success(t *testing.T) {
 func TestExecutor_Execute_CommandNotFound(t *testing.T) {
 	executor := NewExecutor()
 
-	result, err := executor.Execute(context.Background(), &ExecuteOptions{
+	result, err := executor.Execute(t.Context(), &ExecuteOptions{
 		Command: "nonexistent-command-12345",
 	})
 
@@ -60,7 +62,7 @@ func TestExecutor_Execute_Timeout(t *testing.T) {
 	executor := NewExecutor()
 
 	// Use sleep command with very short timeout
-	_, err := executor.Execute(context.Background(), &ExecuteOptions{
+	_, err := executor.Execute(t.Context(), &ExecuteOptions{
 		Command: "sleep",
 		Args:    []string{"10"},
 		Timeout: 100 * time.Millisecond,
@@ -68,6 +70,43 @@ func TestExecutor_Execute_Timeout(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected timeout error")
+	}
+
+	// Timeout errors should be classified as SYSTEM
+	if !forgeerrors.IsCode(err, forgeerrors.CodeSystem) {
+		t.Errorf("expected timeout error to have SYSTEM code, got: %v (code=%q)", err, forgeerrors.GetCode(err))
+	}
+	if !forgeerrors.IsRetryable(err) {
+		t.Error("timeout error should be retryable")
+	}
+
+	// Timeout errors should have a recovery hint
+	if fe, ok := errors.AsType[*forgeerrors.Error](err); ok && fe.Hint() == "" {
+		t.Error("timeout error should have a non-empty recovery hint")
+	}
+}
+
+func TestExecutor_Execute_Canceled(t *testing.T) {
+	executor := NewExecutor()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel() // cancel immediately
+
+	_, err := executor.Execute(ctx, &ExecuteOptions{
+		Command: "sleep",
+		Args:    []string{"10"},
+	})
+
+	if err == nil {
+		t.Fatal("expected cancellation error")
+	}
+
+	// Cancellation errors should be classified as SYSTEM
+	if !forgeerrors.IsCode(err, forgeerrors.CodeSystem) {
+		t.Errorf("expected cancellation error to have SYSTEM code, got: %v (code=%q)", err, forgeerrors.GetCode(err))
+	}
+	if !forgeerrors.IsRetryable(err) {
+		t.Error("cancellation error should be retryable")
 	}
 }
 

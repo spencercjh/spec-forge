@@ -4,6 +4,7 @@ package grpcprotoc
 import (
 	"context"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
@@ -32,13 +33,19 @@ func (e *Extractor) Name() string {
 
 // Detect analyzes a project and returns its information if it's a gRPC-protoc project.
 func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
-	return e.detector.Detect(projectPath)
+	info, err := e.detector.Detect(projectPath)
+	if err != nil {
+		// Detector already returns DETECT-classified errors; avoid double-wrapping
+		return nil, err
+	}
+	return info, nil
 }
 
 // Patch checks if protoc and protoc-gen-connect-openapi are available for the gRPC-protoc project.
 func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.PatchResult, error) {
 	_, err := e.patcher.Patch("")
 	if err != nil {
+		// Patcher already returns PATCH-classified errors; avoid double-wrapping
 		return nil, err
 	}
 	// gRPC-protoc doesn't modify project files, so return empty result.
@@ -47,7 +54,11 @@ func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.Patch
 
 // Generate produces the OpenAPI spec from the gRPC-protoc project.
 func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
-	return e.generator.Generate(ctx, projectPath, info, opts)
+	result, err := e.generator.Generate(ctx, projectPath, info, opts)
+	if err != nil {
+		return nil, forgeerrors.GenerateError("grpc-protoc spec generation failed", err)
+	}
+	return result, nil
 }
 
 // Restore is a no-op for gRPC-protoc projects as we don't modify files.

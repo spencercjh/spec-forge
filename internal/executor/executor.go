@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 )
 
 // Default timeout for command execution.
@@ -90,9 +92,15 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 	// Check if context was canceled/timed out
 	if ctx.Err() != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return result, fmt.Errorf("command '%s' timed out after %v", opts.Command, timeout)
+			return result, forgeerrors.SystemError(
+				fmt.Sprintf("command '%s' timed out after %v", opts.Command, timeout),
+				ctx.Err(),
+			)
 		}
-		return result, fmt.Errorf("command '%s' canceled: %w", opts.Command, ctx.Err())
+		return result, forgeerrors.SystemError(
+			fmt.Sprintf("command '%s' canceled", opts.Command),
+			ctx.Err(),
+		)
 	}
 
 	// Get exit code
@@ -103,21 +111,44 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 	// Handle command not found
 	if execErr, ok := errors.AsType[*exec.Error](err); ok {
 		if errors.Is(execErr.Err, exec.ErrNotFound) {
+			msg := fmt.Sprintf("command '%s' not found in PATH", opts.Command)
 			return result, &CommandNotFoundError{
-				Command: opts.Command,
+				Command:    opts.Command,
+				classified: forgeerrors.SystemError(msg, exec.ErrNotFound),
 			}
 		}
 	}
 
 	// Command executed but failed (non-zero exit code)
 	if err != nil {
+		// Build tools like Maven/Gradle often output errors to stdout, not stderr
+		var output strings.Builder
+		if result.Stdout != "" {
+			output.WriteString(result.Stdout)
+		}
+		if result.Stderr != "" {
+			if output.Len() > 0 {
+				output.WriteString("\n")
+			}
+			output.WriteString(result.Stderr)
+		}
+		combined := strings.TrimSpace(output.String())
+
+		var msg string
+		if combined != "" {
+			msg = fmt.Sprintf("command '%s' failed with exit code %d:\n%s", opts.Command, result.ExitCode, combined)
+		} else {
+			msg = fmt.Sprintf("command '%s' failed with exit code %d (no output)", opts.Command, result.ExitCode)
+		}
+
 		return result, &CommandFailedError{
-			Command:  opts.Command,
-			Args:     opts.Args,
-			ExitCode: result.ExitCode,
-			Stdout:   result.Stdout,
-			Stderr:   result.Stderr,
-			Err:      err,
+			Command:    opts.Command,
+			Args:       opts.Args,
+			ExitCode:   result.ExitCode,
+			Stdout:     result.Stdout,
+			Stderr:     result.Stderr,
+			Err:        err,
+			classified: forgeerrors.SystemError(msg, err),
 		}
 	}
 
@@ -126,28 +157,39 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 
 // CommandNotFoundError indicates the command was not found in PATH.
 type CommandNotFoundError struct {
-	Command string
+	Command    string
+	classified *forgeerrors.Error
 }
 
 func (e *CommandNotFoundError) Error() string {
+	if e.classified != nil {
+		return e.classified.Error()
+	}
 	return fmt.Sprintf("command '%s' not found in PATH", e.Command)
 }
 
 func (e *CommandNotFoundError) Unwrap() error {
+	if e.classified != nil {
+		return e.classified
+	}
 	return exec.ErrNotFound
 }
 
 // CommandFailedError indicates the command executed but returned non-zero exit code.
 type CommandFailedError struct {
-	Command  string
-	Args     []string
-	ExitCode int
-	Stdout   string
-	Stderr   string
-	Err      error
+	Command    string
+	Args       []string
+	ExitCode   int
+	Stdout     string
+	Stderr     string
+	Err        error
+	classified *forgeerrors.Error
 }
 
 func (e *CommandFailedError) Error() string {
+	if e.classified != nil {
+		return e.classified.Error()
+	}
 	// Build tools like Maven/Gradle often output errors to stdout, not stderr
 	// Combine both for better error messages
 	var output strings.Builder
@@ -160,7 +202,6 @@ func (e *CommandFailedError) Error() string {
 		}
 		output.WriteString(e.Stderr)
 	}
-
 	combined := strings.TrimSpace(output.String())
 	if combined != "" {
 		return fmt.Sprintf("command '%s' failed with exit code %d:\n%s", e.Command, e.ExitCode, combined)
@@ -172,5 +213,8 @@ func (e *CommandFailedError) Error() string {
 }
 
 func (e *CommandFailedError) Unwrap() error {
+	if e.classified != nil {
+		return e.classified
+	}
 	return e.Err
 }

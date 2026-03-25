@@ -2,10 +2,10 @@
 package spring
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
@@ -27,7 +27,7 @@ func NewDetector() *Detector {
 func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve path: %w", err)
+		return nil, forgeerrors.DetectError("failed to resolve path", err)
 	}
 
 	// Check for Maven project first
@@ -48,7 +48,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 		return d.detectGradleProject(absPath, gradleKtsPath)
 	}
 
-	return nil, fmt.Errorf("no build file found (pom.xml or build.gradle) in %s", absPath)
+	return nil, forgeerrors.DetectError("no build file found (pom.xml or build.gradle) in "+absPath, nil)
 }
 
 // detectMavenProject analyzes a Maven project.
@@ -58,7 +58,7 @@ func (d *Detector) detectMavenProject(projectPath, pomPath string) (*extractor.P
 	// Parse pom.xml
 	pom, err := d.mavenParser.Parse(pomPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse pom.xml: %w", err)
+		return nil, forgeerrors.DetectError("failed to parse pom.xml", err)
 	}
 
 	// Check for multi-module project
@@ -137,7 +137,7 @@ func (d *Detector) detectGradleProject(projectPath, gradlePath string) (*extract
 	// Parse build.gradle
 	build, err := d.gradleParser.Parse(gradlePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse build.gradle: %w", err)
+		return nil, forgeerrors.DetectError("failed to parse build.gradle", err)
 	}
 
 	// Extract project information

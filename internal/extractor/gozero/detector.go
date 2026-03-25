@@ -2,7 +2,6 @@
 package gozero
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -11,6 +10,7 @@ import (
 
 	"golang.org/x/mod/modfile"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
@@ -38,7 +38,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
 		slog.Error("failed to resolve project path", "path", projectPath, "error", err)
-		return nil, fmt.Errorf("failed to resolve path: %w", err)
+		return nil, forgeerrors.DetectError("failed to resolve path", err)
 	}
 	slog.Debug("resolved absolute path", "path", absPath)
 
@@ -47,10 +47,10 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	if _, statErr := os.Stat(goModPath); statErr != nil {
 		if os.IsNotExist(statErr) {
 			slog.Warn("no go.mod found", "path", absPath)
-			return nil, fmt.Errorf("no go.mod found in %s", absPath)
+			return nil, forgeerrors.DetectError("no go.mod found in "+absPath, nil)
 		}
 		slog.Error("failed to check go.mod", "path", goModPath, "error", statErr)
-		return nil, fmt.Errorf("failed to check go.mod: %w", statErr)
+		return nil, forgeerrors.DetectError("failed to check go.mod", statErr)
 	}
 	slog.Debug("found go.mod", "path", goModPath)
 
@@ -59,7 +59,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	// Parse go.mod
 	if parseErr := d.parseGoMod(goModPath, goZeroInfo); parseErr != nil {
 		slog.Error("failed to parse go.mod", "path", goModPath, "error", parseErr)
-		return nil, fmt.Errorf("failed to parse go.mod: %w", parseErr)
+		return nil, forgeerrors.DetectError("failed to parse go.mod", parseErr)
 	}
 	slog.Debug("parsed go.mod successfully",
 		"module", goZeroInfo.ModuleName,
@@ -78,7 +78,7 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	apiFiles, err := d.findAPIFiles(absPath)
 	if err != nil {
 		slog.Error("failed to find .api files", "path", absPath, "error", err)
-		return nil, fmt.Errorf("failed to find .api files: %w", err)
+		return nil, forgeerrors.DetectError("failed to find .api files", err)
 	}
 	slog.Debug("found .api files", "count", len(apiFiles), "files", apiFiles)
 
@@ -118,12 +118,12 @@ func (d *Detector) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 func (d *Detector) parseGoMod(goModPath string, info *Info) error {
 	data, err := os.ReadFile(goModPath)
 	if err != nil {
-		return fmt.Errorf("failed to read go.mod: %w", err)
+		return err
 	}
 
 	f, err := modfile.Parse(goModPath, data, nil)
 	if err != nil {
-		return fmt.Errorf("failed to parse go.mod: %w", err)
+		return err
 	}
 
 	// Extract module name
