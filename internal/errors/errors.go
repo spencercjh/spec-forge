@@ -36,7 +36,11 @@ func (e *Error) Unwrap() error {
 
 // WithContext returns a shallow copy of the error with an additional key/value
 // pair stored in the Context map. It never mutates the receiver.
+// If the receiver is nil, it returns a new SYSTEM error with the given context.
 func (e *Error) WithContext(key string, value any) *Error {
+	if e == nil {
+		return New(CodeSystem, "nil error receiver", nil).WithContext(key, value)
+	}
 	newCtx := make(map[string]any, len(e.Context)+1)
 	maps.Copy(newCtx, e.Context)
 	newCtx[key] = value

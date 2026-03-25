@@ -75,6 +75,24 @@ func TestError_WithContext_Chaining(t *testing.T) {
 	}
 }
 
+func TestError_WithContext_NilReceiver(t *testing.T) {
+	// Calling WithContext on nil receiver should not panic and should return a valid error
+	var err *Error
+	result := err.WithContext("key", "value")
+
+	// Verify result is non-nil and has expected properties
+	if result != nil {
+		if result.Code != CodeSystem {
+			t.Errorf("expected Code = %q, got %q", CodeSystem, result.Code)
+		}
+		if result.Context["key"] != "value" {
+			t.Errorf("expected context key = %q, got %q", "value", result.Context["key"])
+		}
+	} else {
+		t.Error("WithContext on nil receiver should return non-nil error")
+	}
+}
+
 func TestError_Hint(t *testing.T) {
 	err := DetectError("no build file", nil)
 	hint := err.Hint()

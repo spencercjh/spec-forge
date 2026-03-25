@@ -39,7 +39,7 @@ func (p *ReadMePublisher) Name() string {
 // The API key is passed via README_API_KEY environment variable to avoid leaking in process listings.
 func (p *ReadMePublisher) Publish(ctx context.Context, spec *openapi3.T, opts *PublishOptions) (*PublishResult, error) {
 	if spec == nil {
-		return nil, forgeerrors.SystemError("spec is nil", nil)
+		return nil, forgeerrors.PublishError("spec is nil to publish", nil)
 	}
 
 	if opts == nil || opts.ReadMe == nil {
