@@ -64,7 +64,7 @@ func TestCriticalInvariants(t *testing.T) {
 		})
 	})
 
-	t.Run("FileUploadResult Must Have Required Fields", func(t *testing.T) {
+	t.Run("FileUploadResult Must Have Filename And Size Fields", func(t *testing.T) {
 		validator.ValidateSchemaProperty("FileUploadResult", helpers.SchemaPropertyExpectation{
 			Name: "filename",
 			Type: "string",

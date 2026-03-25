@@ -52,8 +52,16 @@ func TestMalformedPomGracefulDegradation(t *testing.T) {
 		return
 	}
 
-	// If it somehow succeeds, that's also acceptable (graceful degradation)
-	t.Log("Malformed pom.xml handled gracefully without error")
+	// If it somehow succeeds, verify that something was actually generated
+	files, readErr := os.ReadDir(outputDir)
+	if readErr != nil {
+		t.Fatalf("failed to read output directory %q: %v", outputDir, readErr)
+	}
+	if len(files) == 0 {
+		t.Fatalf("expected generated output in %q when Execute() returned nil, but directory is empty", outputDir)
+	}
+
+	t.Logf("Malformed pom.xml handled gracefully without error; generated %d item(s) in %q", len(files), outputDir)
 }
 
 // TestMissingSpringdocDependency tests behavior when springdoc dependency is not present
@@ -110,8 +118,30 @@ func TestMissingSpringdocDependency(t *testing.T) {
 	err := rootCmd.Execute()
 	if err != nil {
 		t.Logf("Expected error when springdoc is not set up: %v", err)
+
+		// Verify the patcher still modified the pom.xml to add springdoc
+		updatedPom, readErr := os.ReadFile(filepath.Join(tempDir, "pom.xml"))
+		if readErr != nil {
+			t.Fatalf("failed to read pom.xml after generate attempt: %v", readErr)
+		}
+
+		// Check if springdoc dependency was added by the patcher
+		if bytes.Contains(updatedPom, []byte("springdoc-openapi")) {
+			t.Log("Patcher successfully added springdoc dependency before build failure")
+		} else {
+			t.Log("Patcher did not add springdoc dependency (may have failed before patching)")
+		}
 		return
 	}
 
-	t.Log("Missing springdoc dependency handled - patcher may have added it")
+	// If it succeeds, verify output was generated
+	files, readErr := os.ReadDir(outputDir)
+	if readErr != nil {
+		t.Fatalf("failed to read output directory %q: %v", outputDir, readErr)
+	}
+	if len(files) == 0 {
+		t.Fatalf("expected generated output in %q when Execute() returned nil, but directory is empty", outputDir)
+	}
+
+	t.Logf("Missing springdoc dependency handled - patcher added it; generated %d item(s)", len(files))
 }

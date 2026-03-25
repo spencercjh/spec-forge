@@ -75,6 +75,11 @@ var goldenSnapshots = []helpers.GoldenSnapshot{
 		File: "schemas/ApiResponseUser.json",
 	},
 	{
+		Name: "ApiResponsePageResultUser Schema Structure",
+		Path: "components.schemas.ApiResponsePageResultUser",
+		File: "schemas/ApiResponsePageResultUser.json",
+	},
+	{
 		Name: "GET /api/v1/users Operation",
 		Path: "paths./api/v1/users.get",
 		File: "paths/api-v1-users-get.json",
@@ -111,6 +116,36 @@ func TestGoldenSnapshots(t *testing.T) {
 	}
 
 	goldenDir := "./fixtures/golden"
+
+	// Validate the full generated OpenAPI spec against the golden openapi.json.
+	t.Run("full_spec", func(t *testing.T) {
+		goldenPath := filepath.Join(goldenDir, "openapi.json")
+
+		goldenData, err := os.ReadFile(goldenPath)
+		if err != nil {
+			t.Fatalf("failed to read golden spec file %s: %v", goldenPath, err)
+		}
+
+		var goldenSpec any
+		if err := json.Unmarshal(goldenData, &goldenSpec); err != nil {
+			t.Fatalf("failed to parse golden spec JSON: %v", err)
+		}
+
+		actualJSON, err := json.MarshalIndent(spec, "", "  ")
+		if err != nil {
+			t.Fatalf("failed to marshal actual spec: %v", err)
+		}
+
+		goldenJSON, err := json.MarshalIndent(goldenSpec, "", "  ")
+		if err != nil {
+			t.Fatalf("failed to marshal golden spec: %v", err)
+		}
+
+		if !bytes.Equal(actualJSON, goldenJSON) {
+			t.Errorf("Full spec golden mismatch\n\nExpected (golden):\n%s\n\nActual:\n%s",
+				string(goldenJSON), string(actualJSON))
+		}
+	})
 
 	for _, snapshot := range goldenSnapshots {
 		t.Run(snapshot.Name, func(t *testing.T) {
