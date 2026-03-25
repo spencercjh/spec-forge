@@ -74,9 +74,10 @@ func Newf(code string, cause error, format string, args ...any) *Error {
 
 // IsCode reports whether any error in err's chain has the given category code.
 func IsCode(err error, code string) bool {
-	var fe *Error
-	if errors.As(err, &fe) {
-		return fe.Code == code
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if fe, ok := e.(*Error); ok && fe.Code == code {
+			return true
+		}
 	}
 	return false
 }

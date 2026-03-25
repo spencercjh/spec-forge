@@ -124,6 +124,16 @@ func TestIsCode(t *testing.T) {
 	if IsCode(nil, CodeSystem) {
 		t.Error("IsCode should return false for nil error")
 	}
+
+	// nested classified errors: outer=DETECT wrapping inner=SYSTEM
+	inner := SystemError("timeout", nil)
+	outer := DetectError("detect failed", inner)
+	if !IsCode(outer, CodeSystem) {
+		t.Error("IsCode should find SYSTEM code nested inside DETECT error")
+	}
+	if !IsCode(outer, CodeDetect) {
+		t.Error("IsCode should find DETECT code in outer error")
+	}
 }
 
 func TestGetCode(t *testing.T) {

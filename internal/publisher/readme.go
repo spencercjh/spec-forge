@@ -217,7 +217,13 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 		return forgeerrors.PublishError("rdme command failed", err)
 	}
 
-	// Other errors (timeout, etc.)
+	// Other errors (timeout, cancellation, etc.) - preserve existing classification
+	// (e.g. SYSTEM for timeout/cancellation errors from executor.Execute)
+	var alreadyClassified *forgeerrors.Error
+	if errors.As(err, &alreadyClassified) {
+		return err
+	}
+
 	if result != nil {
 		output := result.Stdout
 		if result.Stderr != "" {
