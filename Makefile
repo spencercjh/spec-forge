@@ -46,45 +46,8 @@ test:
 	@echo "Tests complete"
 
 # Run end-to-end tests (tests CLI via Cobra ExecuteContext)
-# Automatically detects HTTP_PROXY/HTTPS_PROXY (and lowercase variants) and configures Java tools
 test-e2e:
 	@echo "Running e2e tests..."
-	@PROXY_URL=""; \
-	if [ -n "$$HTTP_PROXY" ] || [ -n "$$http_proxy" ]; then \
-		PROXY_URL=$${HTTP_PROXY:-$$http_proxy}; \
-	elif [ -n "$$HTTPS_PROXY" ] || [ -n "$$https_proxy" ]; then \
-		PROXY_URL=$${HTTPS_PROXY:-$$https_proxy}; \
-	fi; \
-	if [ -n "$$PROXY_URL" ]; then \
-		PROXY_NO_SCHEME=$${PROXY_URL#*://}; \
-		PROXY_AUTH_AND_HOST=$${PROXY_NO_SCHEME%%/*}; \
-		PROXY_HOSTPORT=$${PROXY_AUTH_AND_HOST#*@}; \
-		if printf '%s' "$$PROXY_HOSTPORT" | grep -q '^\['; then \
-			PROXY_HOST=$${PROXY_HOSTPORT%%]*}; \
-			PROXY_HOST=$${PROXY_HOST#\[}; \
-			PROXY_PORT=$${PROXY_HOSTPORT#*]:}; \
-		else \
-			PROXY_HOST=$${PROXY_HOSTPORT%%:*}; \
-			if [ "$$PROXY_HOST" = "$$PROXY_HOSTPORT" ]; then \
-				PROXY_PORT=""; \
-			else \
-				PROXY_PORT=$${PROXY_HOSTPORT##*:}; \
-			fi; \
-		fi; \
-		if [ -n "$$PROXY_HOST" ]; then \
-			PROXY_JAVA_OPTS="-Dhttp.proxyHost=$$PROXY_HOST -Dhttps.proxyHost=$$PROXY_HOST"; \
-			if [ -n "$$PROXY_PORT" ]; then \
-				PROXY_JAVA_OPTS="$$PROXY_JAVA_OPTS -Dhttp.proxyPort=$$PROXY_PORT -Dhttps.proxyPort=$$PROXY_PORT"; \
-			fi; \
-			if [ -n "$$JAVA_TOOL_OPTIONS" ]; then \
-				JAVA_TOOL_OPTIONS="$$PROXY_JAVA_OPTS $$JAVA_TOOL_OPTIONS"; \
-			else \
-				JAVA_TOOL_OPTIONS="$$PROXY_JAVA_OPTS"; \
-			fi; \
-			echo "Detected proxy: $$PROXY_HOST:$${PROXY_PORT:-default}"; \
-			export JAVA_TOOL_OPTIONS; \
-		fi; \
-	fi; \
 	$(GOTEST) -v -tags=e2e ./integration-tests/...
 	@echo "E2E tests complete"
 

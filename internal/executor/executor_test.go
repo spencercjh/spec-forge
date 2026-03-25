@@ -181,30 +181,30 @@ func TestExecutor_Execute_DefaultTimeout(t *testing.T) {
 	}
 }
 
-func TestExecutor_Execute_EnvAppendMode(t *testing.T) {
+func TestExecutor_Execute_EnvReplaceMode(t *testing.T) {
 	executor := NewExecutor()
 
 	t.Run("no custom env inherits parent", func(t *testing.T) {
-		// Use printenv to verify parent PATH is inherited
+		// Use env to verify parent PATH is inherited without assuming it's non-empty
 		result, err := executor.Execute(context.Background(), &ExecuteOptions{
-			Command: "printenv",
-			Args:    []string{"PATH"},
+			Command: "env",
+			Args:    []string{},
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if result.Stdout == "" {
-			t.Error("expected PATH to be inherited from parent environment")
+		if !strings.Contains(result.Stdout, "PATH=") {
+			t.Error("expected PATH to exist and be inherited from parent environment")
 		}
 	})
 
-	t.Run("EnvAppendMode=true appends to parent", func(t *testing.T) {
-		// Set a custom variable and verify both it and PATH exist
+	t.Run("EnvReplaceMode=false (default) appends to parent", func(t *testing.T) {
+		// Default behavior: custom vars are appended to parent environment
 		result, err := executor.Execute(context.Background(), &ExecuteOptions{
-			Command:       "env",
-			Args:          []string{},
-			Env:           []string{"CUSTOM_VAR=test_value"},
-			EnvAppendMode: true,
+			Command:        "env",
+			Args:           []string{},
+			Env:            []string{"CUSTOM_VAR=test_value"},
+			EnvReplaceMode: false, // default - append to parent
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -219,20 +219,19 @@ func TestExecutor_Execute_EnvAppendMode(t *testing.T) {
 		}
 	})
 
-	t.Run("EnvAppendMode=false replaces parent", func(t *testing.T) {
+	t.Run("EnvReplaceMode=true replaces parent", func(t *testing.T) {
 		// In replace mode, only the provided env vars should exist
-		// Use `env` command to directly print environment
 		result, err := executor.Execute(context.Background(), &ExecuteOptions{
-			Command:       "env",
-			Args:          []string{},
-			Env:           []string{"CUSTOM_VAR=isolated"},
-			EnvAppendMode: false,
+			Command:        "env",
+			Args:           []string{},
+			Env:            []string{"CUSTOM_VAR=isolated"},
+			EnvReplaceMode: true, // explicit replace - isolate from parent
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		// Verify custom var is set
-		if result.Stdout != "" && !strings.Contains(result.Stdout, "CUSTOM_VAR=isolated") {
+		// Verify custom var is set (unconditionally assert)
+		if !strings.Contains(result.Stdout, "CUSTOM_VAR=isolated") {
 			t.Errorf("expected CUSTOM_VAR to be set, got: %s", result.Stdout)
 		}
 		// In replace mode, PATH should NOT exist
