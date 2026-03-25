@@ -70,17 +70,18 @@ func (e *Executor) Execute(ctx context.Context, opts *ExecuteOptions) (*ExecuteR
 		cmd.Dir = opts.WorkingDir
 	}
 
-	// Always start with current environment (for proxy settings, etc.)
-	// This ensures HTTP_PROXY, HTTPS_PROXY etc. are inherited by child processes
-	cmd.Env = cmd.Environ()
-
-	if len(opts.Env) > 0 {
-		if opts.EnvAppendMode {
-			cmd.Env = append(cmd.Env, opts.Env...)
-		} else {
-			// Replace mode: use only provided env vars
-			cmd.Env = opts.Env
-		}
+	// Configure environment variables based on EnvAppendMode:
+	// - Append mode (default behavior when opts.Env is set with EnvAppendMode=true):
+	//   Start with current environment and append opts.Env, preserving proxy settings etc.
+	// - Replace mode (EnvAppendMode=false):
+	//   Use only opts.Env, completely replacing the parent environment
+	if len(opts.Env) > 0 && opts.EnvAppendMode {
+		cmd.Env = append(cmd.Environ(), opts.Env...)
+	} else if len(opts.Env) > 0 {
+		cmd.Env = opts.Env
+	} else {
+		// No custom env specified: inherit parent environment
+		cmd.Env = cmd.Environ()
 	}
 
 	var stdout, stderr strings.Builder
