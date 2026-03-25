@@ -1,9 +1,8 @@
 //go:build e2e
 
-package e2e
+package e2e_test
 
 import (
-	"context"
 	"testing"
 
 	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
@@ -14,7 +13,7 @@ func TestExecutorErrorClassification(t *testing.T) {
 	exec := executor.NewExecutor()
 
 	t.Run("command not found returns SYSTEM error", func(t *testing.T) {
-		_, err := exec.Execute(context.Background(), &executor.ExecuteOptions{
+		_, err := exec.Execute(t.Context(), &executor.ExecuteOptions{
 			Command: "nonexistent_command_12345",
 		})
 
@@ -28,7 +27,7 @@ func TestExecutorErrorClassification(t *testing.T) {
 	})
 
 	t.Run("command failed returns SYSTEM error", func(t *testing.T) {
-		_, err := exec.Execute(context.Background(), &executor.ExecuteOptions{
+		_, err := exec.Execute(t.Context(), &executor.ExecuteOptions{
 			Command: "ls",
 			Args:    []string{"/nonexistent/path/that/does/not/exist"},
 		})
