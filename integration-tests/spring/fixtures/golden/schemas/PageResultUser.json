@@ -6,6 +6,11 @@
       },
       "type": "array"
     },
+    "page": {
+      "format": "int32",
+      "type": "integer",
+      "writeOnly": true
+    },
     "pageNumber": {
       "format": "int32",
       "type": "integer"
@@ -13,6 +18,11 @@
     "pageSize": {
       "format": "int32",
       "type": "integer"
+    },
+    "size": {
+      "format": "int32",
+      "type": "integer",
+      "writeOnly": true
     },
     "total": {
       "format": "int64",
