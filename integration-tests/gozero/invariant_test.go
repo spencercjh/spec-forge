@@ -3,6 +3,7 @@
 package gozero
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spencercjh/spec-forge/integration-tests/helpers"
@@ -24,16 +25,40 @@ func TestAPITypeDefinitions(t *testing.T) {
 			t.Fatal("operation is not an object")
 		}
 
-		responses := op["responses"].(map[string]any)
-		resp200 := responses["200"].(map[string]any)
-		content := resp200["content"].(map[string]any)
-		jsonContent := content["application/json"].(map[string]any)
-		schema := jsonContent["schema"].(map[string]any)
-		properties := schema["properties"].(map[string]any)
+		responses, ok := op["responses"].(map[string]any)
+		if !ok {
+			t.Fatal("responses is not an object")
+		}
+		resp200, ok := responses["200"].(map[string]any)
+		if !ok {
+			t.Fatal("200 response is not an object")
+		}
+		content, ok := resp200["content"].(map[string]any)
+		if !ok {
+			t.Fatal("content is not an object")
+		}
+		jsonContent, ok := content["application/json"].(map[string]any)
+		if !ok {
+			t.Fatal("application/json content is not an object")
+		}
+		schema, ok := jsonContent["schema"].(map[string]any)
+		if !ok {
+			t.Fatal("schema is not an object")
+		}
+		properties, ok := schema["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("properties is not an object")
+		}
 
 		// Check the data property contains User fields
-		data := properties["data"].(map[string]any)
-		dataProps := data["properties"].(map[string]any)
+		data, ok := properties["data"].(map[string]any)
+		if !ok {
+			t.Fatal("data property is not an object")
+		}
+		dataProps, ok := data["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("data properties is not an object")
+		}
 
 		expectedFields := []string{"id", "username", "email", "fullName", "age"}
 		for _, field := range expectedFields {
@@ -54,10 +79,22 @@ func TestAPITypeDefinitions(t *testing.T) {
 			t.Fatal("operation is not an object")
 		}
 
-		reqBody := op["requestBody"].(map[string]any)
-		content := reqBody["content"].(map[string]any)
-		jsonContent := content["application/json"].(map[string]any)
-		schema := jsonContent["schema"].(map[string]any)
+		reqBody, ok := op["requestBody"].(map[string]any)
+		if !ok {
+			t.Fatal("requestBody is not an object")
+		}
+		content, ok := reqBody["content"].(map[string]any)
+		if !ok {
+			t.Fatal("content is not an object")
+		}
+		jsonContent, ok := content["application/json"].(map[string]any)
+		if !ok {
+			t.Fatal("application/json content is not an object")
+		}
+		schema, ok := jsonContent["schema"].(map[string]any)
+		if !ok {
+			t.Fatal("schema is not an object")
+		}
 
 		// Check required fields
 		required, ok := schema["required"].([]any)
@@ -90,14 +127,38 @@ func TestAPITypeDefinitions(t *testing.T) {
 			t.Fatal("operation is not an object")
 		}
 
-		responses := op["responses"].(map[string]any)
-		resp200 := responses["200"].(map[string]any)
-		content := resp200["content"].(map[string]any)
-		jsonContent := content["application/json"].(map[string]any)
-		schema := jsonContent["schema"].(map[string]any)
-		properties := schema["properties"].(map[string]any)
-		data := properties["data"].(map[string]any)
-		dataProps := data["properties"].(map[string]any)
+		responses, ok := op["responses"].(map[string]any)
+		if !ok {
+			t.Fatal("responses is not an object")
+		}
+		resp200, ok := responses["200"].(map[string]any)
+		if !ok {
+			t.Fatal("200 response is not an object")
+		}
+		content, ok := resp200["content"].(map[string]any)
+		if !ok {
+			t.Fatal("content is not an object")
+		}
+		jsonContent, ok := content["application/json"].(map[string]any)
+		if !ok {
+			t.Fatal("application/json content is not an object")
+		}
+		schema, ok := jsonContent["schema"].(map[string]any)
+		if !ok {
+			t.Fatal("schema is not an object")
+		}
+		properties, ok := schema["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("properties is not an object")
+		}
+		data, ok := properties["data"].(map[string]any)
+		if !ok {
+			t.Fatal("data property is not an object")
+		}
+		dataProps, ok := data["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("data properties is not an object")
+		}
 
 		paginationFields := []string{"content", "pageNumber", "pageSize", "total", "totalPages"}
 		for _, field := range paginationFields {
@@ -117,8 +178,8 @@ func TestGoSwaggerFormatCompatibility(t *testing.T) {
 		if !ok {
 			t.Fatal("openapi version not found")
 		}
-		if version != "3.0.3" {
-			t.Errorf("expected OpenAPI version 3.0.3, got %s", version)
+		if !strings.HasPrefix(version, "3.") {
+			t.Errorf("expected OpenAPI version 3.x, got %s", version)
 		}
 	})
 

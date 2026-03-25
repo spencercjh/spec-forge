@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spencercjh/spec-forge/cmd"
@@ -45,6 +46,11 @@ func TestMissingGoctlGracefulSkip(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when goctl is not available")
 		return
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "goctl") {
+		t.Errorf("expected error message to mention 'goctl', got: %s", errMsg)
 	}
 
 	t.Logf("Got expected error when goctl not available: %v", err)
@@ -235,14 +241,38 @@ func TestUploadEndpoint(t *testing.T) {
 			t.Fatal("operation is not an object")
 		}
 
-		responses := op["responses"].(map[string]any)
-		resp200 := responses["200"].(map[string]any)
-		content := resp200["content"].(map[string]any)
-		jsonContent := content["application/json"].(map[string]any)
-		schema := jsonContent["schema"].(map[string]any)
-		properties := schema["properties"].(map[string]any)
-		data := properties["data"].(map[string]any)
-		dataProps := data["properties"].(map[string]any)
+		responses, ok := op["responses"].(map[string]any)
+		if !ok {
+			t.Fatal("responses is not an object")
+		}
+		resp200, ok := responses["200"].(map[string]any)
+		if !ok {
+			t.Fatal("200 response is not an object")
+		}
+		content, ok := resp200["content"].(map[string]any)
+		if !ok {
+			t.Fatal("content is not an object")
+		}
+		jsonContent, ok := content["application/json"].(map[string]any)
+		if !ok {
+			t.Fatal("application/json content is not an object")
+		}
+		schema, ok := jsonContent["schema"].(map[string]any)
+		if !ok {
+			t.Fatal("schema is not an object")
+		}
+		properties, ok := schema["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("properties is not an object")
+		}
+		data, ok := properties["data"].(map[string]any)
+		if !ok {
+			t.Fatal("data property is not an object")
+		}
+		dataProps, ok := data["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("data properties is not an object")
+		}
 
 		expectedFields := []string{"filename", "size", "contentType"}
 		for _, field := range expectedFields {

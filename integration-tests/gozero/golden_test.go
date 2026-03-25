@@ -17,6 +17,11 @@ import (
 // goldenSnapshots defines golden file snapshots for semantic stability testing
 var goldenSnapshots = []helpers.GoldenSnapshot{
 	{
+		Name: "Full OpenAPI Spec",
+		Path: "",
+		File: "openapi.json",
+	},
+	{
 		Name: "GET /api/v1/users Operation",
 		Path: "paths./api/v1/users.get",
 		File: "paths/api-v1-users-get.json",
@@ -96,7 +101,13 @@ func TestGoldenSnapshots(t *testing.T) {
 
 	for _, snapshot := range goldenSnapshots {
 		t.Run(snapshot.Name, func(t *testing.T) {
-			actual := helpers.ExtractFromPath(t, spec, snapshot.Path)
+			var actual any
+			if snapshot.Path == "" {
+				// Full spec comparison
+				actual = spec
+			} else {
+				actual = helpers.ExtractFromPath(t, spec, snapshot.Path)
+			}
 			if actual == nil {
 				t.Fatalf("failed to extract value at path: %s", snapshot.Path)
 			}
@@ -309,19 +320,14 @@ func TestRegenerateGolden(t *testing.T) {
 
 	goldenDir := "./fixtures/golden"
 
-	// Write full openapi.json
-	fullSpecData, err := json.MarshalIndent(spec, "", "  ")
-	if err != nil {
-		t.Fatalf("failed to marshal full spec: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(goldenDir, "openapi.json"), fullSpecData, 0o644); err != nil {
-		t.Fatalf("failed to write openapi.json: %v", err)
-	}
-	t.Log("Regenerated: openapi.json")
-
-	// Write individual golden snapshots
+	// Write golden snapshots (includes full spec and per-operation files)
 	for _, snapshot := range goldenSnapshots {
-		actual := helpers.ExtractFromPath(t, spec, snapshot.Path)
+		var actual any
+		if snapshot.Path == "" {
+			actual = spec
+		} else {
+			actual = helpers.ExtractFromPath(t, spec, snapshot.Path)
+		}
 		if actual == nil {
 			t.Logf("Warning: could not extract %s", snapshot.Path)
 			continue
