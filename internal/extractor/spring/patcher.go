@@ -1,12 +1,12 @@
 package spring
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/vifraa/gopom"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
 
@@ -48,7 +48,7 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 	// Detect project info
 	info, err := p.detector.Detect(projectPath)
 	if err != nil {
-		return nil, fmt.Errorf("detection failed: %w", err)
+		return nil, forgeerrors.PatchError("detection failed", err)
 	}
 
 	// Apply defaults
@@ -89,7 +89,7 @@ func (p *Patcher) Patch(projectPath string, opts *extractor.PatchOptions) (*Patc
 	case BuildToolGradle:
 		return p.patchGradle(info, opts)
 	default:
-		return nil, fmt.Errorf("unsupported build tool: %s", info.BuildTool)
+		return nil, forgeerrors.PatchError("unsupported build tool: "+string(info.BuildTool), nil)
 	}
 }
 
@@ -117,7 +117,7 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, springInfo *Info, opts
 	// Read and save original content
 	content, err := os.ReadFile(buildFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read pom.xml: %w", err)
+		return nil, forgeerrors.PatchError("failed to read pom.xml", err)
 	}
 	result.OriginalContent = string(content)
 
@@ -136,7 +136,7 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, springInfo *Info, opts
 	// Parse with gopom
 	pom, err := gopom.Parse(buildFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse pom.xml: %w", err)
+		return nil, forgeerrors.PatchError("failed to parse pom.xml", err)
 	}
 
 	// Add dependency if needed
@@ -167,11 +167,11 @@ func (p *Patcher) patchMaven(info *extractor.ProjectInfo, springInfo *Info, opts
 	if result.DependencyAdded || result.PluginAdded || result.SpringBootConfigured {
 		output, err := p.mavenParser.MarshalPom(pom)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal pom.xml: %w", err)
+			return nil, forgeerrors.PatchError("failed to marshal pom.xml", err)
 		}
 		//nolint:gosec // 0644 is appropriate for build files (pom.xml)
 		if err := os.WriteFile(buildFilePath, output, 0o644); err != nil {
-			return nil, fmt.Errorf("failed to write pom.xml: %w", err)
+			return nil, forgeerrors.PatchError("failed to write pom.xml", err)
 		}
 	}
 
@@ -198,7 +198,7 @@ func (p *Patcher) patchGradle(info *extractor.ProjectInfo, opts *extractor.Patch
 	// Read and save original content
 	content, err := os.ReadFile(buildFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read build.gradle: %w", err)
+		return nil, forgeerrors.PatchError("failed to read build.gradle", err)
 	}
 	result.OriginalContent = string(content)
 
@@ -239,7 +239,7 @@ func (p *Patcher) patchGradleApply(buildFilePath string, springInfo *Info, opts 
 	if result.DependencyAdded || result.PluginAdded {
 		//nolint:gosec // 0644 is appropriate for build files (build.gradle)
 		if err := os.WriteFile(buildFilePath, []byte(modified), 0o644); err != nil {
-			return nil, fmt.Errorf("failed to write build.gradle: %w", err)
+			return nil, forgeerrors.PatchError("failed to write build.gradle", err)
 		}
 	}
 
@@ -255,7 +255,7 @@ func (p *Patcher) addGradleDependencyIfNeeded(buildFilePath, content string, spr
 
 	build, err := p.gradleParser.Parse(buildFilePath)
 	if err != nil {
-		return content, fmt.Errorf("failed to parse build.gradle: %w", err)
+		return content, forgeerrors.PatchError("failed to parse build.gradle", err)
 	}
 
 	if !p.gradleParser.HasSpringdocDependency(build) {
@@ -278,7 +278,7 @@ func (p *Patcher) addGradlePluginIfNeeded(buildFilePath, content string, springI
 
 	build, err := p.gradleParser.Parse(buildFilePath)
 	if err != nil {
-		return content, fmt.Errorf("failed to parse build.gradle: %w", err)
+		return content, forgeerrors.PatchError("failed to parse build.gradle", err)
 	}
 
 	if !p.gradleParser.HasSpringdocPlugin(build) {

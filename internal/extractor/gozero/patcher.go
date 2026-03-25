@@ -4,10 +4,10 @@ package gozero
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
+	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/executor"
 )
 
@@ -65,7 +65,7 @@ func (p *Patcher) Patch(_ string) (*PatchResult, error) {
 
 		// Command failed (non-zero exit code)
 		slog.Error("goctl version check failed", "error", err)
-		return nil, fmt.Errorf("goctl version check failed: %w", err)
+		return nil, forgeerrors.PatchError("goctl version check failed", err)
 	}
 
 	version := strings.TrimSpace(result.Stdout)
