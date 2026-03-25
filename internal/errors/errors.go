@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"maps"
 )
 
 // Error is the unified error type for spec-forge. It carries a category code,
@@ -37,9 +38,7 @@ func (e *Error) Unwrap() error {
 // pair stored in the Context map. It never mutates the receiver.
 func (e *Error) WithContext(key string, value any) *Error {
 	newCtx := make(map[string]any, len(e.Context)+1)
-	for k, v := range e.Context {
-		newCtx[k] = v
-	}
+	maps.Copy(newCtx, e.Context)
 	newCtx[key] = value
 	return &Error{
 		Code:    e.Code,
@@ -73,11 +72,18 @@ func Newf(code string, cause error, format string, args ...any) *Error {
 }
 
 // IsCode reports whether any error in err's chain has the given category code.
+// It traverses through nested classified errors to find matching codes at any level.
 func IsCode(err error, code string) bool {
-	for e := err; e != nil; e = errors.Unwrap(e) {
-		if fe, ok := e.(*Error); ok && fe.Code == code {
-			return true
+	for e := err; e != nil; {
+		if fe, ok := errors.AsType[*Error](e); ok {
+			if fe.Code == code {
+				return true
+			}
+			// Continue checking the Cause if it's also a classified error
+			e = fe.Cause
+			continue
 		}
+		e = errors.Unwrap(e)
 	}
 	return false
 }

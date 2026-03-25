@@ -3,7 +3,6 @@ package publisher
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -210,7 +209,7 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 		trimmed := strings.TrimSpace(output)
 		if trimmed != "" {
 			return forgeerrors.PublishError(
-				fmt.Sprintf("rdme command failed; output: %s", trimmed),
+				"rdme command failed; output: "+trimmed,
 				err,
 			)
 		}
@@ -231,7 +230,7 @@ func (p *ReadMePublisher) wrapExecuteError(err error, result *executor.ExecuteRe
 		}
 		if trimmed := strings.TrimSpace(output); trimmed != "" {
 			return forgeerrors.PublishError(
-				fmt.Sprintf("rdme command failed; output: %s", trimmed),
+				"rdme command failed; output: "+trimmed,
 				err,
 			)
 		}

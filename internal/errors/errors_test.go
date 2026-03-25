@@ -92,7 +92,7 @@ func TestNew(t *testing.T) {
 	if err.Message != "bad config" {
 		t.Errorf("Message = %q, want %q", err.Message, "bad config")
 	}
-	if err.Cause != cause {
+	if !errors.Is(err, cause) {
 		t.Error("Cause should be set")
 	}
 }
