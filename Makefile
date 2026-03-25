@@ -46,8 +46,17 @@ test:
 	@echo "Tests complete"
 
 # Run end-to-end tests (tests CLI via Cobra ExecuteContext)
+# Automatically detects HTTP_PROXY/HTTPS_PROXY and configures Java tools
 test-e2e:
 	@echo "Running e2e tests..."
+	@if [ -n "$$HTTP_PROXY" ] || [ -n "$$HTTPS_PROXY" ]; then \
+		PROXY_HOST=$$(echo "$$HTTP_PROXY$$HTTPS_PROXY" | sed -n 's|.*://\([^:]*\):.*|\1|p' | head -1); \
+		PROXY_PORT=$$(echo "$$HTTP_PROXY$$HTTPS_PROXY" | sed -n 's|.*:\([0-9]*\).*|\1|p' | head -1); \
+		if [ -n "$$PROXY_HOST" ] && [ -n "$$PROXY_PORT" ]; then \
+			export JAVA_TOOL_OPTIONS="-Dhttp.proxyHost=$$PROXY_HOST -Dhttp.proxyPort=$$PROXY_PORT -Dhttps.proxyHost=$$PROXY_HOST -Dhttps.proxyPort=$$PROXY_PORT"; \
+			echo "Detected proxy: $$PROXY_HOST:$$PROXY_PORT"; \
+		fi; \
+	fi; \
 	$(GOTEST) -v -tags=e2e ./integration-tests/...
 	@echo "E2E tests complete"
 
