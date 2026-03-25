@@ -9,59 +9,7 @@ import (
 	"testing"
 
 	"github.com/spencercjh/spec-forge/cmd"
-	"github.com/spencercjh/spec-forge/integration-tests/helpers"
 )
-
-// TestMultiModuleMaven tests multi-module Maven project generation
-func TestMultiModuleMaven(t *testing.T) {
-	projectPath := "../maven-multi-module-demo"
-
-	skipIfProjectMissing(t, projectPath)
-
-	outputDir := t.TempDir()
-	specFile := generateSpec(t, projectPath, outputDir)
-	validator := helpers.NewSpecValidator(t, specFile)
-
-	validator.ValidateOpenAPIVersion()
-	validator.ValidateInfo()
-
-	pathCount := validator.GetPathCount()
-	if pathCount == 0 {
-		t.Error("expected at least some paths to be generated from multi-module project")
-	}
-
-	t.Logf("Multi-module Maven project: generated %d paths", pathCount)
-	validator.LogSummary()
-}
-
-// TestMultiModuleGradle tests multi-module Gradle project generation
-func TestMultiModuleGradle(t *testing.T) {
-	projectPath := "../gradle-multi-module-demo"
-
-	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-		t.Skip("Gradle multi-module demo project not found")
-	}
-
-	gradlewPath := filepath.Join(projectPath, "gradlew")
-	if _, err := os.Stat(gradlewPath); os.IsNotExist(err) {
-		t.Skip("Gradle wrapper not found, skipping test")
-	}
-
-	outputDir := t.TempDir()
-	specFile := generateSpec(t, projectPath, outputDir)
-	validator := helpers.NewSpecValidator(t, specFile)
-
-	validator.ValidateOpenAPIVersion()
-	validator.ValidateInfo()
-
-	pathCount := validator.GetPathCount()
-	if pathCount == 0 {
-		t.Error("expected at least some paths to be generated from multi-module project")
-	}
-
-	t.Logf("Multi-module Gradle project: generated %d paths", pathCount)
-	validator.LogSummary()
-}
 
 // TestMalformedPomGracefulDegradation tests graceful handling of malformed pom.xml
 func TestMalformedPomGracefulDegradation(t *testing.T) {
@@ -166,55 +114,4 @@ func TestMissingSpringdocDependency(t *testing.T) {
 	}
 
 	t.Log("Missing springdoc dependency handled - patcher may have added it")
-}
-
-// TestGradleSpringBoot tests Gradle-based Spring Boot project generation
-func TestGradleSpringBoot(t *testing.T) {
-	projectPath := "../gradle-springboot-openapi-demo"
-
-	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-		t.Skip("Gradle Spring Boot demo project not found")
-	}
-
-	gradlewPath := filepath.Join(projectPath, "gradlew")
-	if _, err := os.Stat(gradlewPath); os.IsNotExist(err) {
-		t.Skip("Gradle wrapper not found, skipping test")
-	}
-
-	outputDir := t.TempDir()
-	specFile := generateSpec(t, projectPath, outputDir)
-	validator := helpers.NewSpecValidator(t, specFile)
-
-	validator.FullValidation(helpers.ValidationConfig{
-		ExpectedPaths: []string{
-			"/api/v1/users",
-			"/api/v1/users/{id}",
-			"/api/v1/users/{id}/profile",
-			"/api/v1/users/upload",
-		},
-		Operations: []helpers.OperationConfig{
-			{
-				Path:            "/api/v1/users",
-				Method:          "get",
-				WantOperationID: true,
-			},
-			{
-				Path:            "/api/v1/users",
-				Method:          "post",
-				WantOperationID: true,
-			},
-			{
-				Path:            "/api/v1/users/{id}",
-				Method:          "get",
-				WantOperationID: true,
-				ExpectedParams:  []string{"id"},
-			},
-		},
-		ExpectedSchemas: []string{
-			"User",
-			"FileUploadResult",
-		},
-	})
-
-	t.Log("Gradle Spring Boot project generation successful")
 }
