@@ -1,0 +1,15 @@
+{
+  "properties": {
+    "code": {
+      "format": "int32",
+      "type": "integer"
+    },
+    "data": {
+      "$ref": "#/components/schemas/User"
+    },
+    "message": {
+      "type": "string"
+    }
+  },
+  "type": "object"
+}

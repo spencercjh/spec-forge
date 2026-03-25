@@ -1,0 +1,18 @@
+{
+  "properties": {
+    "contentType": {
+      "type": "string"
+    },
+    "filename": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "size": {
+      "format": "int64",
+      "type": "integer"
+    }
+  },
+  "type": "object"
+}

@@ -1,0 +1,29 @@
+{
+  "operationId": "getUserById",
+  "parameters": [
+    {
+      "in": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+        "format": "int64",
+        "type": "integer"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "content": {
+        "*/*": {
+          "schema": {
+            "$ref": "#/components/schemas/ApiResponseUser"
+          }
+        }
+      },
+      "description": "OK"
+    }
+  },
+  "tags": [
+    "user-controller"
+  ]
+}

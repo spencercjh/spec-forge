@@ -1,0 +1,22 @@
+{
+  "properties": {
+    "age": {
+      "format": "int32",
+      "type": "integer"
+    },
+    "email": {
+      "type": "string"
+    },
+    "fullName": {
+      "type": "string"
+    },
+    "id": {
+      "format": "int64",
+      "type": "integer"
+    },
+    "username": {
+      "type": "string"
+    }
+  },
+  "type": "object"
+}

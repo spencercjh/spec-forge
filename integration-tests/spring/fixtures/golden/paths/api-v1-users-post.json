@@ -1,0 +1,28 @@
+{
+  "operationId": "createUser",
+  "requestBody": {
+    "content": {
+      "application/json": {
+        "schema": {
+          "$ref": "#/components/schemas/User"
+        }
+      }
+    },
+    "required": true
+  },
+  "responses": {
+    "200": {
+      "content": {
+        "*/*": {
+          "schema": {
+            "$ref": "#/components/schemas/ApiResponseUser"
+          }
+        }
+      },
+      "description": "OK"
+    }
+  },
+  "tags": [
+    "user-controller"
+  ]
+}
