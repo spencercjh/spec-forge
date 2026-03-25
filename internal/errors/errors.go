@@ -91,8 +91,7 @@ func IsCode(err error, code string) bool {
 // GetCode returns the category code of the first *Error found in err's chain.
 // It returns an empty string if no *Error is found.
 func GetCode(err error) string {
-	var fe *Error
-	if errors.As(err, &fe) {
+	if fe, ok := errors.AsType[*Error](err); ok {
 		return fe.Code
 	}
 	return ""

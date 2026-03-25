@@ -23,7 +23,7 @@ func TestExecutor_Execute_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := executor.Execute(context.Background(), &ExecuteOptions{
+			result, err := executor.Execute(t.Context(), &ExecuteOptions{
 				Command: tt.command,
 				Args:    tt.args,
 			})
@@ -41,7 +41,7 @@ func TestExecutor_Execute_Success(t *testing.T) {
 func TestExecutor_Execute_CommandNotFound(t *testing.T) {
 	executor := NewExecutor()
 
-	result, err := executor.Execute(context.Background(), &ExecuteOptions{
+	result, err := executor.Execute(t.Context(), &ExecuteOptions{
 		Command: "nonexistent-command-12345",
 	})
 
@@ -62,7 +62,7 @@ func TestExecutor_Execute_Timeout(t *testing.T) {
 	executor := NewExecutor()
 
 	// Use sleep command with very short timeout
-	_, err := executor.Execute(context.Background(), &ExecuteOptions{
+	_, err := executor.Execute(t.Context(), &ExecuteOptions{
 		Command: "sleep",
 		Args:    []string{"10"},
 		Timeout: 100 * time.Millisecond,
@@ -81,8 +81,7 @@ func TestExecutor_Execute_Timeout(t *testing.T) {
 	}
 
 	// Timeout errors should have a recovery hint
-	var fe *forgeerrors.Error
-	if errors.As(err, &fe) && fe.Hint() == "" {
+	if fe, ok := errors.AsType[*forgeerrors.Error](err); ok && fe.Hint() == "" {
 		t.Error("timeout error should have a non-empty recovery hint")
 	}
 }
@@ -90,7 +89,7 @@ func TestExecutor_Execute_Timeout(t *testing.T) {
 func TestExecutor_Execute_Canceled(t *testing.T) {
 	executor := NewExecutor()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel immediately
 
 	_, err := executor.Execute(ctx, &ExecuteOptions{

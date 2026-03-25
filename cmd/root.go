@@ -38,8 +38,7 @@ func Execute() {
 // printHintAndExit prints a recovery hint (if the error is classified) and exits
 // with an appropriate exit code.
 func printHintAndExit(err error) {
-	var fe *forgeerrors.Error
-	if errors.As(err, &fe) {
+	if fe, ok := errors.AsType[*forgeerrors.Error](err); ok {
 		hint := fe.Hint()
 		if hint != "" {
 			fmt.Fprintf(os.Stderr, "Hint: %s\n", hint)
