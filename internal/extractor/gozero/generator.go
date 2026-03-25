@@ -16,7 +16,6 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 
-	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/executor"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
@@ -54,7 +53,8 @@ func (e *Extractor) Name() string {
 func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	info, err := e.detector.Detect(projectPath)
 	if err != nil {
-		return nil, forgeerrors.DetectError("go-zero project detection failed", err)
+		// Detector already returns DETECT-classified errors; avoid double-wrapping
+		return nil, err
 	}
 	return info, nil
 }
@@ -63,7 +63,8 @@ func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.PatchResult, error) {
 	_, err := e.patcher.Patch("")
 	if err != nil {
-		return nil, forgeerrors.PatchError("go-zero patching failed", err)
+		// Patcher already returns PATCH-classified errors; avoid double-wrapping
+		return nil, err
 	}
 	// go-zero doesn't modify project files, so return empty result.
 	return &extractor.PatchResult{}, nil
@@ -73,7 +74,8 @@ func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.Patch
 func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
 	result, err := e.generator.Generate(ctx, projectPath, info, opts)
 	if err != nil {
-		return nil, forgeerrors.GenerateError("go-zero spec generation failed", err)
+		// Generator errors are classified at source; avoid double-wrapping
+		return nil, err
 	}
 	return result, nil
 }

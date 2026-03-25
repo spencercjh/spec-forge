@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 	"github.com/spencercjh/spec-forge/internal/executor"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 )
@@ -91,7 +90,8 @@ func (e *Extractor) Name() string {
 func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	info, err := e.detector.Detect(projectPath)
 	if err != nil {
-		return nil, forgeerrors.DetectError("spring project detection failed", err)
+		// Detector already returns DETECT-classified errors; avoid double-wrapping
+		return nil, err
 	}
 	return info, nil
 }
@@ -100,7 +100,8 @@ func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 func (e *Extractor) Patch(projectPath string, opts *extractor.PatchOptions) (*extractor.PatchResult, error) {
 	springResult, err := e.patcher.Patch(projectPath, opts)
 	if err != nil {
-		return nil, forgeerrors.PatchError("spring project patching failed", err)
+		// Patcher already returns PATCH-classified errors; avoid double-wrapping
+		return nil, err
 	}
 	// Convert spring.PatchResult to extractor.PatchResult
 	return &extractor.PatchResult{
@@ -116,7 +117,8 @@ func (e *Extractor) Patch(projectPath string, opts *extractor.PatchOptions) (*ex
 func (e *Extractor) Generate(ctx context.Context, projectPath string, info *extractor.ProjectInfo, opts *extractor.GenerateOptions) (*extractor.GenerateResult, error) {
 	result, err := e.generator.Generate(ctx, projectPath, info, opts)
 	if err != nil {
-		return nil, forgeerrors.GenerateError("spring spec generation failed", err)
+		// Generator errors are classified at source; avoid double-wrapping
+		return nil, err
 	}
 	return result, nil
 }

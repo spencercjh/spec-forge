@@ -35,7 +35,8 @@ func (e *Extractor) Name() string {
 func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	info, err := e.detector.Detect(projectPath)
 	if err != nil {
-		return nil, forgeerrors.DetectError("grpc-protoc project detection failed", err)
+		// Detector already returns DETECT-classified errors; avoid double-wrapping
+		return nil, err
 	}
 	return info, nil
 }
@@ -44,7 +45,8 @@ func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 func (e *Extractor) Patch(_ string, _ *extractor.PatchOptions) (*extractor.PatchResult, error) {
 	_, err := e.patcher.Patch("")
 	if err != nil {
-		return nil, forgeerrors.PatchError("grpc-protoc patching failed", err)
+		// Patcher already returns PATCH-classified errors; avoid double-wrapping
+		return nil, err
 	}
 	// gRPC-protoc doesn't modify project files, so return empty result.
 	return &extractor.PatchResult{}, nil

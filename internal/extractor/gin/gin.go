@@ -51,7 +51,8 @@ func (e *Extractor) Detect(projectPath string) (*extractor.ProjectInfo, error) {
 	e.ensureInitialized()
 	info, err := e.detector.Detect(projectPath)
 	if err != nil {
-		return nil, forgeerrors.DetectError("gin project detection failed", err)
+		// Detector already returns DETECT-classified errors; avoid double-wrapping
+		return nil, err
 	}
 	return info, nil
 }
