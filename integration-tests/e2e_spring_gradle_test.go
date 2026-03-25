@@ -14,6 +14,9 @@ import (
 
 // TestE2E_GradleSpringBoot_Generate tests the generate flow for a Gradle Spring Boot project.
 func TestE2E_GradleSpringBoot_Generate(t *testing.T) {
+	// Acquire lock to prevent port conflicts with other Spring Boot tests
+	helpers.AcquireSpringLock(t)
+
 	projectPath := "gradle-springboot-openapi-demo"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {

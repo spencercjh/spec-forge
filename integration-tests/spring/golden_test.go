@@ -31,6 +31,9 @@ func skipIfProjectMissing(t *testing.T, projectPath string) {
 func generateSpec(t *testing.T, projectPath, outputDir string) string {
 	t.Helper()
 
+	// Acquire global lock to prevent port conflicts with other Spring Boot tests
+	helpers.AcquireSpringLock(t)
+
 	rootCmd := cmd.NewRootCommand()
 	var stdout, stderr bytes.Buffer
 	rootCmd.SetOut(&stdout)
