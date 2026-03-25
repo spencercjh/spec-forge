@@ -93,6 +93,29 @@ func generateSpec(t *testing.T, format string) (string, map[string]any) {
 	return specFile, spec
 }
 
+// volatileFields are top-level fields in goctl output that change on every run
+// and must be stripped before golden comparison.
+var volatileFields = []string{"x-date"}
+
+// stripVolatileFields removes runtime-dependent fields (e.g., x-date) from a
+// spec map so that golden comparisons are deterministic.
+func stripVolatileFields(spec map[string]any) map[string]any {
+	clean := make(map[string]any, len(spec))
+	for k, v := range spec {
+		skip := false
+		for _, vf := range volatileFields {
+			if k == vf {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			clean[k] = v
+		}
+	}
+	return clean
+}
+
 // TestGoldenSnapshots tests against golden files
 func TestGoldenSnapshots(t *testing.T) {
 	_, spec := generateSpec(t, "json")
@@ -103,8 +126,8 @@ func TestGoldenSnapshots(t *testing.T) {
 		t.Run(snapshot.Name, func(t *testing.T) {
 			var actual any
 			if snapshot.Path == "" {
-				// Full spec comparison
-				actual = spec
+				// Full spec comparison — strip volatile fields
+				actual = stripVolatileFields(spec)
 			} else {
 				actual = helpers.ExtractFromPath(t, spec, snapshot.Path)
 			}
@@ -324,7 +347,8 @@ func TestRegenerateGolden(t *testing.T) {
 	for _, snapshot := range goldenSnapshots {
 		var actual any
 		if snapshot.Path == "" {
-			actual = spec
+			// Strip volatile fields so golden file is deterministic
+			actual = stripVolatileFields(spec)
 		} else {
 			actual = helpers.ExtractFromPath(t, spec, snapshot.Path)
 		}
