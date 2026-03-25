@@ -92,7 +92,7 @@ func (p *Patcher) checkProtoc(ctx context.Context) (string, error) {
 		//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
 		if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
 			slog.Error("protoc not found", "error", err)
-			return "", forgeerrors.PatchError(ErrProtocNotInstalled.Error(), nil)
+			return "", forgeerrors.PatchError(ErrProtocNotInstalled.Error(), err)
 		}
 
 		// Command failed (non-zero exit code)
@@ -118,7 +118,7 @@ func (p *Patcher) checkProtocGenConnectOpenAPI(ctx context.Context) (string, err
 		//nolint:errcheck // errors.AsType only returns (T, bool), no error to check
 		if _, ok := errors.AsType[*executor.CommandNotFoundError](err); ok {
 			slog.Error("protoc-gen-connect-openapi not found", "error", err)
-			return "", forgeerrors.PatchError(ErrProtocGenConnectOpenAPINotInstalled.Error(), nil)
+			return "", forgeerrors.PatchError(ErrProtocGenConnectOpenAPINotInstalled.Error(), err)
 		}
 
 		// Command failed (non-zero exit code)
