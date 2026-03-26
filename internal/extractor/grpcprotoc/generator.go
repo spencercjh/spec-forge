@@ -265,9 +265,10 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 	// Walk subdirectories of outputDir to find the generated file,
 	// since protoc mirrors the proto source directory structure.
 	var found string
-	_ = filepath.Walk(outputDir, func(path string, fi os.FileInfo, walkErr error) error {
-		if walkErr != nil {
-			return nil
+	var walkErr error
+	walkErr = filepath.Walk(outputDir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
 		if !fi.IsDir() && strings.HasSuffix(fi.Name(), expectedExt) {
 			found = path
@@ -277,6 +278,9 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 	})
 	if found != "" {
 		return found, nil
+	}
+	if walkErr != nil {
+		slog.Debug("error walking output directory", "dir", outputDir, "error", walkErr)
 	}
 
 	// Then check directories containing service proto files

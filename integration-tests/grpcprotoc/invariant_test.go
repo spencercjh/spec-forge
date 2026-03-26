@@ -123,11 +123,24 @@ func TestProtoFieldMapping(t *testing.T) {
 			t.Error("User.fullName (from proto full_name) not found in properties")
 		}
 
-		// Proto field full_name's title should reflect the original proto field name
-		if fullName, ok := properties["fullName"].(map[string]any); ok {
-			if title, ok := fullName["title"].(string); ok {
-				if title != "full_name" {
-					t.Errorf("fullName title should be 'full_name' (proto field name), got %q", title)
+		// Verify that proto field names are preserved in title properties
+		expectedTitles := map[string]string{
+			"id":       "id",
+			"username": "username",
+			"email":    "email",
+			"fullName": "full_name",
+			"age":      "age",
+		}
+		for jsonName, expectedTitle := range expectedTitles {
+			prop, ok := properties[jsonName].(map[string]any)
+			if !ok {
+				t.Errorf("User.%s property not found", jsonName)
+				continue
+			}
+			if title, ok := prop["title"].(string); ok {
+				if title != expectedTitle {
+					t.Errorf("User.%s title should be %q (proto field name), got %q",
+						jsonName, expectedTitle, title)
 				}
 			}
 		}
