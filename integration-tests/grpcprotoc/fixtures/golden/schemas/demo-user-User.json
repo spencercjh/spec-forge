@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": [
+        "integer",
+        "string"
+      ],
+      "title": "id",
+      "format": "int64",
+      "description": "Unique identifier for the user"
+    },
+    "username": {
+      "type": "string",
+      "title": "username",
+      "description": "Username for login"
+    },
+    "email": {
+      "type": "string",
+      "title": "email",
+      "description": "Email address"
+    },
+    "fullName": {
+      "type": "string",
+      "title": "full_name",
+      "description": "Full display name"
+    },
+    "age": {
+      "type": "integer",
+      "title": "age",
+      "format": "int32",
+      "description": "Age in years"
+    }
+  },
+  "title": "User",
+  "additionalProperties": false,
+  "description": "User entity representing a user in the system"
+}

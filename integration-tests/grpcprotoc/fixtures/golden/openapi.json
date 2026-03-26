@@ -1,0 +1,641 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "demo.user"
+  },
+  "paths": {
+    "/v1/users": {
+      "get": {
+        "tags": [
+          "demo.user.UserService"
+        ],
+        "summary": "ListUsers",
+        "description": "List users with pagination and optional filtering",
+        "operationId": "demo.user.UserService.ListUsers",
+        "parameters": [
+          {
+            "name": "page.page",
+            "in": "query",
+            "description": "Page number (0-indexed)",
+            "schema": {
+              "type": "integer",
+              "title": "page",
+              "format": "int32",
+              "description": "Page number (0-indexed)"
+            }
+          },
+          {
+            "name": "page.size",
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "type": "integer",
+              "title": "size",
+              "format": "int32",
+              "description": "Number of items per page"
+            }
+          },
+          {
+            "name": "usernameFilter",
+            "in": "query",
+            "description": "Optional username filter (partial match)",
+            "schema": {
+              "type": "string",
+              "title": "username_filter",
+              "description": "Optional username filter (partial match)"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/demo.user.ListUsersResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "demo.user.UserService"
+        ],
+        "summary": "CreateUser",
+        "description": "Create a new user",
+        "operationId": "demo.user.UserService.CreateUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/demo.user.CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/demo.user.CreateUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{id}": {
+      "get": {
+        "tags": [
+          "demo.user.UserService"
+        ],
+        "summary": "GetUser",
+        "description": "Get a user by their ID",
+        "operationId": "demo.user.UserService.GetUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "User ID to retrieve",
+            "required": true,
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "title": "id",
+              "format": "int64",
+              "description": "User ID to retrieve"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/demo.user.GetUserResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "demo.user.UserService"
+        ],
+        "summary": "UpdateProfile",
+        "description": "Update user profile information",
+        "operationId": "demo.user.UserService.UpdateProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "User ID to update",
+            "required": true,
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "title": "id",
+              "format": "int64",
+              "description": "User ID to update"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fullName": {
+                    "type": "string",
+                    "title": "full_name",
+                    "description": "New full name (optional)"
+                  },
+                  "email": {
+                    "type": "string",
+                    "title": "email",
+                    "description": "New email (optional)"
+                  },
+                  "age": {
+                    "type": "integer",
+                    "title": "age",
+                    "format": "int32",
+                    "description": "New age (optional)"
+                  }
+                },
+                "title": "UpdateProfileRequest",
+                "additionalProperties": false,
+                "description": "Request to update user profile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/demo.user.UpdateProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{user_id}/files": {
+      "post": {
+        "tags": [
+          "demo.user.UserService"
+        ],
+        "summary": "UploadFile",
+        "description": "Upload a file for a user",
+        "operationId": "demo.user.UserService.UploadFile",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "User ID (optional)",
+            "required": true,
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "title": "user_id",
+              "format": "int64",
+              "description": "User ID (optional)"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fileInfo": {
+                    "title": "file_info",
+                    "description": "File information",
+                    "$ref": "#/components/schemas/demo.common.FileInfo"
+                  },
+                  "content": {
+                    "type": "string",
+                    "title": "content",
+                    "format": "byte",
+                    "description": "File content (binary)"
+                  }
+                },
+                "title": "UploadFileRequest",
+                "additionalProperties": false,
+                "description": "Request to upload a file for a user"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/demo.user.UploadFileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "demo.common.ApiResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "title": "code",
+            "format": "int32",
+            "description": "Response status code"
+          },
+          "message": {
+            "type": "string",
+            "title": "message",
+            "description": "Response message"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "success",
+            "description": "Whether the request was successful"
+          }
+        },
+        "title": "ApiResponse",
+        "additionalProperties": false,
+        "description": "Generic API response wrapper"
+      },
+      "demo.common.FileInfo": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "filename",
+            "description": "Original filename"
+          },
+          "size": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "size",
+            "format": "int64",
+            "description": "File size in bytes"
+          },
+          "contentType": {
+            "type": "string",
+            "title": "content_type",
+            "description": "MIME content type"
+          }
+        },
+        "title": "FileInfo",
+        "additionalProperties": false,
+        "description": "File upload information"
+      },
+      "demo.common.PageMetadata": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "page",
+            "format": "int32",
+            "description": "Current page number"
+          },
+          "size": {
+            "type": "integer",
+            "title": "size",
+            "format": "int32",
+            "description": "Number of items per page"
+          },
+          "total": {
+            "type": "integer",
+            "title": "total",
+            "format": "int32",
+            "description": "Total number of items"
+          },
+          "totalPages": {
+            "type": "integer",
+            "title": "total_pages",
+            "format": "int32",
+            "description": "Total number of pages"
+          }
+        },
+        "title": "PageMetadata",
+        "additionalProperties": false,
+        "description": "Pagination metadata for list responses"
+      },
+      "demo.common.PageRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "page",
+            "format": "int32",
+            "description": "Page number (0-indexed)"
+          },
+          "size": {
+            "type": "integer",
+            "title": "size",
+            "format": "int32",
+            "description": "Number of items per page"
+          }
+        },
+        "title": "PageRequest",
+        "additionalProperties": false,
+        "description": "Pagination parameters for list requests"
+      },
+      "demo.user.CreateUserRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "username",
+            "description": "Username for the new user"
+          },
+          "email": {
+            "type": "string",
+            "title": "email",
+            "description": "Email address"
+          },
+          "fullName": {
+            "type": "string",
+            "title": "full_name",
+            "description": "Full display name"
+          },
+          "age": {
+            "type": "integer",
+            "title": "age",
+            "format": "int32",
+            "description": "Age in years"
+          }
+        },
+        "title": "CreateUserRequest",
+        "additionalProperties": false,
+        "description": "Request to create a new user"
+      },
+      "demo.user.CreateUserResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "title": "user",
+            "description": "The newly created user",
+            "$ref": "#/components/schemas/demo.user.User"
+          },
+          "status": {
+            "title": "status",
+            "description": "Response status",
+            "$ref": "#/components/schemas/demo.common.ApiResponse"
+          }
+        },
+        "title": "CreateUserResponse",
+        "additionalProperties": false,
+        "description": "Response containing the created user"
+      },
+      "demo.user.GetUserRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "id",
+            "format": "int64",
+            "description": "User ID to retrieve"
+          }
+        },
+        "title": "GetUserRequest",
+        "additionalProperties": false,
+        "description": "Request to get a user by ID"
+      },
+      "demo.user.GetUserResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "title": "user",
+            "description": "The requested user",
+            "$ref": "#/components/schemas/demo.user.User"
+          },
+          "status": {
+            "title": "status",
+            "description": "Response status",
+            "$ref": "#/components/schemas/demo.common.ApiResponse"
+          }
+        },
+        "title": "GetUserResponse",
+        "additionalProperties": false,
+        "description": "Response containing a single user"
+      },
+      "demo.user.ListUsersRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "title": "page",
+            "description": "Pagination parameters",
+            "$ref": "#/components/schemas/demo.common.PageRequest"
+          },
+          "usernameFilter": {
+            "type": "string",
+            "title": "username_filter",
+            "description": "Optional username filter (partial match)"
+          }
+        },
+        "title": "ListUsersRequest",
+        "additionalProperties": false,
+        "description": "Request to list users with optional filtering"
+      },
+      "demo.user.ListUsersResponse": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/demo.user.User"
+            },
+            "title": "users",
+            "description": "List of users on the current page"
+          },
+          "page": {
+            "title": "page",
+            "description": "Pagination metadata",
+            "$ref": "#/components/schemas/demo.common.PageMetadata"
+          },
+          "status": {
+            "title": "status",
+            "description": "Response status",
+            "$ref": "#/components/schemas/demo.common.ApiResponse"
+          }
+        },
+        "title": "ListUsersResponse",
+        "additionalProperties": false,
+        "description": "Response containing a list of users"
+      },
+      "demo.user.UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "id",
+            "format": "int64",
+            "description": "User ID to update"
+          },
+          "fullName": {
+            "type": "string",
+            "title": "full_name",
+            "description": "New full name (optional)"
+          },
+          "email": {
+            "type": "string",
+            "title": "email",
+            "description": "New email (optional)"
+          },
+          "age": {
+            "type": "integer",
+            "title": "age",
+            "format": "int32",
+            "description": "New age (optional)"
+          }
+        },
+        "title": "UpdateProfileRequest",
+        "additionalProperties": false,
+        "description": "Request to update user profile"
+      },
+      "demo.user.UpdateProfileResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "title": "user",
+            "description": "The updated user",
+            "$ref": "#/components/schemas/demo.user.User"
+          },
+          "status": {
+            "title": "status",
+            "description": "Response status",
+            "$ref": "#/components/schemas/demo.common.ApiResponse"
+          }
+        },
+        "title": "UpdateProfileResponse",
+        "additionalProperties": false,
+        "description": "Response containing the updated user"
+      },
+      "demo.user.UploadFileRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "user_id",
+            "format": "int64",
+            "description": "User ID (optional)"
+          },
+          "fileInfo": {
+            "title": "file_info",
+            "description": "File information",
+            "$ref": "#/components/schemas/demo.common.FileInfo"
+          },
+          "content": {
+            "type": "string",
+            "title": "content",
+            "format": "byte",
+            "description": "File content (binary)"
+          }
+        },
+        "title": "UploadFileRequest",
+        "additionalProperties": false,
+        "description": "Request to upload a file for a user"
+      },
+      "demo.user.UploadFileResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "message",
+            "description": "Upload result message"
+          },
+          "status": {
+            "title": "status",
+            "description": "Response status",
+            "$ref": "#/components/schemas/demo.common.ApiResponse"
+          }
+        },
+        "title": "UploadFileResponse",
+        "additionalProperties": false,
+        "description": "Response for file upload"
+      },
+      "demo.user.User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "id",
+            "format": "int64",
+            "description": "Unique identifier for the user"
+          },
+          "username": {
+            "type": "string",
+            "title": "username",
+            "description": "Username for login"
+          },
+          "email": {
+            "type": "string",
+            "title": "email",
+            "description": "Email address"
+          },
+          "fullName": {
+            "type": "string",
+            "title": "full_name",
+            "description": "Full display name"
+          },
+          "age": {
+            "type": "integer",
+            "title": "age",
+            "format": "int32",
+            "description": "Age in years"
+          }
+        },
+        "title": "User",
+        "additionalProperties": false,
+        "description": "User entity representing a user in the system"
+      }
+    }
+  },
+  "security": [],
+  "tags": [
+    {
+      "name": "demo.user.UserService",
+      "description": "UserService provides user management operations"
+    }
+  ]
+}

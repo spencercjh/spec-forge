@@ -21,6 +21,7 @@ BUILD_DIR=./build
 
 # E2E test tool versions (pinned for supply chain security)
 GOCTL_VERSION=v1.9.2
+PROTOC_GEN_CONNECT_OPENAPI_VERSION=v0.25.5
 
 # All-in-one: clean, deps, format, lint, test, build
 all: clean deps fmt lint test build
@@ -51,8 +52,20 @@ test:
 # Install E2E test dependencies
 e2e-deps:
 	@echo "Installing E2E test dependencies..."
+	@# Check for protoc (required for gRPC-protoc tests)
+	@if ! command -v protoc >/dev/null 2>&1; then \
+		echo "⚠️  WARNING: protoc not found in PATH. gRPC-protoc tests will be skipped."; \
+		echo "   Install protoc from: https://grpc.io/docs/protoc-installation/"; \
+	fi
+	@# Check for java (required for Spring Boot tests)
+	@if ! command -v java >/dev/null 2>&1; then \
+		echo "⚠️  WARNING: java not found in PATH. Spring Boot tests will be skipped."; \
+		echo "   Install Java 25 from: https://adoptium.net/ or your package manager"; \
+	fi
 	@echo "Installing goctl $(GOCTL_VERSION)..."
 	$(GOCMD) install github.com/zeromicro/go-zero/tools/goctl@$(GOCTL_VERSION)
+	@echo "Installing protoc-gen-connect-openapi $(PROTOC_GEN_CONNECT_OPENAPI_VERSION)..."
+	$(GOCMD) install github.com/sudorandom/protoc-gen-connect-openapi@$(PROTOC_GEN_CONNECT_OPENAPI_VERSION)
 	@echo "E2E dependencies installed"
 
 # Run end-to-end tests (tests CLI via Cobra ExecuteContext)

@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "properties": {
+    "users": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/demo.user.User"
+      },
+      "title": "users",
+      "description": "List of users on the current page"
+    },
+    "page": {
+      "title": "page",
+      "description": "Pagination metadata",
+      "$ref": "#/components/schemas/demo.common.PageMetadata"
+    },
+    "status": {
+      "title": "status",
+      "description": "Response status",
+      "$ref": "#/components/schemas/demo.common.ApiResponse"
+    }
+  },
+  "title": "ListUsersResponse",
+  "additionalProperties": false,
+  "description": "Response containing a list of users"
+}

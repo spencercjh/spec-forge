@@ -1,0 +1,30 @@
+{
+  "tags": [
+    "demo.user.UserService"
+  ],
+  "summary": "CreateUser",
+  "description": "Create a new user",
+  "operationId": "demo.user.UserService.CreateUser",
+  "requestBody": {
+    "content": {
+      "application/json": {
+        "schema": {
+          "$ref": "#/components/schemas/demo.user.CreateUserRequest"
+        }
+      }
+    },
+    "required": true
+  },
+  "responses": {
+    "200": {
+      "description": "Success",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/demo.user.CreateUserResponse"
+          }
+        }
+      }
+    }
+  }
+}

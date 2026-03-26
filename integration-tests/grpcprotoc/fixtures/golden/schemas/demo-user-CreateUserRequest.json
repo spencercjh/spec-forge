@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "properties": {
+    "username": {
+      "type": "string",
+      "title": "username",
+      "description": "Username for the new user"
+    },
+    "email": {
+      "type": "string",
+      "title": "email",
+      "description": "Email address"
+    },
+    "fullName": {
+      "type": "string",
+      "title": "full_name",
+      "description": "Full display name"
+    },
+    "age": {
+      "type": "integer",
+      "title": "age",
+      "format": "int32",
+      "description": "Age in years"
+    }
+  },
+  "title": "CreateUserRequest",
+  "additionalProperties": false,
+  "description": "Request to create a new user"
+}

@@ -276,6 +276,66 @@ message Response {}
 	}
 }
 
+func TestGenerator_Generate_WithJSONFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	protoFile := filepath.Join(tmpDir, "test.proto")
+	protoContent := `syntax = "proto3";
+package test;
+service TestService { rpc Method(Request) returns (Response); }
+message Request {}
+message Response {}
+`
+	if err := os.WriteFile(protoFile, []byte(protoContent), 0o644); err != nil {
+		t.Fatalf("Failed to create .proto file: %v", err)
+	}
+
+	var capturedArgs []string
+	mockExec := &mockExecutorForGenerator{
+		results: map[string]*executor.ExecuteResult{
+			"protoc": {ExitCode: 0},
+		},
+		errors: map[string]error{
+			"protoc": nil,
+		},
+		captureArgs: &capturedArgs,
+		postExecuteHook: func() {
+			_ = os.WriteFile(filepath.Join(tmpDir, "test.openapi.json"), []byte(`{}`), 0o644)
+		},
+	}
+
+	g := grpcprotoc.NewGeneratorWithExecutor(mockExec)
+
+	info := &extractor.ProjectInfo{
+		Framework:     grpcprotoc.ExtractorName,
+		BuildTool:     grpcprotoc.BuildToolProtoc,
+		BuildFilePath: tmpDir,
+		FrameworkData: &grpcprotoc.Info{
+			ProtoFiles:        []string{protoFile},
+			ServiceProtoFiles: []string{protoFile},
+			ProtoRoot:         tmpDir,
+			HasGoogleAPI:      false,
+			HasBuf:            false,
+			ImportPaths:       []string{tmpDir},
+		},
+	}
+
+	opts := &extractor.GenerateOptions{
+		OutputDir: tmpDir,
+		Format:    "json",
+		Timeout:   30 * time.Second,
+	}
+
+	_, err := g.Generate(context.Background(), tmpDir, info, opts)
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	// Check that format=json option is added (protoc-gen-connect-openapi defaults to YAML)
+	if !slices.Contains(capturedArgs, "--connect-openapi_opt=format=json") {
+		t.Errorf("Expected --connect-openapi_opt=format=json, got: %v", capturedArgs)
+	}
+}
+
 func TestGenerator_Generate_WithYAMLFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 	protoFile := filepath.Join(tmpDir, "test.proto")

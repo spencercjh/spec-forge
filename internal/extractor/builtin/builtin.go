@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/spencercjh/spec-forge/internal/extractor"
+	"github.com/spencercjh/spec-forge/internal/extractor/grpcprotoc"
 )
 
 // registry holds all registered extractors.
@@ -34,6 +35,8 @@ func GetAll() []extractor.Extractor {
 }
 
 // DetectFramework tries all registered extractors and returns the first matching framework.
+// Special errors that indicate "detected but rejected" (e.g., ErrBufProjectDetected) are
+// propagated immediately instead of continuing to other extractors.
 func DetectFramework(projectPath string) (extractor.Extractor, *extractor.ProjectInfo, error) {
 	extractors := GetAll()
 	slog.Debug("detecting framework", "projectPath", projectPath, "extractorCount", len(extractors))
@@ -44,6 +47,11 @@ func DetectFramework(projectPath string) (extractor.Extractor, *extractor.Projec
 		if err == nil {
 			slog.Info("framework detected", "name", e.Name(), "projectPath", projectPath)
 			return e, info, nil
+		}
+		// Propagate special "detected but rejected" errors immediately
+		if errors.Is(err, grpcprotoc.ErrBufProjectDetected) {
+			slog.Warn("project detected but rejected", "extractor", e.Name(), "error", err)
+			return nil, nil, err
 		}
 		slog.Debug("extractor failed to detect framework", "extractor", e.Name(), "error", err)
 	}

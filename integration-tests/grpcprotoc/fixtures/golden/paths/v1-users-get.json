@@ -1,0 +1,54 @@
+{
+  "tags": [
+    "demo.user.UserService"
+  ],
+  "summary": "ListUsers",
+  "description": "List users with pagination and optional filtering",
+  "operationId": "demo.user.UserService.ListUsers",
+  "parameters": [
+    {
+      "name": "page.page",
+      "in": "query",
+      "description": "Page number (0-indexed)",
+      "schema": {
+        "type": "integer",
+        "title": "page",
+        "format": "int32",
+        "description": "Page number (0-indexed)"
+      }
+    },
+    {
+      "name": "page.size",
+      "in": "query",
+      "description": "Number of items per page",
+      "schema": {
+        "type": "integer",
+        "title": "size",
+        "format": "int32",
+        "description": "Number of items per page"
+      }
+    },
+    {
+      "name": "usernameFilter",
+      "in": "query",
+      "description": "Optional username filter (partial match)",
+      "schema": {
+        "type": "string",
+        "title": "username_filter",
+        "description": "Optional username filter (partial match)"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "description": "Success",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/demo.user.ListUsersResponse"
+          }
+        }
+      }
+    }
+  }
+}
