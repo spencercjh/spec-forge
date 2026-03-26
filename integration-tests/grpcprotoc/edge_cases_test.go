@@ -236,12 +236,11 @@ func TestMultipleProtoFiles(t *testing.T) {
 func TestNonProtocProject(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// Create a basic Go project without proto files
+	// Create a basic Go project without proto files or any framework dependency
+	// This ensures no detector matches and we can verify the error message
 	goMod := `module non-protoc-test
 
 go 1.26
-
-require github.com/gin-gonic/gin v1.12.0
 `
 	if err := os.WriteFile(filepath.Join(tempDir, "go.mod"), []byte(goMod), 0o644); err != nil {
 		t.Fatalf("failed to write go.mod: %v", err)
@@ -270,8 +269,16 @@ func main() {}
 		"--skip-publish",
 	})
 
-	// This might either fail (if no detector matches) or succeed (if gin detector picks it up)
-	// The important thing is that it doesn't crash
-	_ = rootCmd.Execute()
-	t.Log("Non-protoc project handled without crash")
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatalf("expected generate to fail for non-protoc project, but it succeeded; stdout=%q, stderr=%q", stdout.String(), stderr.String())
+	}
+
+	// Assert that we surface a stable, helpful error about no supported framework being detected
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "no supported framework detected") {
+		t.Fatalf("unexpected error for non-protoc project.\nGot error: %v\nstdout: %q\nstderr: %q", err, stdout.String(), stderr.String())
+	}
+
+	t.Logf("Got expected error for non-protoc project: %v", err)
 }
