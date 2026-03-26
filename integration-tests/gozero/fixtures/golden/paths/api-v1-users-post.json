@@ -1,0 +1,82 @@
+{
+  "operationId": "createUserHandler",
+  "requestBody": {
+    "content": {
+      "application/json": {
+        "schema": {
+          "properties": {
+            "age": {
+              "type": "integer"
+            },
+            "email": {
+              "type": "string"
+            },
+            "fullName": {
+              "type": "string"
+            },
+            "username": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "username",
+            "email",
+            "fullName",
+            "age"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    "required": true,
+    "x-originalParamName": "body"
+  },
+  "responses": {
+    "200": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "code": {
+                "type": "integer"
+              },
+              "data": {
+                "properties": {
+                  "age": {
+                    "type": "integer"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "fullName": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "integer"
+                  },
+                  "username": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "username",
+                  "email",
+                  "fullName",
+                  "age"
+                ],
+                "type": "object"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "description": ""
+    }
+  },
+  "summary": "CreateUserHandler"
+}

@@ -8,8 +8,7 @@
     },
     "page": {
       "format": "int32",
-      "type": "integer",
-      "writeOnly": true
+      "type": "integer"
     },
     "pageNumber": {
       "format": "int32",
@@ -21,8 +20,7 @@
     },
     "size": {
       "format": "int32",
-      "type": "integer",
-      "writeOnly": true
+      "type": "integer"
     },
     "total": {
       "format": "int64",

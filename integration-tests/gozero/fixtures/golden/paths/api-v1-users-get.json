@@ -1,0 +1,106 @@
+{
+  "operationId": "listUsersHandler",
+  "parameters": [
+    {
+      "in": "query",
+      "name": "page",
+      "required": true,
+      "schema": {
+        "default": 0,
+        "type": "integer"
+      }
+    },
+    {
+      "in": "query",
+      "name": "size",
+      "required": true,
+      "schema": {
+        "default": 10,
+        "type": "integer"
+      }
+    },
+    {
+      "in": "query",
+      "name": "username",
+      "schema": {
+        "allowEmptyValue": true,
+        "type": "string"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "code": {
+                "type": "integer"
+              },
+              "data": {
+                "properties": {
+                  "content": {
+                    "items": {
+                      "properties": {
+                        "age": {
+                          "type": "integer"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "fullName": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "integer"
+                        },
+                        "username": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "username",
+                        "email",
+                        "fullName",
+                        "age"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "pageNumber": {
+                    "type": "integer"
+                  },
+                  "pageSize": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  },
+                  "totalPages": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "content",
+                  "pageNumber",
+                  "pageSize",
+                  "total",
+                  "totalPages"
+                ],
+                "type": "object"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "description": ""
+    }
+  },
+  "summary": "ListUsersHandler"
+}
