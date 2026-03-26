@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -251,6 +252,7 @@ func (g *Generator) toRelativePath(path, base string) string {
 // findOutputFile locates the generated OpenAPI file.
 // protoc-gen-connect-openapi generates files mirroring the proto source directory structure
 // inside the output directory (e.g., outputDir/proto/user.openapi.json).
+// When multiple files exist, it prefers files in directories corresponding to service proto files.
 func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string, error) {
 	// Determine expected extension
 	expectedExt := ".openapi.json"
@@ -263,28 +265,52 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 		return outputPath, nil
 	}
 
-	// Walk subdirectories of outputDir to find the generated file,
-	// since protoc mirrors the proto source directory structure.
-	var found string
+	// Collect all candidate files from the output directory tree
+	var candidates []string
 	walkErr := filepath.Walk(outputDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !fi.IsDir() && strings.HasSuffix(fi.Name(), expectedExt) {
-			found = path
-			return filepath.SkipAll
+			candidates = append(candidates, path)
 		}
 		return nil
 	})
-	if found != "" {
-		return found, nil
-	}
 	if walkErr != nil {
 		slog.Debug("error walking output directory", "dir", outputDir, "error", walkErr)
 	}
 
-	// Then check directories containing service proto files
-	// Use a set to avoid searching the same directory multiple times
+	// If only one candidate, return it
+	if len(candidates) == 1 {
+		return candidates[0], nil
+	}
+
+	// If multiple candidates, prefer files in directories corresponding to service proto files
+	if len(candidates) > 1 {
+		// Build a set of service proto directories (relative paths) for matching
+		serviceDirs := make(map[string]bool)
+		for _, serviceFile := range info.ServiceProtoFiles {
+			relDir := g.toRelativePath(filepath.Dir(serviceFile), info.ProtoRoot)
+			serviceDirs[filepath.Clean(relDir)] = true
+		}
+
+		// Find candidates in service proto directories
+		for _, candidate := range candidates {
+			relCandidate := g.toRelativePath(candidate, outputDir)
+			candidateDir := filepath.Dir(relCandidate)
+			if serviceDirs[filepath.Clean(candidateDir)] {
+				slog.Debug("preferring output file from service proto directory", "file", candidate)
+				return candidate, nil
+			}
+		}
+
+		// Fallback: return the first candidate (sorted for determinism)
+		slices.Sort(candidates)
+		slog.Debug("multiple output files found, returning first (sorted)", "files", candidates)
+		return candidates[0], nil
+	}
+
+	// No candidates found via walk, try checking service proto file directories directly
 	searchedDirs := make(map[string]bool)
 	searchedDirs[filepath.Clean(outputDir)] = true
 

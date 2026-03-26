@@ -124,6 +124,9 @@ func TestMissingProtocGracefulSkip(t *testing.T) {
 
 // TestYAMLOutputFormat tests YAML output format for gRPC-protoc projects
 func TestYAMLOutputFormat(t *testing.T) {
+	// Acquire lock to prevent race conditions with other tests
+	helpers.AcquireFileLock(t, "grpcprotoc")
+
 	projectPath := "../grpc-protoc-demo"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {

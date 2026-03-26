@@ -76,6 +76,10 @@ func skipIfProtocNotAvailable(t *testing.T) {
 func generateSpec(t *testing.T, format string) (string, map[string]any) {
 	t.Helper()
 
+	// Acquire lock to prevent race conditions when multiple packages run tests
+	// in parallel (go test ./...)
+	helpers.AcquireFileLock(t, "grpcprotoc")
+
 	projectPath := "../grpc-protoc-demo"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
