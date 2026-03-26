@@ -1,4 +1,4 @@
-.PHONY: all build clean deps test test-e2e test-all test-coverage lint fmt install build-linux dev verify help
+.PHONY: all build clean deps test test-e2e e2e-deps test-all test-coverage lint fmt install build-linux dev verify help
 
 # Go parameters
 GOCMD=go
@@ -18,6 +18,9 @@ MAIN_PACKAGE=.
 
 # Build directory
 BUILD_DIR=./build
+
+# E2E test tool versions (pinned for supply chain security)
+GOCTL_VERSION=v1.9.2
 
 # All-in-one: clean, deps, format, lint, test, build
 all: clean deps fmt lint test build
@@ -45,8 +48,15 @@ test:
 	$(GOTEST) -race -v -coverprofile=coverage.out ./...
 	@echo "Tests complete"
 
+# Install E2E test dependencies
+e2e-deps:
+	@echo "Installing E2E test dependencies..."
+	@echo "Installing goctl $(GOCTL_VERSION)..."
+	$(GOCMD) install github.com/zeromicro/go-zero/tools/goctl@$(GOCTL_VERSION)
+	@echo "E2E dependencies installed"
+
 # Run end-to-end tests (tests CLI via Cobra ExecuteContext)
-test-e2e:
+test-e2e: e2e-deps
 	@echo "Running e2e tests..."
 	$(GOTEST) -v -tags=e2e ./integration-tests/...
 	@echo "E2E tests complete"
@@ -105,9 +115,10 @@ help:
 	@echo "  all           - Clean, download dependencies, format, lint, test, and build"
 	@echo "  build         - Build the binary"
 	@echo "  clean         - Remove build artifacts"
-	@echo "  deps          - Download and tidy dependencies"
+	@echo "  deps          - Download and tidy Go module dependencies"
+	@echo "  e2e-deps      - Install E2E test dependencies (goctl)"
 	@echo "  test          - Run unit tests with coverage"
-	@echo "  test-e2e      - Run E2E tests (requires Maven/Gradle/goctl/protoc)"
+	@echo "  test-e2e      - Run E2E tests (auto-installs goctl)"
 	@echo "  test-all      - Run all tests (unit + e2e)"
 	@echo "  test-coverage - Generate HTML coverage report"
 	@echo "  lint          - Run golangci-lint (linters + formatters check)"

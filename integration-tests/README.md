@@ -29,8 +29,10 @@ E2E tests require external tools to be installed:
 - **Maven** / **Gradle** - Demo projects include `mvnw`/`gradlew` wrappers, but you need a working Java environment. The wrappers will download dependencies automatically.
 - **goctl** - Required for go-zero projects. Install with:
   ```bash
-  go install github.com/zeromicro/go-zero/tools/goctl@latest
+  go install github.com/zeromicro/go-zero/tools/goctl@v1.9.2
   ```
+
+  **Note:** Version is pinned to v1.9.2 for supply chain security. Using `@latest` may cause golden test failures due to version field changes.
 - **protoc** & **protoc-gen-connect-openapi** - Required for gRPC projects:
   ```bash
   # Install protoc (macOS)
@@ -50,7 +52,7 @@ sudo apt install openjdk-25-jdk
 sudo apt install protobuf-compiler
 
 # Install Go tools
-go install github.com/zeromicro/go-zero/tools/goctl@latest
+go install github.com/zeromicro/go-zero/tools/goctl@v1.9.2
 go install github.com/sudorandom/protoc-gen-connect-openapi@latest
 ```
 
@@ -108,6 +110,7 @@ Golden fixtures are JSON snapshots of expected OpenAPI output, used to detect re
 |---------|-----------|-------------|
 | `spring/` | `spring/fixtures/golden/` | Spring Boot (Maven) golden snapshots |
 | `gin/` | `gin/fixtures/golden/` | Gin framework golden snapshots |
+| `gozero/` | `gozero/fixtures/golden/` | go-zero framework golden snapshots |
 
 ### Spring Golden Fixtures
 
@@ -133,6 +136,31 @@ spring/fixtures/golden/
 
 ```bash
 REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/spring/... -run TestRegenerateGolden
+```
+
+### go-zero Golden Fixtures
+
+The `gozero/fixtures/golden/` directory contains:
+
+```
+gozero/fixtures/golden/
+├── openapi.json                    # Full OpenAPI spec snapshot
+└── paths/
+    ├── api-v1-users-get.json       # GET /api/v1/users operation
+    ├── api-v1-users-post.json      # POST /api/v1/users operation
+    └── api-v1-users-id-get.json    # GET /api/v1/users/{id} operation
+```
+
+**Volatile Fields:** goctl generates runtime-dependent fields that change on every run:
+- `x-date` - Timestamp of spec generation (changes every run)
+- `x-goctl-version` - Tool version (may change when goctl is updated)
+
+These fields are automatically stripped before golden comparison to ensure deterministic tests.
+
+**Regenerating go-zero golden files:**
+
+```bash
+REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/gozero/... -run TestRegenerateGolden
 ```
 
 ### Regenerating Golden Files
@@ -247,6 +275,21 @@ Spring Boot tests start an application on port 8080 during spec generation. Sinc
 | `spring/invariant_test.go` | `TestCriticalInvariants` | Validates semantic invariants (field types, required params, refs) |
 | `spring/edge_cases_test.go` | `TestMalformedPomGracefulDegradation` | Tests graceful error on malformed pom.xml |
 | `spring/edge_cases_test.go` | `TestMissingSpringdocDependency` | Tests patcher behavior without springdoc dependency |
+
+### go-zero Golden & Invariant Tests
+
+| Test File | Tests | Description |
+|-----------|-------|-------------|
+| `gozero/golden_test.go` | `TestGoldenSnapshots` | Compares generated spec (full + extracted) against golden fixtures |
+| `gozero/golden_test.go` | `TestRegenerateGolden` | Regenerates golden files (gated by `REGENERATE_GOLDEN=true`) |
+| `gozero/invariant_test.go` | `TestAPITypeDefinitions` | Validates API type definitions are correctly parsed |
+| `gozero/invariant_test.go` | `TestGoSwaggerFormatCompatibility` | Validates go-swagger format compatibility |
+| `gozero/invariant_test.go` | `TestRouteGeneration` | Validates routes are correctly generated from .api files |
+| `gozero/edge_cases_test.go` | `TestMissingGoctlGracefulSkip` | Tests graceful skip when goctl is not installed |
+| `gozero/edge_cases_test.go` | `TestNonGoZeroProject` | Tests error handling for non-go-zero projects |
+| `gozero/edge_cases_test.go` | `TestYAMLOutputFormat` | Tests YAML output format generation |
+| `gozero/edge_cases_test.go` | `TestFormDataEndpoint` | Tests form-data endpoint handling |
+| `gozero/edge_cases_test.go` | `TestUploadEndpoint` | Tests file upload endpoint handling |
 
 ### CLI E2E Tests
 
