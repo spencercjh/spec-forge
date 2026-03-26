@@ -282,7 +282,7 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 		return nil
 	})
 	if walkErr != nil {
-		slog.Debug("error walking output directory", "dir", outputDir, "error", walkErr)
+		return "", fmt.Errorf("walking output directory %q: %w", outputDir, walkErr)
 	}
 
 	// If no candidates found, return error
