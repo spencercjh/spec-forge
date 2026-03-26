@@ -252,7 +252,6 @@ func (g *Generator) toRelativePath(path, base string) string {
 // findOutputFile locates the generated OpenAPI file.
 // protoc-gen-connect-openapi generates files mirroring the proto source directory structure
 // inside the output directory (e.g., outputDir/proto/user.openapi.json).
-// When multiple files exist, it prefers files in directories corresponding to service proto files.
 func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string, error) {
 	// Determine expected extension
 	expectedExt := ".openapi.json"
@@ -260,9 +259,15 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 		expectedExt = ".openapi.yaml"
 	}
 
-	// First, check the output directory itself
-	if outputPath, err := g.findFileWithExt(outputDir, expectedExt); err == nil {
-		return outputPath, nil
+	// Optimization: when there's exactly one service proto file, compute the expected output path directly
+	if len(info.ServiceProtoFiles) == 1 {
+		serviceFile := info.ServiceProtoFiles[0]
+		relDir := g.toRelativePath(filepath.Dir(serviceFile), info.ProtoRoot)
+		expectedPath := filepath.Join(outputDir, relDir, strings.TrimSuffix(filepath.Base(serviceFile), ".proto")+expectedExt)
+		if _, err := os.Stat(expectedPath); err == nil {
+			slog.Debug("found expected output file for single service proto", "file", expectedPath)
+			return expectedPath, nil
+		}
 	}
 
 	// Collect all candidate files from the output directory tree
@@ -280,73 +285,24 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 		slog.Debug("error walking output directory", "dir", outputDir, "error", walkErr)
 	}
 
-	// If only one candidate, return it
+	// If no candidates found, return error
+	if len(candidates) == 0 {
+		return "", ErrOutputFileNotFound
+	}
+
+	// If exactly one candidate, return it
 	if len(candidates) == 1 {
 		return candidates[0], nil
 	}
 
-	// If multiple candidates, prefer files in directories corresponding to service proto files
-	if len(candidates) > 1 {
-		// Build a set of service proto directories (relative paths) for matching
-		serviceDirs := make(map[string]bool)
-		for _, serviceFile := range info.ServiceProtoFiles {
-			relDir := g.toRelativePath(filepath.Dir(serviceFile), info.ProtoRoot)
-			serviceDirs[filepath.Clean(relDir)] = true
-		}
-
-		// Find candidates in service proto directories
-		for _, candidate := range candidates {
-			relCandidate := g.toRelativePath(candidate, outputDir)
-			candidateDir := filepath.Dir(relCandidate)
-			if serviceDirs[filepath.Clean(candidateDir)] {
-				slog.Debug("preferring output file from service proto directory", "file", candidate)
-				return candidate, nil
-			}
-		}
-
-		// Fallback: return the first candidate (sorted for determinism)
-		slices.Sort(candidates)
-		slog.Debug("multiple output files found, returning first (sorted)", "files", candidates)
-		return candidates[0], nil
-	}
-
-	// No candidates found via walk, try checking service proto file directories directly
-	searchedDirs := make(map[string]bool)
-	searchedDirs[filepath.Clean(outputDir)] = true
-
-	for _, serviceFile := range info.ServiceProtoFiles {
-		protoDir := filepath.Dir(serviceFile)
-		cleanDir := filepath.Clean(protoDir)
-
-		// Skip if we've already searched this directory
-		if searchedDirs[cleanDir] {
-			continue
-		}
-		searchedDirs[cleanDir] = true
-
-		if outputPath, err := g.findFileWithExt(protoDir, expectedExt); err == nil {
-			return outputPath, nil
-		}
-	}
-
-	return "", ErrOutputFileNotFound
-}
-
-// findFileWithExt searches for a file with the given extension in the directory.
-func (g *Generator) findFileWithExt(dir, ext string) (string, error) {
-	entries, readErr := os.ReadDir(dir)
-	if readErr != nil {
-		return "", fmt.Errorf("failed to read directory: %w", readErr)
-	}
-
-	for _, entry := range entries {
-		name := entry.Name()
-		if !entry.IsDir() && strings.HasSuffix(name, ext) {
-			return filepath.Join(dir, name), nil
-		}
-	}
-
-	return "", ErrOutputFileNotFound
+	// Multiple candidates found - return an explicit error
+	slices.Sort(candidates)
+	return "", fmt.Errorf("multiple OpenAPI output files found (%d): %v. "+
+		"This indicates multiple service proto files generated separate specs. "+
+		"To resolve: either (1) run spec-forge separately per service proto directory, or "+
+		"(2) configure protoc-gen-connect-openapi to generate a single combined spec. "+
+		"See: https://github.com/sudorandom/protoc-gen-connect-openapi for configuration options",
+		len(candidates), candidates)
 }
 
 // combineOutput combines stdout and stderr for error messages.

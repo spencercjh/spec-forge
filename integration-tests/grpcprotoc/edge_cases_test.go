@@ -72,13 +72,12 @@ name: buf.build/test/project
 		return
 	}
 
+	// Verify the error is specifically due to buf.yaml detection
 	errMsg := err.Error()
-	// The error could mention buf.yaml or fall through to another detector
-	if strings.Contains(errMsg, "buf") || strings.Contains(errMsg, "detect") {
-		t.Logf("Got expected error for buf.yaml project: %v", err)
-	} else {
-		t.Logf("Generate failed (expected): %v", err)
+	if !strings.Contains(errMsg, "buf.yaml detected") {
+		t.Fatalf("expected buf.yaml detection error, got: %v", err)
 	}
+	t.Logf("Got expected error for buf.yaml project: %v", err)
 }
 
 // TestMissingProtocGracefulSkip tests graceful handling when protoc is not available
