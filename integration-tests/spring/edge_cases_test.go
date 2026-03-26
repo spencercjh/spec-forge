@@ -105,6 +105,8 @@ func TestMissingSpringdocDependency(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	rootCmd.SetOut(&stdout)
 	rootCmd.SetErr(&stderr)
+	// Use --keep-patched to preserve the patched pom.xml for verification
+	// Without this flag, generate restores the original file after execution
 	rootCmd.SetArgs([]string{
 		"generate",
 		tempDir,
@@ -112,6 +114,7 @@ func TestMissingSpringdocDependency(t *testing.T) {
 		"--output", "json",
 		"--skip-enrich",
 		"--skip-publish",
+		"--keep-patched",
 	})
 
 	// This may fail (no Maven wrapper, no source code) but shouldn't panic
@@ -119,17 +122,17 @@ func TestMissingSpringdocDependency(t *testing.T) {
 	if err != nil {
 		t.Logf("Expected error when springdoc is not set up: %v", err)
 
-		// Verify the patcher still modified the pom.xml to add springdoc
+		// Verify the patcher modified the pom.xml to add springdoc
 		updatedPom, readErr := os.ReadFile(filepath.Join(tempDir, "pom.xml"))
 		if readErr != nil {
 			t.Fatalf("failed to read pom.xml after generate attempt: %v", readErr)
 		}
 
-		// Check if springdoc dependency was added by the patcher
-		if bytes.Contains(updatedPom, []byte("springdoc-openapi")) {
-			t.Log("Patcher successfully added springdoc dependency before build failure")
+		// Assert that springdoc dependency was added by the patcher
+		if !bytes.Contains(updatedPom, []byte("springdoc-openapi")) {
+			t.Errorf("expected patcher to add springdoc-openapi dependency to pom.xml, but it was not found")
 		} else {
-			t.Log("Patcher did not add springdoc dependency (may have failed before patching)")
+			t.Log("Patcher successfully added springdoc dependency before build failure")
 		}
 		return
 	}
