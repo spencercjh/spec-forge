@@ -14,6 +14,9 @@ import (
 
 // TestE2E_MavenSpringBoot_Generate tests the generate flow for a Maven Spring Boot project.
 func TestE2E_MavenSpringBoot_Generate(t *testing.T) {
+	// Acquire lock to prevent port conflicts with other Spring Boot tests
+	helpers.AcquireSpringLock(t)
+
 	projectPath := "maven-springboot-openapi-demo"
 
 	// Check if project exists
