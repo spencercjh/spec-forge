@@ -51,6 +51,10 @@ func skipIfGoctlNotAvailable(t *testing.T) {
 func generateSpec(t *testing.T, format string) (string, map[string]any) {
 	t.Helper()
 
+	// Acquire lock to prevent race conditions with intermediate files (openapi.swagger.json)
+	// when multiple packages run tests in parallel (go test ./...)
+	helpers.AcquireGozeroLock(t)
+
 	projectPath := "../gozero-demo"
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
@@ -94,8 +98,9 @@ func generateSpec(t *testing.T, format string) (string, map[string]any) {
 }
 
 // volatileFields are top-level fields in goctl output that change on every run
+// (e.g., timestamp) or across versions (e.g., tool version)
 // and must be stripped before golden comparison.
-var volatileFields = []string{"x-date"}
+var volatileFields = []string{"x-date", "x-goctl-version"}
 
 // stripVolatileFields removes runtime-dependent fields (e.g., x-date) from a
 // spec map so that golden comparisons are deterministic.
