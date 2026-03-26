@@ -25,8 +25,8 @@ This directory contains end-to-end tests for the spec-forge CLI tool.
 
 E2E tests require external tools to be installed:
 
-- **Java 25** - Required for Spring Boot projects (Maven/Gradle wrappers are included in demo projects)
-- **Maven** / **Gradle** - Not required directly; demo projects include `mvnw`/`gradlew` wrappers
+- **Java 25** - Required for Spring Boot projects. Install from [Adoptium](https://adoptium.net/) or use your package manager.
+- **Maven** / **Gradle** - Demo projects include `mvnw`/`gradlew` wrappers, but you need a working Java environment. The wrappers will download dependencies automatically.
 - **goctl** - Required for go-zero projects. Install with:
   ```bash
   go install github.com/zeromicro/go-zero/tools/goctl@latest
@@ -39,6 +39,20 @@ E2E tests require external tools to be installed:
   # Install protoc-gen-connect-openapi
   go install github.com/sudorandom/protoc-gen-connect-openapi@latest
   ```
+
+### Quick Setup (Ubuntu/Debian)
+
+```bash
+# Install Java 25
+sudo apt install openjdk-25-jdk
+
+# Install protoc
+sudo apt install protobuf-compiler
+
+# Install Go tools
+go install github.com/zeromicro/go-zero/tools/goctl@latest
+go install github.com/sudorandom/protoc-gen-connect-openapi@latest
+```
 
 ## Running Tests
 
@@ -93,8 +107,33 @@ Golden fixtures are JSON snapshots of expected OpenAPI output, used to detect re
 | Package | Golden Dir | Description |
 |---------|-----------|-------------|
 | `spring/` | `spring/fixtures/golden/` | Spring Boot (Maven) golden snapshots |
-| `gozero/` | `gozero/fixtures/golden/` | go-zero framework golden snapshots |
 | `gin/` | `gin/fixtures/golden/` | Gin framework golden snapshots |
+
+### Spring Golden Fixtures
+
+The `spring/fixtures/golden/` directory contains:
+
+```
+spring/fixtures/golden/
+├── openapi.json                    # Full OpenAPI spec snapshot
+├── schemas/
+│   ├── User.json                   # User schema structure
+│   ├── PageResultUser.json         # Pagination wrapper schema
+│   ├── ApiResponseUser.json        # API response wrapper schema
+│   └── ...
+└── paths/
+    ├── api-v1-users-get.json       # GET /api/v1/users operation
+    ├── api-v1-users-post.json      # POST /api/v1/users operation
+    └── ...
+```
+
+**Purpose:** Golden fixtures detect regressions by comparing generated specs against known-good snapshots. Any change to the generated spec (field types, required properties, response codes) will cause a test failure, making regressions visible via `git diff`.
+
+**Regenerating Spring golden files:**
+
+```bash
+REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/spring/... -run TestRegenerateGolden
+```
 
 ### Regenerating Golden Files
 
@@ -114,22 +153,36 @@ After regeneration, review the diff carefully with `git diff` to confirm only ex
 
 ### Adding a Golden Snapshot Test
 
-Use `helpers.GoldenSnapshot` to define what to extract and compare:
+Golden snapshots compare generated spec fragments against stored fixtures. This detects regressions at a fine-grained level.
+
+1. **Define the snapshot** in your test file:
 
 ```go
 var goldenSnapshots = []helpers.GoldenSnapshot{
     {
         Name: "User Schema Structure",
-        Path: "components.schemas.User",      // dot-path into the spec
-        File: "schemas/User.json",            // relative to fixtures/golden/
+        Path: "components.schemas.User",      // JSONPath-style path into the spec
+        File: "schemas/User.json",            // Relative to fixtures/golden/
     },
     {
         Name: "GET /api/v1/users Operation",
-        Path: "paths./api/v1/users.get",      // supports OpenAPI path syntax
+        Path: "paths./api/v1/users.get",      // Supports OpenAPI path syntax
         File: "paths/api-v1-users-get.json",
     },
 }
 ```
+
+2. **Create the golden file** (first time only):
+
+```bash
+# Generate the spec, then extract snapshots
+REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/spring/... -run TestRegenerateGolden
+
+# Review the generated files
+git diff integration-tests/spring/fixtures/golden/
+```
+
+3. **Commit the golden files** to version control.
 
 ### Adding an Invariant Test
 
