@@ -61,8 +61,8 @@ public class UserController {
 
         PageResult<User> result = new PageResult<>();
         result.setContent(pageContent);
-        result.setPage(page);
-        result.setSize(size);
+        result.setPageNumber(page);
+        result.setPageSize(size);
         result.setTotal(allUsers.size());
         result.setTotalPages((int) Math.ceil((double) allUsers.size() / size));
 
