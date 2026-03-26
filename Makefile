@@ -57,6 +57,11 @@ e2e-deps:
 		echo "⚠️  WARNING: protoc not found in PATH. gRPC-protoc tests will be skipped."; \
 		echo "   Install protoc from: https://grpc.io/docs/protoc-installation/"; \
 	fi
+	@# Check for java (required for Spring Boot tests)
+	@if ! command -v java >/dev/null 2>&1; then \
+		echo "⚠️  WARNING: java not found in PATH. Spring Boot tests will be skipped."; \
+		echo "   Install Java 25 from: https://adoptium.net/ or your package manager"; \
+	fi
 	@echo "Installing goctl $(GOCTL_VERSION)..."
 	$(GOCMD) install github.com/zeromicro/go-zero/tools/goctl@$(GOCTL_VERSION)
 	@echo "Installing protoc-gen-connect-openapi $(PROTOC_GEN_CONNECT_OPENAPI_VERSION)..."
