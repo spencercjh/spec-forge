@@ -209,9 +209,10 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 
 	// Add format option — protoc-gen-connect-openapi defaults to YAML,
 	// so we must pass format=json explicitly for JSON output.
-	if opts.Format == "json" {
+	switch opts.Format {
+	case "json":
 		args = append(args, "--connect-openapi_opt=format=json")
-	} else if opts.Format == "yaml" || opts.Format == "yml" {
+	case "yaml", "yml":
 		args = append(args, "--connect-openapi_opt=format=yaml")
 	}
 
@@ -265,8 +266,7 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 	// Walk subdirectories of outputDir to find the generated file,
 	// since protoc mirrors the proto source directory structure.
 	var found string
-	var walkErr error
-	walkErr = filepath.Walk(outputDir, func(path string, fi os.FileInfo, err error) error {
+	walkErr := filepath.Walk(outputDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
