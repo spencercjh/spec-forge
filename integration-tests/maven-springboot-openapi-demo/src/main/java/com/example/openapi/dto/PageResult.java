@@ -53,8 +53,16 @@ public class PageResult<T> {
         this.totalPages = totalPages;
     }
 
+    public int getPage() {
+        return pageNumber;
+    }
+
     public void setPage(int pageNumber) {
         this.pageNumber = pageNumber;
+    }
+
+    public int getSize() {
+        return pageSize;
     }
 
     public void setSize(int pageSize) {
