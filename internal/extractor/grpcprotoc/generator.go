@@ -259,18 +259,28 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 		expectedExt = ".openapi.yaml"
 	}
 
-	// Optimization: when there's exactly one service proto file, compute the expected output path directly
-	if len(info.ServiceProtoFiles) == 1 {
-		serviceFile := info.ServiceProtoFiles[0]
+	// Optimization: check expected paths directly based on service proto directories
+	// before doing a potentially expensive full directory walk
+	checkedDirs := make(map[string]bool)
+	for _, serviceFile := range info.ServiceProtoFiles {
 		relDir := g.toRelativePath(filepath.Dir(serviceFile), info.ProtoRoot)
+		cleanDir := filepath.Clean(relDir)
+
+		// Skip if we've already checked this directory
+		if checkedDirs[cleanDir] {
+			continue
+		}
+		checkedDirs[cleanDir] = true
+
+		// Compute expected output path
 		expectedPath := filepath.Join(outputDir, relDir, strings.TrimSuffix(filepath.Base(serviceFile), ".proto")+expectedExt)
 		if _, err := os.Stat(expectedPath); err == nil {
-			slog.Debug("found expected output file for single service proto", "file", expectedPath)
+			slog.Debug("found output file via direct path check", "file", expectedPath)
 			return expectedPath, nil
 		}
 	}
 
-	// Collect all candidate files from the output directory tree
+	// Fall back to full directory walk for cases where output structure differs from expected
 	var candidates []string
 	walkErr := filepath.Walk(outputDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
