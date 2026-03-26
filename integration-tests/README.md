@@ -111,6 +111,7 @@ Golden fixtures are JSON snapshots of expected OpenAPI output, used to detect re
 | `spring/` | `spring/fixtures/golden/` | Spring Boot (Maven) golden snapshots |
 | `gin/` | `gin/fixtures/golden/` | Gin framework golden snapshots |
 | `gozero/` | `gozero/fixtures/golden/` | go-zero framework golden snapshots |
+| `grpcprotoc/` | `grpcprotoc/fixtures/golden/` | gRPC-protoc framework golden snapshots |
 
 ### Spring Golden Fixtures
 
@@ -163,6 +164,30 @@ These fields are automatically stripped before golden comparison to ensure deter
 REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/gozero/... -run TestRegenerateGolden
 ```
 
+### gRPC-protoc Golden Fixtures
+
+The `grpcprotoc/fixtures/golden/` directory contains:
+
+```
+grpcprotoc/fixtures/golden/
+├── openapi.json                          # Full OpenAPI spec snapshot
+├── schemas/
+│   ├── demo-user-User.json               # User schema structure
+│   ├── demo-user-CreateUserRequest.json   # CreateUserRequest schema
+│   └── demo-user-ListUsersResponse.json   # ListUsersResponse schema
+└── paths/
+    ├── v1-users-get.json                  # GET /v1/users operation
+    ├── v1-users-post.json                 # POST /v1/users operation
+    ├── v1-users-id-get.json               # GET /v1/users/{id} operation
+    └── v1-users-id-put.json               # PUT /v1/users/{id} operation
+```
+
+**Regenerating gRPC-protoc golden files:**
+
+```bash
+REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/grpcprotoc/... -run TestRegenerateGolden
+```
+
 ### Regenerating Golden Files
 
 When the expected output legitimately changes (e.g., springdoc version bump, new endpoints):
@@ -173,6 +198,9 @@ REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/spring/... -run 
 
 # Regenerate go-zero golden files
 REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/gozero/... -run TestRegenerateGolden
+
+# Regenerate gRPC-protoc golden files
+REGENERATE_GOLDEN=true go test -v -tags=e2e ./integration-tests/grpcprotoc/... -run TestRegenerateGolden
 ```
 
 After regeneration, review the diff carefully with `git diff` to confirm only expected changes.
@@ -291,6 +319,23 @@ Spring Boot tests start an application on port 8080 during spec generation. Sinc
 | `gozero/edge_cases_test.go` | `TestFormDataEndpoint` | Tests form-data endpoint handling |
 | `gozero/edge_cases_test.go` | `TestUploadEndpoint` | Tests file upload endpoint handling |
 
+### gRPC-protoc Golden & Invariant Tests
+
+| Test File | Tests | Description |
+|-----------|-------|-------------|
+| `grpcprotoc/golden_test.go` | `TestGoldenSnapshots` | Compares generated spec (full + extracted) against golden fixtures |
+| `grpcprotoc/golden_test.go` | `TestCriticalInvariants` | Validates semantic invariants (schema fields, operationIds, request bodies) |
+| `grpcprotoc/golden_test.go` | `TestRegenerateGolden` | Regenerates golden files (gated by `REGENERATE_GOLDEN=true`) |
+| `grpcprotoc/invariant_test.go` | `TestGRPCServiceMapping` | Validates gRPC service methods map to correct REST endpoints |
+| `grpcprotoc/invariant_test.go` | `TestProtoFieldMapping` | Validates proto field name/type mapping (snake_case to camelCase) |
+| `grpcprotoc/invariant_test.go` | `TestProtoMessageReferences` | Validates proto message $ref references (nested, cross-package) |
+| `grpcprotoc/invariant_test.go` | `TestConnectProtocolSupport` | Validates Connect protocol features (error schema, responses) |
+| `grpcprotoc/edge_cases_test.go` | `TestBufYAMLRejection` | Tests rejection of buf.yaml managed projects |
+| `grpcprotoc/edge_cases_test.go` | `TestMissingProtocGracefulSkip` | Tests graceful skip when protoc is not installed |
+| `grpcprotoc/edge_cases_test.go` | `TestYAMLOutputFormat` | Tests YAML output format generation |
+| `grpcprotoc/edge_cases_test.go` | `TestMultipleProtoFiles` | Tests correct handling of multiple proto files |
+| `grpcprotoc/edge_cases_test.go` | `TestNonProtocProject` | Tests error handling for non-protoc projects |
+
 ### CLI E2E Tests
 
 | Test File | Tests | Description |
@@ -343,7 +388,14 @@ validator.FullValidation(ValidationConfig{
 
 ### gRPC-protoc Test Details
 
-The `TestE2E_GrpcProtoc_Generate` test verifies:
+The gRPC-protoc test suite (`grpcprotoc/`) verifies:
 - Project detection (grpc-protoc framework)
-- OpenAPI spec generation with REST endpoints
-- Expected REST paths from `google.api.http` annotations
+- buf.yaml rejection with helpful error
+- OpenAPI spec generation with REST endpoints from `google.api.http` annotations
+- Golden snapshot stability (8 golden files)
+- Proto field name mapping (snake_case → camelCase)
+- Proto field type mapping (int32/int64 formats)
+- Cross-package message references
+- Multiple proto file handling
+- YAML output format support
+- Connect protocol features

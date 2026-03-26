@@ -1,0 +1,37 @@
+{
+  "tags": [
+    "demo.user.UserService"
+  ],
+  "summary": "GetUser",
+  "description": "Get a user by their ID",
+  "operationId": "demo.user.UserService.GetUser",
+  "parameters": [
+    {
+      "name": "id",
+      "in": "path",
+      "description": "User ID to retrieve",
+      "required": true,
+      "schema": {
+        "type": [
+          "integer",
+          "string"
+        ],
+        "title": "id",
+        "format": "int64",
+        "description": "User ID to retrieve"
+      }
+    }
+  ],
+  "responses": {
+    "200": {
+      "description": "Success",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/demo.user.GetUserResponse"
+          }
+        }
+      }
+    }
+  }
+}

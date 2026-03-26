@@ -1,0 +1,68 @@
+{
+  "tags": [
+    "demo.user.UserService"
+  ],
+  "summary": "UpdateProfile",
+  "description": "Update user profile information",
+  "operationId": "demo.user.UserService.UpdateProfile",
+  "parameters": [
+    {
+      "name": "id",
+      "in": "path",
+      "description": "User ID to update",
+      "required": true,
+      "schema": {
+        "type": [
+          "integer",
+          "string"
+        ],
+        "title": "id",
+        "format": "int64",
+        "description": "User ID to update"
+      }
+    }
+  ],
+  "requestBody": {
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "fullName": {
+              "type": "string",
+              "title": "full_name",
+              "description": "New full name (optional)"
+            },
+            "email": {
+              "type": "string",
+              "title": "email",
+              "description": "New email (optional)"
+            },
+            "age": {
+              "type": "integer",
+              "title": "age",
+              "format": "int32",
+              "description": "New age (optional)"
+            }
+          },
+          "title": "UpdateProfileRequest",
+          "additionalProperties": false,
+          "description": "Request to update user profile"
+        }
+      }
+    },
+    "required": true
+  },
+  "responses": {
+    "200": {
+      "description": "Success",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/demo.user.UpdateProfileResponse"
+          }
+        }
+      }
+    }
+  }
+}

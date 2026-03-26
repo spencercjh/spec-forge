@@ -207,8 +207,11 @@ func (g *Generator) buildProtocArgs(info *Info, outputDir string, opts *extracto
 	// Add connect-openapi output
 	args = append(args, "--connect-openapi_out="+outputDir)
 
-	// Add format option for YAML
-	if opts.Format == "yaml" || opts.Format == "yml" {
+	// Add format option — protoc-gen-connect-openapi defaults to YAML,
+	// so we must pass format=json explicitly for JSON output.
+	if opts.Format == "json" {
+		args = append(args, "--connect-openapi_opt=format=json")
+	} else if opts.Format == "yaml" || opts.Format == "yml" {
 		args = append(args, "--connect-openapi_opt=format=yaml")
 	}
 
@@ -245,7 +248,8 @@ func (g *Generator) toRelativePath(path, base string) string {
 }
 
 // findOutputFile locates the generated OpenAPI file.
-// protoc-gen-connect-openapi generates files in the same directory as the input proto files.
+// protoc-gen-connect-openapi generates files mirroring the proto source directory structure
+// inside the output directory (e.g., outputDir/proto/user.openapi.json).
 func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string, error) {
 	// Determine expected extension
 	expectedExt := ".openapi.json"
@@ -256,6 +260,23 @@ func (g *Generator) findOutputFile(info *Info, outputDir, format string) (string
 	// First, check the output directory itself
 	if outputPath, err := g.findFileWithExt(outputDir, expectedExt); err == nil {
 		return outputPath, nil
+	}
+
+	// Walk subdirectories of outputDir to find the generated file,
+	// since protoc mirrors the proto source directory structure.
+	var found string
+	_ = filepath.Walk(outputDir, func(path string, fi os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		if !fi.IsDir() && strings.HasSuffix(fi.Name(), expectedExt) {
+			found = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if found != "" {
+		return found, nil
 	}
 
 	// Then check directories containing service proto files
