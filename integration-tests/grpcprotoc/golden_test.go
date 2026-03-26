@@ -1,5 +1,7 @@
 //go:build e2e
 
+// Package grpcprotoc provides integration tests for gRPC-protoc framework support,
+// including golden snapshot tests, semantic invariant tests, and edge case tests.
 package grpcprotoc
 
 import (
