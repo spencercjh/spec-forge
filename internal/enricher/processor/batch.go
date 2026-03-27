@@ -14,16 +14,31 @@ import (
 
 // BatchProcessor processes batches of elements
 type BatchProcessor struct {
-	provider    provider.Provider
-	templateMgr *prompt.TemplateManager
+	provider     provider.Provider
+	templateMgr  *prompt.TemplateManager
+	streamWriter *StreamWriter // New: optional streaming writer
+}
+
+// BatchProcessorOption for configuring BatchProcessor
+type BatchProcessorOption func(*BatchProcessor)
+
+// WithStreamWriter sets streaming writer for BatchProcessor
+func WithStreamWriter(sw *StreamWriter) BatchProcessorOption {
+	return func(bp *BatchProcessor) {
+		bp.streamWriter = sw
+	}
 }
 
 // NewBatchProcessor creates a new batch processor
-func NewBatchProcessor(p provider.Provider, tm *prompt.TemplateManager) *BatchProcessor {
-	return &BatchProcessor{
+func NewBatchProcessor(p provider.Provider, tm *prompt.TemplateManager, opts ...BatchProcessorOption) *BatchProcessor {
+	bp := &BatchProcessor{
 		provider:    p,
 		templateMgr: tm,
 	}
+	for _, opt := range opts {
+		opt(bp)
+	}
+	return bp
 }
 
 // ProcessBatch processes a single batch of elements
@@ -41,7 +56,17 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 		}
 
 		fullPrompt := systemPrompt + "\n\n" + userPrompt
-		response, err := p.provider.Generate(ctx, fullPrompt)
+
+		// Prepare options for provider
+		var genOpts []provider.Option
+		if p.streamWriter != nil {
+			prefix := string(batch.Type) // e.g., "api", "schema", "param" (lowercase from TemplateType)
+			genOpts = append(genOpts, provider.WithStreamingFunc(func(_ context.Context, chunk []byte) error {
+				return p.streamWriter.WriteWithPrefix(prefix, chunk)
+			}))
+		}
+
+		response, err := p.provider.Generate(ctx, fullPrompt, genOpts...)
 		if err != nil {
 			return fmt.Errorf("LLM call failed: %w", err)
 		}

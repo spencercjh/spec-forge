@@ -9,6 +9,9 @@ import (
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
+// CustomProviderName is the default name of the custom provider.
+const CustomProviderName = "custom"
+
 // CustomProvider implements Provider for custom OpenAI-compatible services
 type CustomProvider struct {
 	llm     llms.Model
@@ -36,7 +39,7 @@ func newCustomProvider(cfg CustomProviderConfig) (*CustomProvider, error) {
 
 	name := cfg.Name
 	if name == "" {
-		name = "custom"
+		name = CustomProviderName
 	}
 
 	llm, err := openai.New(
@@ -56,13 +59,28 @@ func newCustomProvider(cfg CustomProviderConfig) (*CustomProvider, error) {
 	}, nil
 }
 
-// Generate generates a response for the given prompt
-func (p *CustomProvider) Generate(ctx context.Context, prompt string) (string, error) {
-	response, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
-	if err != nil {
-		return "", fmt.Errorf("custom provider generation failed: %w", err)
+// Generate generates a response with optional streaming
+func (p *CustomProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
+	cfg := applyOptions(opts...)
+
+	messages := []llms.MessageContent{
+		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
 	}
-	return response, nil
+
+	var callOpts []llms.CallOption
+	if cfg.StreamingFunc != nil {
+		callOpts = append(callOpts, llms.WithStreamingFunc(cfg.StreamingFunc))
+	}
+
+	response, err := p.llm.GenerateContent(ctx, messages, callOpts...)
+	if err != nil {
+		return "", fmt.Errorf("%s provider generation failed: %w", CustomProviderName, err)
+	}
+
+	if len(response.Choices) == 0 {
+		return "", errors.New("custom provider generation returned no choices")
+	}
+	return response.Choices[0].Content, nil
 }
 
 // Name returns the provider name

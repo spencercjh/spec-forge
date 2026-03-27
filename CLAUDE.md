@@ -27,6 +27,10 @@ make fmt
 make verify
 ```
 
+> **Important:** `make verify` checks for uncommitted changes (git diff) and will fail if there are pending changes.
+> Before committing code, use individual commands: `make fmt`, `make lint`, `make test`.
+> Only use `make verify` after committing or in CI environments where working tree is clean.
+
 ## Architecture Overview
 
 Spec Forge is a CLI tool that generates enriched OpenAPI specifications from various frameworks (Spring Boot, go-zero, gRPC-protoc).

@@ -2,8 +2,11 @@ package enricher
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -22,7 +25,9 @@ type Enricher struct {
 
 // EnrichOptions provides runtime options for enrichment
 type EnrichOptions struct {
-	Language string // Runtime language override
+	Language string    // Runtime language override
+	Stream   *bool     // Enable streaming output (nil = default true, false = disabled)
+	Writer   io.Writer // Custom writer for streaming (default: os.Stdout)
 }
 
 // NewEnricher creates a new Enricher
@@ -56,6 +61,27 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 		language = opts.Language
 	}
 
+	// Determine streaming settings
+	stream := true // default: streaming enabled
+	var writer io.Writer = os.Stdout
+	if opts != nil {
+		// Stream is a tri-state (*bool): nil means "use default" (true)
+		if opts.Stream != nil {
+			stream = *opts.Stream
+		}
+		if opts.Writer != nil {
+			writer = opts.Writer
+		}
+	}
+	if writer == nil {
+		writer = os.Stdout
+	}
+
+	var streamWriter *processor.StreamWriter
+	if stream {
+		streamWriter = processor.NewStreamWriter(writer)
+	}
+
 	// Extract context from project (if extractor is configured)
 	// This is a no-op for NoOpExtractor, but future extractors can provide
 	// richer context like Javadoc, Go struct tags, etc.
@@ -80,11 +106,19 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 
 	// Process batches
 	tmplMgr := prompt.NewTemplateManager()
-	batchProcessor := processor.NewBatchProcessor(e.provider, tmplMgr)
+	batchProcessor := processor.NewBatchProcessor(e.provider, tmplMgr,
+		processor.WithStreamWriter(streamWriter))
 	concurrentProcessor := processor.NewConcurrentProcessor(batchProcessor, e.config.Concurrency)
 
 	if err := concurrentProcessor.ProcessAll(ctx, batches); err != nil {
 		return spec, err
+	}
+
+	// Flush any remaining buffered content in StreamWriter
+	if streamWriter != nil {
+		if flushErr := streamWriter.Flush(); flushErr != nil {
+			return spec, fmt.Errorf("failed to flush stream writer: %w", flushErr)
+		}
 	}
 
 	return spec, nil
