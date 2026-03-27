@@ -188,17 +188,9 @@ func TestGenerator_findMainAPIFile(t *testing.T) {
 func TestGenerator_findMainAPIFile_NilInfo(t *testing.T) {
 	g := NewGenerator()
 
-	// Test with nil info - this should not panic but may return empty
-	// since info.APIFiles would cause nil pointer dereference
-	// We document this as undefined behavior, but it shouldn't crash
-	defer func() {
-		if r := recover(); r != nil {
-			t.Logf("findMainAPIFile panicked with nil info (expected): %v", r)
-		}
-	}()
-
-	// This will panic because info is nil - that's expected behavior
-	g.findMainAPIFile("/project", nil, nil)
+	// Test with nil info - should return empty string gracefully
+	got := g.findMainAPIFile("/project", nil, nil)
+	assert.Equal(t, "", got)
 }
 
 func TestGenerator_findMainAPIFile_WindowsPaths(t *testing.T) {
