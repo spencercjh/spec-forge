@@ -26,7 +26,7 @@ type Enricher struct {
 // EnrichOptions provides runtime options for enrichment
 type EnrichOptions struct {
 	Language string    // Runtime language override
-	Stream   bool      // Enable streaming output (default: true)
+	Stream   *bool     // Enable streaming output (nil = default true, false = disabled)
 	Writer   io.Writer // Custom writer for streaming (default: os.Stdout)
 }
 
@@ -62,11 +62,12 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	}
 
 	// Determine streaming settings
-	stream := true       // default
-	var writer io.Writer // default is os.Stdout
+	stream := true // default: streaming enabled
+	var writer io.Writer = os.Stdout
 	if opts != nil {
-		if !opts.Stream {
-			stream = false
+		// Stream is a tri-state (*bool): nil means "use default" (true)
+		if opts.Stream != nil {
+			stream = *opts.Stream
 		}
 		if opts.Writer != nil {
 			writer = opts.Writer

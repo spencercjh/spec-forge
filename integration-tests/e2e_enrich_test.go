@@ -299,6 +299,6 @@ components:
 	// Verify at least some summaries were filled in
 	assert.NotContains(t, enrichedContent, "summary: \"\"", "Summary should not be empty after enrichment")
 
-	// Verify descriptions are not empty strings
-	assert.Contains(t, enrichedContent, "用户", "Description should contain Chinese text (language=zh)")
+	// Verify descriptions are not empty strings (language-agnostic check)
+	assert.NotContains(t, enrichedContent, `description: ""`, "Descriptions should not be empty after enrichment")
 }

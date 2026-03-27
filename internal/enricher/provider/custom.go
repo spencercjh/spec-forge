@@ -77,10 +77,10 @@ func (p *CustomProvider) Generate(ctx context.Context, prompt string, opts ...Op
 		return "", fmt.Errorf("%s provider generation failed: %w", CustomProviderName, err)
 	}
 
-	if len(response.Choices) > 0 {
-		return response.Choices[0].Content, nil
+	if len(response.Choices) == 0 {
+		return "", errors.New("custom provider generation returned no choices")
 	}
-	return "", nil
+	return response.Choices[0].Content, nil
 }
 
 // Name returns the provider name

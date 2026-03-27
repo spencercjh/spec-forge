@@ -155,9 +155,10 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Enrich
+	streamEnabled := !noStreamFlag // Streaming enabled by default
 	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{
 		Language: lang,
-		Stream:   !noStreamFlag, // Streaming enabled by default
+		Stream:   &streamEnabled,
 	})
 	if err != nil {
 		// Check if partial enrichment

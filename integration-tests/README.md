@@ -382,7 +382,6 @@ Spring Boot tests start an application on port 8080 during spec generation. Sinc
 | `e2e_enrich_test.go` | `TestE2E_Enrich_NonExistentFile` | Tests error handling for non-existent file |
 | `e2e_enrich_test.go` | `TestE2E_Enrich_NoStreamFlag` | Tests `--no-stream` flag disables streaming (requires config) |
 | `e2e_enrich_test.go` | `TestE2E_Enrich_WithStreaming` | Tests real LLM enrichment with streaming (requires config) |
-| `e2e_enrich_test.go` | `TestE2E_Enrich_WithLocalConfig` | Tests local config file loading (requires config) |
 | `e2e_publish_test.go` | `TestE2E_Publish_Help` | Tests publish command help |
 | `e2e_publish_test.go` | `TestE2E_Publish_MissingAPIKey` | Tests error handling for missing API key |
 | `e2e_publish_test.go` | `TestE2E_Publish_MissingTarget` | Tests error handling for missing --to flag |

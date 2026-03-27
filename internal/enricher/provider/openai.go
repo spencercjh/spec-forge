@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/tmc/langchaingo/llms"
@@ -51,10 +52,10 @@ func (p *OpenAIProvider) Generate(ctx context.Context, prompt string, opts ...Op
 		return "", fmt.Errorf("OpenAI generation failed: %w", err)
 	}
 
-	if len(response.Choices) > 0 {
-		return response.Choices[0].Content, nil
+	if len(response.Choices) == 0 {
+		return "", errors.New("OpenAI generation returned no choices")
 	}
-	return "", nil
+	return response.Choices[0].Content, nil
 }
 
 // Name returns the provider name

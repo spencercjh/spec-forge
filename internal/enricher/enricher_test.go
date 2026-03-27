@@ -288,9 +288,10 @@ func TestEnricher_WithStreaming(t *testing.T) {
 		Paths: paths,
 	}
 
+	streamEnabled := true
 	_, err = e.Enrich(context.Background(), spec, &EnrichOptions{
 		Language: "en",
-		Stream:   true,
+		Stream:   &streamEnabled,
 		Writer:   &buf,
 	})
 	require.NoError(t, err)
@@ -376,9 +377,10 @@ func TestEnricher_WithStreamingDisabled(t *testing.T) {
 		Paths: paths,
 	}
 
+	streamDisabled := false
 	_, err = e.Enrich(context.Background(), spec, &EnrichOptions{
 		Language: "en",
-		Stream:   false, // Disable streaming
+		Stream:   &streamDisabled, // Disable streaming
 		Writer:   &buf,
 	})
 	require.NoError(t, err)

@@ -56,10 +56,10 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string, opts ...Op
 		return "", fmt.Errorf("%s generation failed: %w", OllamaProviderName, err)
 	}
 
-	if len(response.Choices) > 0 {
-		return response.Choices[0].Content, nil
+	if len(response.Choices) == 0 {
+		return "", fmt.Errorf("%s generation returned no choices", OllamaProviderName)
 	}
-	return "", nil
+	return response.Choices[0].Content, nil
 }
 
 // Name returns the provider name
