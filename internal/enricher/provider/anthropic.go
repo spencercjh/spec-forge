@@ -8,6 +8,9 @@ import (
 	"github.com/tmc/langchaingo/llms/anthropic"
 )
 
+// AnthropicProviderName is the name of the Anthropic provider.
+const AnthropicProviderName = "anthropic"
+
 // AnthropicProvider implements Provider for Anthropic Claude using langchaingo
 type AnthropicProvider struct {
 	llm   llms.Model
@@ -45,7 +48,7 @@ func (p *AnthropicProvider) Generate(ctx context.Context, prompt string, opts ..
 
 	response, err := p.llm.GenerateContent(ctx, messages, callOpts...)
 	if err != nil {
-		return "", fmt.Errorf("anthropic generation failed: %w", err)
+		return "", fmt.Errorf("%s generation failed: %w", AnthropicProviderName, err)
 	}
 
 	if len(response.Choices) > 0 {
@@ -56,5 +59,5 @@ func (p *AnthropicProvider) Generate(ctx context.Context, prompt string, opts ..
 
 // Name returns the provider name
 func (p *AnthropicProvider) Name() string {
-	return "anthropic"
+	return AnthropicProviderName
 }
