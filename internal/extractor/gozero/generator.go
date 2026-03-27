@@ -255,7 +255,7 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 // findMainAPIFile finds the main API file to use for swagger generation.
 // Returns the patched file path if available, otherwise returns the original.
 func (g *Generator) findMainAPIFile(workDir string, info *Info, patchedFiles map[string]string) string {
-	if len(info.APIFiles) == 0 {
+	if info == nil || len(info.APIFiles) == 0 {
 		return ""
 	}
 
