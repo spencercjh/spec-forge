@@ -326,3 +326,65 @@ func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opt
 func (m *mockStreamingProvider) Name() string {
 	return "mock-streaming"
 }
+
+// mockStreamingDisabledProvider tracks whether streaming was attempted
+type mockStreamingDisabledProvider struct {
+	response        string
+	streamingCalled bool
+}
+
+func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
+	cfg := &provider.GenerateOptions{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	if cfg.StreamingFunc != nil {
+		m.streamingCalled = true
+	}
+	return m.response, nil
+}
+
+func (m *mockStreamingDisabledProvider) Name() string {
+	return "mock-streaming-disabled"
+}
+
+func TestEnricher_WithStreamingDisabled(t *testing.T) {
+	mockProvider := &mockStreamingDisabledProvider{
+		response: `{"summary": "Get test", "description": "Test endpoint"}`,
+	}
+
+	var buf bytes.Buffer
+	cfg := Config{
+		Provider:    "mock",
+		Model:       "mock-model",
+		Language:    "en",
+		Concurrency: 1,
+		Timeout:     5 * time.Second,
+	}
+
+	e, err := NewEnricher(cfg, mockProvider)
+	require.NoError(t, err)
+
+	paths := openapi3.NewPaths()
+	paths.Set("/test", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Summary:     "",
+			Description: "",
+		},
+	})
+	spec := &openapi3.T{
+		Paths: paths,
+	}
+
+	_, err = e.Enrich(context.Background(), spec, &EnrichOptions{
+		Language: "en",
+		Stream:   false, // Disable streaming
+		Writer:   &buf,
+	})
+	require.NoError(t, err)
+
+	// Verify streaming was NOT called
+	assert.False(t, mockProvider.streamingCalled, "Streaming function should not be called when Stream: false")
+	// Buffer should be empty since no streaming occurred
+	assert.Empty(t, buf.String(), "Buffer should be empty when streaming is disabled")
+}
