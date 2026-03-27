@@ -190,7 +190,7 @@ func TestGenerator_findMainAPIFile_NilInfo(t *testing.T) {
 
 	// Test with nil info - should return empty string gracefully
 	got := g.findMainAPIFile("/project", nil, nil)
-	assert.Equal(t, "", got)
+	assert.Empty(t, got)
 }
 
 func TestGenerator_findMainAPIFile_WindowsPaths(t *testing.T) {
