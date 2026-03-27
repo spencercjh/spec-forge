@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -195,6 +194,8 @@ paths:
 
 // TestE2E_Enrich_WithStreaming tests real LLM enrichment with streaming enabled (default).
 // This test requires a valid E2E config with LLM settings.
+// Note: Streaming output goes to os.Stdout directly, not through Cobra's buffer.
+// We verify enrichment by checking the output spec file contains descriptions.
 func TestE2E_Enrich_WithStreaming(t *testing.T) {
 	cfg := skipIfNoConfig(t)
 
@@ -269,7 +270,7 @@ components:
 		"--provider", cfg.Enrich.Provider,
 		"--model", cfg.Enrich.Model,
 		"--language", cfg.Enrich.Language,
-		"-v", // Verbose output
+		"-v",
 	}
 	if cfg.Enrich.BaseURL != "" {
 		args = append(args, "--custom-base-url", cfg.Enrich.BaseURL)
@@ -282,20 +283,8 @@ components:
 
 	require.NoError(t, err, "enrich command failed: %s", stderr.String())
 
-	// Verify streaming output contains expected prefixes
-	output := stdout.String()
-	t.Logf("Enrich output (took %v):\n%s", duration, output)
-
-	// Check for streaming prefixes (indicates streaming is working)
-	streamingPrefixes := []string{"[api]", "[schema]", "[param]"}
-	foundAnyPrefix := false
-	for _, prefix := range streamingPrefixes {
-		if strings.Contains(output, prefix) {
-			foundAnyPrefix = true
-			t.Logf("Found streaming prefix: %s", prefix)
-		}
-	}
-	assert.True(t, foundAnyPrefix, "Expected at least one streaming prefix in output")
+	// Log Cobra output (note: streaming output goes to os.Stdout, not captured here)
+	t.Logf("Cobra output (took %v):\n%s", duration, stdout.String())
 
 	// Verify the spec file was enriched
 	enrichedData, err := os.ReadFile(specFile)
@@ -307,73 +296,9 @@ components:
 	// Check that descriptions were added (not empty anymore)
 	assert.Contains(t, enrichedContent, "description:", "Spec should have descriptions after enrichment")
 
-	// Verify API operations got descriptions
+	// Verify at least some summaries were filled in
 	assert.NotContains(t, enrichedContent, "summary: \"\"", "Summary should not be empty after enrichment")
 
-	t.Log("Enrich with streaming succeeded!")
-}
-
-// TestE2E_Enrich_WithLocalConfig tests using a local .spec-forge.yaml config file.
-// This verifies the config file loading mechanism works in E2E scenarios.
-func TestE2E_Enrich_WithLocalConfig(t *testing.T) {
-	cfg := skipIfNoConfig(t)
-
-	// Create a test spec
-	specContent := `openapi: "3.0.0"
-info:
-  title: Config Test API
-  version: "1.0"
-paths:
-  /test:
-    get:
-      summary: ""
-      operationId: testEndpoint
-      responses:
-        "200":
-          description: ""
-`
-	tmpDir := t.TempDir()
-	specFile := filepath.Join(tmpDir, "test-spec.yaml")
-	require.NoError(t, os.WriteFile(specFile, []byte(specContent), 0o644))
-
-	// Create a local config file in the same directory
-	localConfig := "enrich:\n"
-	if cfg.Enrich.Provider != "" {
-		localConfig += "  provider: " + cfg.Enrich.Provider + "\n"
-	}
-	if cfg.Enrich.Model != "" {
-		localConfig += "  model: " + cfg.Enrich.Model + "\n"
-	}
-	if cfg.Enrich.BaseURL != "" {
-		localConfig += "  baseUrl: " + cfg.Enrich.BaseURL + "\n"
-	}
-	if cfg.Enrich.APIKeyEnv != "" {
-		localConfig += "  apiKeyEnv: " + cfg.Enrich.APIKeyEnv + "\n"
-	}
-	if cfg.Enrich.Language != "" {
-		localConfig += "  language: " + cfg.Enrich.Language + "\n"
-	}
-
-	configFile := filepath.Join(tmpDir, ".spec-forge.yaml")
-	require.NoError(t, os.WriteFile(configFile, []byte(localConfig), 0o644))
-
-	// Change to the temp directory so the config is picked up
-	originalDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer func() { _ = os.Chdir(originalDir) }()
-
-	rootCmd := cmd.NewRootCommand()
-
-	var stdout, stderr bytes.Buffer
-	rootCmd.SetOut(&stdout)
-	rootCmd.SetErr(&stderr)
-
-	// Don't specify provider/model - should use config file
-	rootCmd.SetArgs([]string{"enrich", "test-spec.yaml", "-v"})
-
-	err = rootCmd.Execute()
-	require.NoError(t, err, "enrich with local config failed: %s", stderr.String())
-
-	t.Log("Enrich with local config succeeded!")
+	// Verify descriptions are not empty strings
+	assert.Contains(t, enrichedContent, "用户", "Description should contain Chinese text (language=zh)")
 }

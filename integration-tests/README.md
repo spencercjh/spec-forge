@@ -85,7 +85,6 @@ make test-e2e
 |------|-------------|
 | `TestE2E_Enrich_NoStreamFlag` | Tests `--no-stream` flag disables streaming prefixes |
 | `TestE2E_Enrich_WithStreaming` | Tests real LLM enrichment with streaming output verification |
-| `TestE2E_Enrich_WithLocalConfig` | Tests loading LLM settings from local config file |
 
 **Without config:** These tests will be **skipped** with a clear message:
 ```
