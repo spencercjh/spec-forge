@@ -332,3 +332,80 @@ func TestBatchProcessor_ProcessSchemaBatch(t *testing.T) {
 		t.Errorf("expected 2 SetValue calls, got %d", len(setValues))
 	}
 }
+
+// mockStreamingAwareProvider tracks if streaming options are passed
+type mockStreamingAwareProvider struct {
+	response        string
+	streamingCalled bool
+	streamingChunks [][]byte
+}
+
+func (m *mockStreamingAwareProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
+	cfg := &provider.GenerateOptions{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	if cfg.StreamingFunc != nil {
+		m.streamingCalled = true
+		// Simulate streaming chunks
+		chunks := [][]byte{[]byte("chunk1"), []byte("chunk2")}
+		for _, chunk := range chunks {
+			m.streamingChunks = append(m.streamingChunks, chunk)
+			if err := cfg.StreamingFunc(ctx, chunk); err != nil {
+				return "", err
+			}
+		}
+	}
+	return m.response, nil
+}
+
+func (m *mockStreamingAwareProvider) Name() string {
+	return "mock-streaming-aware"
+}
+
+func TestBatchProcessor_ProcessBatch_WithStreaming(t *testing.T) {
+	mockProvider := &mockStreamingAwareProvider{
+		response: `{"summary": "Get users", "description": "Retrieves user list"}`,
+	}
+
+	tmplMgr := prompt.NewTemplateManager()
+	var buf strings.Builder
+	sw := NewStreamWriter(&buf)
+
+	bp := NewBatchProcessor(mockProvider, tmplMgr, WithStreamWriter(sw))
+
+	batch := &Batch{
+		Type: prompt.TemplateTypeAPI,
+		Elements: []EnrichmentElement{
+			{
+				Type: prompt.TemplateTypeAPI,
+				Context: prompt.TemplateContext{
+					Method: "GET",
+					Path:   "/users",
+				},
+				SetValue: func(desc string) {},
+			},
+		},
+	}
+
+	err := bp.ProcessBatch(context.Background(), batch)
+	if err != nil {
+		t.Fatalf("ProcessBatch() error = %v", err)
+	}
+
+	// Verify streaming was called
+	if !mockProvider.streamingCalled {
+		t.Error("Expected streaming function to be called when StreamWriter is configured")
+	}
+
+	// Verify chunks were streamed
+	if len(mockProvider.streamingChunks) != 2 {
+		t.Errorf("Expected 2 streaming chunks, got %d", len(mockProvider.streamingChunks))
+	}
+
+	// Verify output contains the prefix
+	output := buf.String()
+	if !strings.Contains(output, "[api]") {
+		t.Errorf("Expected output to contain '[api]' prefix, got: %s", output)
+	}
+}
