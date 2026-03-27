@@ -1,11 +1,15 @@
 package enricher
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
@@ -251,4 +255,74 @@ func TestEnricher_CollectSchemaFields(t *testing.T) {
 	if len(userSchema.Fields) != 2 {
 		t.Errorf("expected 2 fields in User schema, got %d", len(userSchema.Fields))
 	}
+}
+
+func TestEnricher_WithStreaming(t *testing.T) {
+	// Create a mock provider that simulates streaming
+	chunks := []string{"Hello", " ", "World"}
+	mockProvider := &mockStreamingProvider{
+		chunks:   chunks,
+		response: `{"summary": "Get test", "description": "Test endpoint"}`,
+	}
+
+	var buf bytes.Buffer
+	cfg := Config{
+		Provider:    "mock",
+		Model:       "mock-model",
+		Language:    "en",
+		Concurrency: 1,
+		Timeout:     5 * time.Second,
+	}
+
+	e, err := NewEnricher(cfg, mockProvider)
+	require.NoError(t, err)
+
+	paths := openapi3.NewPaths()
+	paths.Set("/test", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Summary:     "", // Empty to trigger enrichment
+			Description: "",
+		},
+	})
+	spec := &openapi3.T{
+		Paths: paths,
+	}
+
+	_, err = e.Enrich(context.Background(), spec, &EnrichOptions{
+		Language: "en",
+		Stream:   true,
+		Writer:   &buf,
+	})
+	require.NoError(t, err)
+
+	// Verify streaming output was written
+	// Note: TemplateType is lowercase, so prefix is "[api]" not "[API]"
+	output := buf.String()
+	assert.Contains(t, output, "[api]", "Expected [api] prefix in streaming output")
+}
+
+// mockStreamingProvider simulates streaming behavior
+type mockStreamingProvider struct {
+	chunks   []string
+	response string
+}
+
+func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
+	// Apply options to get streaming config
+	cfg := &provider.GenerateOptions{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	if cfg.StreamingFunc != nil {
+		for _, chunk := range m.chunks {
+			if err := cfg.StreamingFunc(ctx, []byte(chunk)); err != nil {
+				return "", err
+			}
+		}
+	}
+	return m.response, nil
+}
+
+func (m *mockStreamingProvider) Name() string {
+	return "mock-streaming"
 }
