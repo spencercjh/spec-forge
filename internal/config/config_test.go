@@ -6,6 +6,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Note: These tests intentionally do NOT use t.Parallel() because viper is a
+// global singleton. Parallel tests would race on viper.Set()/viper.Reset()
+// calls, causing intermittent failures. Cleanup functions ensure tests leave
+// state as they found it.
+
 func TestDefaultConfig(t *testing.T) {
 	cfg := Default()
 	// Empty Dir means CLI defaults to project root unless overridden by config or flags
@@ -18,6 +23,10 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestGet_ReturnsGlobalWhenSet(t *testing.T) {
+	// Save and restore global state
+	prev := global
+	t.Cleanup(func() { global = prev })
+
 	// Set global directly
 	expected := &Config{
 		Output: OutputConfig{
@@ -37,6 +46,13 @@ func TestGet_ReturnsGlobalWhenSet(t *testing.T) {
 }
 
 func TestGet_CallsLoadWhenGlobalNil(t *testing.T) {
+	// Save and restore global and viper state
+	prevGlobal := global
+	t.Cleanup(func() {
+		global = prevGlobal
+		viper.Reset()
+	})
+
 	// Reset global to nil to trigger Load()
 	global = nil
 	viper.Reset()
@@ -56,6 +72,13 @@ func TestGet_CallsLoadWhenGlobalNil(t *testing.T) {
 }
 
 func TestLoad_OverridesWithViperSettings(t *testing.T) {
+	// Save and restore global and viper state
+	prevGlobal := global
+	t.Cleanup(func() {
+		global = prevGlobal
+		viper.Reset()
+	})
+
 	// Reset state
 	global = nil
 	viper.Reset()
@@ -85,6 +108,13 @@ func TestLoad_OverridesWithViperSettings(t *testing.T) {
 }
 
 func TestLoad_ReturnsDefaultsWithoutViperSettings(t *testing.T) {
+	// Save and restore global and viper state
+	prevGlobal := global
+	t.Cleanup(func() {
+		global = prevGlobal
+		viper.Reset()
+	})
+
 	// Reset state
 	global = nil
 	viper.Reset()
