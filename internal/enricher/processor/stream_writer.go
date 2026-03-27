@@ -13,8 +13,12 @@ type StreamWriter struct {
 	writer io.Writer
 }
 
-// NewStreamWriter creates a new StreamWriter
+// NewStreamWriter creates a new StreamWriter.
+// It panics if w is nil, as a nil writer would cause runtime errors.
 func NewStreamWriter(w io.Writer) *StreamWriter {
+	if w == nil {
+		panic("stream writer: writer cannot be nil")
+	}
 	return &StreamWriter{writer: w}
 }
 

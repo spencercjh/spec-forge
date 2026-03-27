@@ -55,3 +55,9 @@ func TestStreamWriter_MultipleWritesSamePrefix(t *testing.T) {
 	assert.Contains(t, output, "[API] chunk1")
 	assert.Contains(t, output, "[API] chunk2")
 }
+
+func TestStreamWriter_NilWriterPanics(t *testing.T) {
+	assert.Panics(t, func() {
+		NewStreamWriter(nil)
+	}, "NewStreamWriter should panic when given nil writer")
+}
