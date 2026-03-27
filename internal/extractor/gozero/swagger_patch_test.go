@@ -445,3 +445,240 @@ func TestPatchSwagger_AllOperations(t *testing.T) {
 	assert.Empty(t, doc.Paths["/test"].Head.Parameters)
 	assert.Empty(t, doc.Paths["/test"].Options.Parameters)
 }
+
+// Direct unit tests for patchSchema function
+
+func TestPatchSchema_NilSchema(t *testing.T) {
+	// Should not panic
+	patchSchema(nil)
+}
+
+func TestPatchSchema_ArrayWithoutItems(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"array"},
+	}
+	patchSchema(schema)
+
+	assert.NotNil(t, schema.Items)
+	assert.Equal(t, "object", schema.Items.Value.Type.Slice()[0])
+}
+
+func TestPatchSchema_ArrayWithExistingItems(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"array"},
+		Items: &openapi2.SchemaRef{
+			Value: &openapi2.Schema{Type: &openapi3.Types{"string"}},
+		},
+	}
+	patchSchema(schema)
+
+	// Items should remain unchanged
+	assert.NotNil(t, schema.Items)
+	assert.Equal(t, "string", schema.Items.Value.Type.Slice()[0])
+}
+
+func TestPatchSchema_NonArraySchema(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+	}
+	patchSchema(schema)
+
+	// Should not add items
+	assert.Nil(t, schema.Items)
+}
+
+func TestPatchSchema_NestedProperties(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+		Properties: map[string]*openapi2.SchemaRef{
+			"items": {
+				Value: &openapi2.Schema{
+					Type: &openapi3.Types{"array"},
+				},
+			},
+		},
+	}
+	patchSchema(schema)
+
+	// Nested array should get items
+	prop := schema.Properties["items"]
+	assert.NotNil(t, prop.Value.Items)
+	assert.Equal(t, "object", prop.Value.Items.Value.Type.Slice()[0])
+}
+
+func TestPatchSchema_DeeplyNestedProperties(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+		Properties: map[string]*openapi2.SchemaRef{
+			"level1": {
+				Value: &openapi2.Schema{
+					Type: &openapi3.Types{"object"},
+					Properties: map[string]*openapi2.SchemaRef{
+						"level2": {
+							Value: &openapi2.Schema{
+								Type: &openapi3.Types{"array"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	patchSchema(schema)
+
+	// Deeply nested array should get items
+	nestedArray := schema.Properties["level1"].Value.Properties["level2"].Value
+	assert.NotNil(t, nestedArray.Items)
+	assert.Equal(t, "object", nestedArray.Items.Value.Type.Slice()[0])
+}
+
+func TestPatchSchema_NilPropertyRef(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+		Properties: map[string]*openapi2.SchemaRef{
+			"nilProp": nil,
+		},
+	}
+	// Should not panic
+	patchSchema(schema)
+}
+
+func TestPatchSchema_ItemsRecursion(t *testing.T) {
+	// Array with nested array in items
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"array"},
+		Items: &openapi2.SchemaRef{
+			Value: &openapi2.Schema{
+				Type: &openapi3.Types{"array"}, // Nested array without items
+			},
+		},
+	}
+	patchSchema(schema)
+
+	// Outer array should have items (unchanged)
+	assert.NotNil(t, schema.Items)
+	// Nested array should get items
+	assert.NotNil(t, schema.Items.Value.Items)
+	assert.Equal(t, "object", schema.Items.Value.Items.Value.Type.Slice()[0])
+}
+
+func TestPatchSchema_AllOfRecursion(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+		AllOf: []*openapi2.SchemaRef{
+			{
+				Value: &openapi2.Schema{
+					Type: &openapi3.Types{"array"},
+				},
+			},
+		},
+	}
+	patchSchema(schema)
+
+	// Array in allOf should get items
+	allOfArray := schema.AllOf[0].Value
+	assert.NotNil(t, allOfArray.Items)
+	assert.Equal(t, "object", allOfArray.Items.Value.Type.Slice()[0])
+}
+
+func TestPatchSchema_AllOfNilRef(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+		AllOf: []*openapi2.SchemaRef{
+			nil,
+			{Value: &openapi2.Schema{Type: &openapi3.Types{"string"}}},
+		},
+	}
+	// Should not panic
+	patchSchema(schema)
+}
+
+func TestPatchSchema_NotRecursion(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+		Not: &openapi2.SchemaRef{
+			Value: &openapi2.Schema{
+				Type: &openapi3.Types{"array"},
+			},
+		},
+	}
+	patchSchema(schema)
+
+	// Array in Not should get items
+	notArray := schema.Not.Value
+	assert.NotNil(t, notArray.Items)
+	assert.Equal(t, "object", notArray.Items.Value.Type.Slice()[0])
+}
+
+func TestPatchSchema_NotNilRef(t *testing.T) {
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+		Not:  nil,
+	}
+	// Should not panic
+	patchSchema(schema)
+}
+
+func TestPatchSchema_ComplexNestedStructure(t *testing.T) {
+	// Multi-level nesting with various structures
+	schema := &openapi2.Schema{
+		Type: &openapi3.Types{"object"},
+		Properties: map[string]*openapi2.SchemaRef{
+			"data": {
+				Value: &openapi2.Schema{
+					Type: &openapi3.Types{"object"},
+					Properties: map[string]*openapi2.SchemaRef{
+						"items": {
+							Value: &openapi2.Schema{
+								Type: &openapi3.Types{"array"},
+								Items: &openapi2.SchemaRef{
+									Value: &openapi2.Schema{
+										Type: &openapi3.Types{"object"},
+										Properties: map[string]*openapi2.SchemaRef{
+											"tags": {
+												Value: &openapi2.Schema{
+													Type: &openapi3.Types{"array"}, // Deeply nested array
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		AllOf: []*openapi2.SchemaRef{
+			{
+				Value: &openapi2.Schema{
+					Type: &openapi3.Types{"object"},
+					Properties: map[string]*openapi2.SchemaRef{
+						"extra": {
+							Value: &openapi2.Schema{
+								Type: &openapi3.Types{"array"}, // Array in allOf
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	patchSchema(schema)
+
+	// Check nested properties
+	tags := schema.Properties["data"].Value.Properties["items"].Value.Items.Value.Properties["tags"].Value
+	assert.NotNil(t, tags.Items)
+	assert.Equal(t, "object", tags.Items.Value.Type.Slice()[0])
+
+	// Check allOf
+	extra := schema.AllOf[0].Value.Properties["extra"].Value
+	assert.NotNil(t, extra.Items)
+	assert.Equal(t, "object", extra.Items.Value.Type.Slice()[0])
+}
+
+func TestPatchSchema_EmptySchema(t *testing.T) {
+	schema := &openapi2.Schema{}
+	// Should not panic
+	patchSchema(schema)
+}
