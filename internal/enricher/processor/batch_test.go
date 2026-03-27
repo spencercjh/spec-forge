@@ -403,6 +403,11 @@ func TestBatchProcessor_ProcessBatch_WithStreaming(t *testing.T) {
 		t.Errorf("Expected 2 streaming chunks, got %d", len(mockProvider.streamingChunks))
 	}
 
+	// Flush the buffer before checking output (StreamWriter uses buffering)
+	if err := sw.Flush(); err != nil {
+		t.Fatalf("Flush() error = %v", err)
+	}
+
 	// Verify output contains the prefix
 	output := buf.String()
 	if !strings.Contains(output, "[api]") {

@@ -2,6 +2,7 @@ package enricher
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -110,6 +111,13 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 
 	if err := concurrentProcessor.ProcessAll(ctx, batches); err != nil {
 		return spec, err
+	}
+
+	// Flush any remaining buffered content in StreamWriter
+	if streamWriter != nil {
+		if flushErr := streamWriter.Flush(); flushErr != nil {
+			return spec, fmt.Errorf("failed to flush stream writer: %w", flushErr)
+		}
 	}
 
 	return spec, nil
