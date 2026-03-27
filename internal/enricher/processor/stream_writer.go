@@ -113,7 +113,7 @@ func (sw *StreamWriter) WriteWithPrefix(prefix string, chunk []byte) error {
 	}
 
 	// Check if we should flush
-	if sw.buffer.Len() >= sw.flushThreshold || bytes.Contains(chunk, []byte("\n")) {
+	if sw.buffer.Len() >= sw.flushThreshold || bytes.IndexByte(chunk, '\n') >= 0 {
 		return sw.flushLocked()
 	}
 

@@ -49,19 +49,29 @@ func loadE2EConfig(t *testing.T) *e2eConfig {
 		return nil
 	}
 
+	// Check if enrichment is explicitly disabled
+	if cfg.Enrich.Enabled == false {
+		t.Logf("Config %s has enrich.enabled=false, skipping", e2eConfigPath)
+		return nil
+	}
+
 	// Validate config has required fields
 	if cfg.Enrich.Provider == "" || cfg.Enrich.Model == "" {
 		t.Logf("Config %s missing provider or model", e2eConfigPath)
 		return nil
 	}
 
-	// Check if API key is available
+	// Check if API key is required and available
+	// Some providers (e.g., ollama) don't require API keys
+	requiresAPIKey := cfg.Enrich.Provider != "ollama"
+
 	apiKeyEnv := cfg.Enrich.APIKeyEnv
 	if apiKeyEnv == "" {
 		apiKeyEnv = "LLM_API_KEY"
 	}
-	if os.Getenv(apiKeyEnv) == "" {
-		t.Logf("Config %s found but %s not set", e2eConfigPath, apiKeyEnv)
+
+	if requiresAPIKey && os.Getenv(apiKeyEnv) == "" {
+		t.Logf("Config %s found but %s not set (provider=%s requires API key)", e2eConfigPath, apiKeyEnv, cfg.Enrich.Provider)
 		return nil
 	}
 
@@ -179,6 +189,10 @@ paths:
 	if cfg.Enrich.BaseURL != "" {
 		args = append(args, "--custom-base-url", cfg.Enrich.BaseURL)
 	}
+	// Pass custom API key env if provider is custom
+	if cfg.Enrich.Provider == "custom" && cfg.Enrich.APIKeyEnv != "" {
+		args = append(args, "--custom-api-key-env", cfg.Enrich.APIKeyEnv)
+	}
 	rootCmd.SetArgs(args)
 
 	err := rootCmd.Execute()
@@ -274,6 +288,10 @@ components:
 	}
 	if cfg.Enrich.BaseURL != "" {
 		args = append(args, "--custom-base-url", cfg.Enrich.BaseURL)
+	}
+	// Pass custom API key env if provider is custom
+	if cfg.Enrich.Provider == "custom" && cfg.Enrich.APIKeyEnv != "" {
+		args = append(args, "--custom-api-key-env", cfg.Enrich.APIKeyEnv)
 	}
 	rootCmd.SetArgs(args)
 

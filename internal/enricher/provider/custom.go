@@ -74,11 +74,11 @@ func (p *CustomProvider) Generate(ctx context.Context, prompt string, opts ...Op
 
 	response, err := p.llm.GenerateContent(ctx, messages, callOpts...)
 	if err != nil {
-		return "", fmt.Errorf("%s provider generation failed: %w", CustomProviderName, err)
+		return "", fmt.Errorf("%s provider generation failed: %w", p.name, err)
 	}
 
 	if len(response.Choices) == 0 {
-		return "", errors.New("custom provider generation returned no choices")
+		return "", fmt.Errorf("%s provider generation returned no choices", p.name)
 	}
 	return response.Choices[0].Content, nil
 }
