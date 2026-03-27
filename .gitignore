@@ -41,7 +41,10 @@ Thumbs.db
 
 # Local config files (keep example)
 .spec-forge.yaml
+.spec-forge.local.yaml
+.spec-forge.e2e.local.yaml
 !.spec-forge.example.yaml
+!.spec-forge.e2e.example.yaml
 
 # Environment files
 .env
