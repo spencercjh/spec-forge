@@ -69,9 +69,14 @@ e2e-deps:
 	@echo "E2E dependencies installed"
 
 # Run end-to-end tests (tests CLI via Cobra ExecuteContext)
+# Use -p 1 to run packages sequentially to avoid port conflicts between Spring Boot apps.
+# Without this flag, Go runs test packages in parallel by default, causing:
+# - Port 8080 conflicts when multiple Spring Boot apps try to start simultaneously
+# - JMX port 9001 conflicts for the spring-boot-maven-plugin stop goal
+# - Random "Spring application lifecycle JMX bean not found" failures
 test-e2e: e2e-deps
 	@echo "Running e2e tests..."
-	$(GOTEST) -v -tags=e2e ./integration-tests/...
+	$(GOTEST) -v -p 1 -tags=e2e ./integration-tests/...
 	@echo "E2E tests complete"
 
 # Run all tests (unit + e2e)
