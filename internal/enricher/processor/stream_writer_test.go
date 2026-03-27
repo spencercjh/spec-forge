@@ -118,7 +118,7 @@ func TestStreamWriter_BatchingReducesOutputCalls(t *testing.T) {
 	sw := NewStreamWriter(counter, WithFlushThreshold(100))
 
 	// Write multiple small chunks
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		err := sw.WriteWithPrefix("api", []byte("x"))
 		require.NoError(t, err)
 	}
@@ -165,7 +165,7 @@ func TestStreamWriter_Metrics(t *testing.T) {
 	sw := NewStreamWriter(&buf, WithFlushThreshold(5))
 
 	// Write multiple chunks with different prefixes
-	_ = sw.WriteWithPrefix("api", []byte("12345"))    // Triggers flush (threshold)
+	_ = sw.WriteWithPrefix("api", []byte("12345"))   // Triggers flush (threshold)
 	_ = sw.WriteWithPrefix("schema", []byte("ab"))   // Buffered (below threshold)
 	_ = sw.WriteWithPrefix("schema", []byte("cde"))  // Triggers flush (threshold)
 	_ = sw.WriteWithPrefix("param", []byte("xyz\n")) // Triggers flush (newline)

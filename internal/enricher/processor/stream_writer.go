@@ -17,10 +17,10 @@ const (
 
 // StreamWriterMetrics holds streaming statistics
 type StreamWriterMetrics struct {
-	TotalChunks  int64 // Total number of chunks written
-	TotalBytes   int64 // Total bytes written (excluding prefixes)
-	FlushCount   int64 // Number of flush operations
-	PrefixCount  int64 // Number of unique prefixes used
+	TotalChunks int64 // Total number of chunks written
+	TotalBytes  int64 // Total bytes written (excluding prefixes)
+	FlushCount  int64 // Number of flush operations
+	PrefixCount int64 // Number of unique prefixes used
 }
 
 // StreamWriter ensures thread-safe streaming with batch prefix and buffering
