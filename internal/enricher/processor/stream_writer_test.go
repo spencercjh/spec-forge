@@ -42,7 +42,7 @@ func TestStreamWriter_WriteWithPrefix_AutoFlushOnThreshold(t *testing.T) {
 	var buf bytes.Buffer
 	sw := NewStreamWriter(&buf, WithFlushThreshold(5))
 
-	// Write exactly at threshold (5 bytes)
+	// Write exactly at threshold
 	err := sw.WriteWithPrefix("api", []byte("12345"))
 	require.NoError(t, err)
 
@@ -146,6 +146,50 @@ func TestStreamWriter_WithFlushThreshold(t *testing.T) {
 	assert.Contains(t, buf.String(), "[api] 12345")
 }
 
+func TestStreamWriter_LargeContent(t *testing.T) {
+	var buf bytes.Buffer
+	sw := NewStreamWriter(&buf, WithFlushThreshold(10))
+
+	// Write content larger than threshold
+	largeContent := strings.Repeat("x", 100)
+	err := sw.WriteWithPrefix("api", []byte(largeContent))
+	require.NoError(t, err)
+
+	// Should have auto-flushed
+	assert.Contains(t, buf.String(), "[api]")
+	assert.Contains(t, buf.String(), largeContent)
+}
+
+func TestStreamWriter_Metrics(t *testing.T) {
+	var buf bytes.Buffer
+	sw := NewStreamWriter(&buf, WithFlushThreshold(5))
+
+	// Write multiple chunks with different prefixes
+	_ = sw.WriteWithPrefix("api", []byte("12345"))    // Triggers flush (threshold)
+	_ = sw.WriteWithPrefix("schema", []byte("ab"))   // Buffered (below threshold)
+	_ = sw.WriteWithPrefix("schema", []byte("cde"))  // Triggers flush (threshold)
+	_ = sw.WriteWithPrefix("param", []byte("xyz\n")) // Triggers flush (newline)
+
+	// Check metrics
+	metrics := sw.GetMetrics()
+	assert.Equal(t, int64(4), metrics.TotalChunks, "Should have 4 total chunks")
+	assert.Equal(t, int64(14), metrics.TotalBytes, "Should have 14 total bytes (5+2+3+4)")
+	assert.Equal(t, int64(3), metrics.PrefixCount, "Should have 3 unique prefixes")
+	assert.GreaterOrEqual(t, metrics.FlushCount, int64(3), "Should have at least 3 flushes")
+}
+
+func TestStreamWriter_WithDebug(t *testing.T) {
+	var buf bytes.Buffer
+	sw := NewStreamWriter(&buf, WithDebug(true))
+
+	// Write with debug enabled - should not error
+	err := sw.WriteWithPrefix("api", []byte("test\n"))
+	require.NoError(t, err)
+
+	// Verify output still works
+	assert.Contains(t, buf.String(), "[api] test")
+}
+
 // writeCounter counts Write calls
 type writeCounter struct {
 	buf   bytes.Buffer
@@ -159,18 +203,4 @@ func (w *writeCounter) Write(p []byte) (int, error) {
 
 func (w *writeCounter) String() string {
 	return w.buf.String()
-}
-
-func TestStreamWriter_LargeContent(t *testing.T) {
-	var buf bytes.Buffer
-	sw := NewStreamWriter(&buf, WithFlushThreshold(10))
-
-	// Write content larger than threshold
-	largeContent := strings.Repeat("x", 100)
-	err := sw.WriteWithPrefix("api", []byte(largeContent))
-	require.NoError(t, err)
-
-	// Should have auto-flushed
-	assert.Contains(t, buf.String(), "[api]")
-	assert.Contains(t, buf.String(), largeContent)
 }
