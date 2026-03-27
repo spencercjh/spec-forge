@@ -61,7 +61,7 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 		var genOpts []provider.Option
 		if p.streamWriter != nil {
 			prefix := string(batch.Type) // "API", "Schema", "Param"
-			genOpts = append(genOpts, provider.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+			genOpts = append(genOpts, provider.WithStreamingFunc(func(_ context.Context, chunk []byte) error {
 				return p.streamWriter.WriteWithPrefix(prefix, chunk)
 			}))
 		}
