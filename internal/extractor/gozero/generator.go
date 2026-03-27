@@ -211,7 +211,7 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 	args = append(args, "-filename", swaggerFilename)
 
 	// Find the main API file (usually in the api/ directory or the first one found)
-	apiFile := g.FindMainAPIFile(workDir, info, patchedFiles)
+	apiFile := g.findMainAPIFile(workDir, info, patchedFiles)
 	if apiFile == "" {
 		slog.Error("no .api files found in project")
 		return "", errors.New("no .api files found in project")
@@ -252,10 +252,9 @@ func (g *Generator) generateSwagger(ctx context.Context, workDir string, info *I
 	return swaggerPath, nil
 }
 
-// FindMainAPIFile finds the main API file to use for swagger generation.
+// findMainAPIFile finds the main API file to use for swagger generation.
 // Returns the patched file path if available, otherwise returns the original.
-// Exported for testing purposes.
-func (g *Generator) FindMainAPIFile(workDir string, info *Info, patchedFiles map[string]string) string {
+func (g *Generator) findMainAPIFile(workDir string, info *Info, patchedFiles map[string]string) string {
 	if len(info.APIFiles) == 0 {
 		return ""
 	}

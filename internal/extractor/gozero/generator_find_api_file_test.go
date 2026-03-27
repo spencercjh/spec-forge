@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGenerator_FindMainAPIFile(t *testing.T) {
+func TestGenerator_findMainAPIFile(t *testing.T) {
 	g := NewGenerator()
 
 	tests := []struct {
@@ -159,13 +159,13 @@ func TestGenerator_FindMainAPIFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := g.FindMainAPIFile(tt.workDir, tt.info, tt.patchedFiles)
+			got := g.findMainAPIFile(tt.workDir, tt.info, tt.patchedFiles)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestGenerator_FindMainAPIFile_NilInfo(t *testing.T) {
+func TestGenerator_findMainAPIFile_NilInfo(t *testing.T) {
 	g := NewGenerator()
 
 	// Test with nil info - this should not panic but may return empty
@@ -173,15 +173,15 @@ func TestGenerator_FindMainAPIFile_NilInfo(t *testing.T) {
 	// We document this as undefined behavior, but it shouldn't crash
 	defer func() {
 		if r := recover(); r != nil {
-			t.Logf("FindMainAPIFile panicked with nil info (expected): %v", r)
+			t.Logf("findMainAPIFile panicked with nil info (expected): %v", r)
 		}
 	}()
 
 	// This will panic because info is nil - that's expected behavior
-	g.FindMainAPIFile("/project", nil, nil)
+	g.findMainAPIFile("/project", nil, nil)
 }
 
-func TestGenerator_FindMainAPIFile_WindowsPaths(t *testing.T) {
+func TestGenerator_findMainAPIFile_WindowsPaths(t *testing.T) {
 	g := NewGenerator()
 
 	// Test that Windows-style paths are handled without panicking
@@ -217,7 +217,7 @@ func TestGenerator_FindMainAPIFile_WindowsPaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// The test should not panic and should return a valid result
-			got := g.FindMainAPIFile(tt.workDir, tt.info, nil)
+			got := g.findMainAPIFile(tt.workDir, tt.info, nil)
 			// Just ensure we get some result without panic
 			assert.NotEmpty(t, got)
 			assert.Equal(t, tt.want, got)
@@ -225,7 +225,7 @@ func TestGenerator_FindMainAPIFile_WindowsPaths(t *testing.T) {
 	}
 }
 
-func TestGenerator_FindMainAPIFile_PrefersApiDirectory(t *testing.T) {
+func TestGenerator_findMainAPIFile_PrefersApiDirectory(t *testing.T) {
 	g := NewGenerator()
 
 	// Test that files in api/ directory are preferred regardless of order
@@ -264,7 +264,7 @@ func TestGenerator_FindMainAPIFile_PrefersApiDirectory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			info := &Info{APIFiles: tt.apiFiles}
-			got := g.FindMainAPIFile(tt.workDir, info, nil)
+			got := g.findMainAPIFile(tt.workDir, info, nil)
 			assert.Equal(t, tt.want, got)
 		})
 	}
