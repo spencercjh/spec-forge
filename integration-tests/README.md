@@ -58,6 +58,41 @@ go install github.com/sudorandom/protoc-gen-connect-openapi@latest
 
 ## Running Tests
 
+### Enrich E2E Tests (Requires LLM API Key)
+
+Some E2E tests require a real LLM API key to test the enrichment functionality with streaming. These tests are **conditionally skipped** if no configuration is found.
+
+**Setup:**
+
+```bash
+# 1. Copy the example config
+cp integration-tests/.spec-forge.e2e.example.yaml integration-tests/.spec-forge.e2e.local.yaml
+
+# 2. Edit the config with your preferred LLM settings
+# (provider, model, baseUrl, apiKeyEnv, language)
+
+# 3. Set the API key environment variable
+export LLM_API_KEY="your-api-key"
+# Or use a custom env var name matching apiKeyEnv in your config
+
+# 4. Run E2E tests
+make test-e2e
+```
+
+**Tests that require config:**
+
+| Test | Description |
+|------|-------------|
+| `TestE2E_Enrich_NoStreamFlag` | Tests `--no-stream` flag disables streaming prefixes |
+| `TestE2E_Enrich_WithStreaming` | Tests real LLM enrichment with streaming output verification |
+| `TestE2E_Enrich_WithLocalConfig` | Tests loading LLM settings from local config file |
+
+**Without config:** These tests will be **skipped** with a clear message:
+```
+--- SKIP: TestE2E_Enrich_WithStreaming
+    Skipping: no valid E2E config found. Create integration-tests/.spec-forge.e2e.local.yaml
+```
+
 ### Unit Tests
 
 ```bash
@@ -344,6 +379,11 @@ Spring Boot tests start an application on port 8080 during spec generation. Sinc
 | `e2e_generate_test.go` | `TestE2E_Generate_Version` | Tests CLI version output |
 | `e2e_generate_test.go` | `TestE2E_Generate_InvalidProject` | Tests error handling for non-existent project |
 | `e2e_enrich_test.go` | `TestE2E_Enrich_Help` | Tests enrich command help |
+| `e2e_enrich_test.go` | `TestE2E_Enrich_MissingArgs` | Tests error handling for missing spec file |
+| `e2e_enrich_test.go` | `TestE2E_Enrich_NonExistentFile` | Tests error handling for non-existent file |
+| `e2e_enrich_test.go` | `TestE2E_Enrich_NoStreamFlag` | Tests `--no-stream` flag disables streaming (requires config) |
+| `e2e_enrich_test.go` | `TestE2E_Enrich_WithStreaming` | Tests real LLM enrichment with streaming (requires config) |
+| `e2e_enrich_test.go` | `TestE2E_Enrich_WithLocalConfig` | Tests local config file loading (requires config) |
 | `e2e_publish_test.go` | `TestE2E_Publish_Help` | Tests publish command help |
 | `e2e_publish_test.go` | `TestE2E_Publish_MissingAPIKey` | Tests error handling for missing API key |
 | `e2e_publish_test.go` | `TestE2E_Publish_MissingTarget` | Tests error handling for missing --to flag |

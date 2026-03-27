@@ -30,61 +30,46 @@ type e2eConfig struct {
 	} `yaml:"enrich"`
 }
 
-// loadE2EConfig loads the E2E test configuration from a local config file.
-// It checks for .spec-forge.e2e.local.yaml in the project root.
+// e2eConfigPath is the fixed path to the E2E test configuration file
+// Relative to the integration-tests/ directory where tests run
+const e2eConfigPath = ".spec-forge.e2e.local.yaml"
+
+// loadE2EConfig loads the E2E test configuration from a fixed local file.
 // Returns nil if the config file doesn't exist or is invalid.
 func loadE2EConfig(t *testing.T) *e2eConfig {
 	t.Helper()
 
-	// Look for the local E2E config file
-	configPaths := []string{
-		".spec-forge.e2e.local.yaml", // Preferred: dedicated E2E config
-		".spec-forge.local.yaml",     // Alternative: local config
+	data, err := os.ReadFile(e2eConfigPath)
+	if err != nil {
+		return nil
 	}
 
-	for _, configPath := range configPaths {
-		// Check in current directory and parent directories
-		for i := 0; i < 3; i++ {
-			path := configPath
-			if i > 0 {
-				path = filepath.Join(strings.Repeat("../", i), configPath)
-			}
-
-			data, err := os.ReadFile(path)
-			if err != nil {
-				continue
-			}
-
-			var cfg e2eConfig
-			if err := yaml.Unmarshal(data, &cfg); err != nil {
-				t.Logf("Failed to parse %s: %v", path, err)
-				continue
-			}
-
-			// Validate config has required fields
-			if cfg.Enrich.Provider == "" || cfg.Enrich.Model == "" {
-				t.Logf("Config %s missing provider or model", path)
-				continue
-			}
-
-			// Check if API key is available
-			apiKeyEnv := cfg.Enrich.APIKeyEnv
-			if apiKeyEnv == "" {
-				apiKeyEnv = "LLM_API_KEY"
-			}
-			if os.Getenv(apiKeyEnv) == "" {
-				t.Logf("Config %s found but %s not set", path, apiKeyEnv)
-				continue
-			}
-
-			t.Logf("Using E2E config from %s (provider=%s, model=%s)",
-				path, cfg.Enrich.Provider, cfg.Enrich.Model)
-
-			return &cfg
-		}
+	var cfg e2eConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		t.Logf("Failed to parse %s: %v", e2eConfigPath, err)
+		return nil
 	}
 
-	return nil
+	// Validate config has required fields
+	if cfg.Enrich.Provider == "" || cfg.Enrich.Model == "" {
+		t.Logf("Config %s missing provider or model", e2eConfigPath)
+		return nil
+	}
+
+	// Check if API key is available
+	apiKeyEnv := cfg.Enrich.APIKeyEnv
+	if apiKeyEnv == "" {
+		apiKeyEnv = "LLM_API_KEY"
+	}
+	if os.Getenv(apiKeyEnv) == "" {
+		t.Logf("Config %s found but %s not set", e2eConfigPath, apiKeyEnv)
+		return nil
+	}
+
+	t.Logf("Using E2E config from %s (provider=%s, model=%s)",
+		e2eConfigPath, cfg.Enrich.Provider, cfg.Enrich.Model)
+
+	return &cfg
 }
 
 // skipIfNoConfig skips the test if no valid E2E config is found.
