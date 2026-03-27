@@ -61,7 +61,7 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	}
 
 	// Determine streaming settings
-	stream := true      // default
+	stream := true       // default
 	var writer io.Writer // default is os.Stdout
 	if opts != nil {
 		if !opts.Stream {
