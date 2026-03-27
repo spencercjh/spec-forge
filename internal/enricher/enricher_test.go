@@ -17,7 +17,7 @@ type mockProvider struct {
 	err      error
 }
 
-func (m *mockProvider) Generate(ctx context.Context, prompt string) (string, error) {
+func (m *mockProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
 	if m.err != nil {
 		return "", m.err
 	}

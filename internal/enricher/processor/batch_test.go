@@ -19,7 +19,7 @@ type mockProvider struct {
 	called       atomic.Int32
 }
 
-func (m *mockProvider) Generate(ctx context.Context, p string) (string, error) {
+func (m *mockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
 	m.called.Add(1)
 	if m.responseFunc != nil {
 		return m.responseFunc()
@@ -264,12 +264,12 @@ func TestParseSchemaResponse(t *testing.T) {
 
 // MockProvider for schema batch test
 type MockProvider struct {
-	GenerateFunc func(ctx context.Context, p string) (string, error)
+	GenerateFunc func(ctx context.Context, p string, opts ...provider.Option) (string, error)
 }
 
-func (m *MockProvider) Generate(ctx context.Context, p string) (string, error) {
+func (m *MockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
 	if m.GenerateFunc != nil {
-		return m.GenerateFunc(ctx, p)
+		return m.GenerateFunc(ctx, p, opts...)
 	}
 	return "", nil
 }
@@ -280,7 +280,7 @@ func (m *MockProvider) Name() string {
 
 func TestBatchProcessor_ProcessSchemaBatch(t *testing.T) {
 	mockProvider := &MockProvider{
-		GenerateFunc: func(_ context.Context, prompt string) (string, error) {
+		GenerateFunc: func(_ context.Context, prompt string, opts ...provider.Option) (string, error) {
 			// Return mock schema field descriptions
 			if strings.Contains(prompt, "User") {
 				return `{"id": "User ID", "name": "User name"}`, nil

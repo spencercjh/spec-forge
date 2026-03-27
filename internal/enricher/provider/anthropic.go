@@ -31,7 +31,10 @@ func newAnthropicProvider(apiKey, model string) (*AnthropicProvider, error) {
 }
 
 // Generate generates a response for the given prompt
-func (p *AnthropicProvider) Generate(ctx context.Context, prompt string) (string, error) {
+func (p *AnthropicProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
+	cfg := applyOptions(opts...)
+	_ = cfg // Will use in next task for streaming
+
 	response, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
 	if err != nil {
 		return "", fmt.Errorf("anthropic generation failed: %w", err)

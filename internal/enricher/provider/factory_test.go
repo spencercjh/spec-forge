@@ -7,13 +7,13 @@ import (
 
 // MockProvider for testing
 type MockProvider struct {
-	GenerateFunc func(ctx context.Context, prompt string) (string, error)
+	GenerateFunc func(ctx context.Context, prompt string, opts ...Option) (string, error)
 	name         string
 }
 
-func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, error) {
+func (m *MockProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
 	if m.GenerateFunc != nil {
-		return m.GenerateFunc(ctx, prompt)
+		return m.GenerateFunc(ctx, prompt, opts...)
 	}
 	return "", nil
 }
@@ -30,7 +30,7 @@ func TestProvider_Interface(t *testing.T) {
 func TestMockProvider_Generate(t *testing.T) {
 	mock := &MockProvider{
 		name: "test",
-		GenerateFunc: func(ctx context.Context, prompt string) (string, error) {
+		GenerateFunc: func(ctx context.Context, prompt string, opts ...Option) (string, error) {
 			return "response: " + prompt, nil
 		},
 	}
@@ -214,4 +214,36 @@ func containsString(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestWithStreamingFunc(t *testing.T) {
+	var called bool
+	fn := func(ctx context.Context, chunk []byte) error {
+		called = true
+		return nil
+	}
+
+	opts := applyOptions(WithStreamingFunc(fn))
+	if opts.StreamingFunc == nil {
+		t.Fatal("StreamingFunc should not be nil")
+	}
+	if called {
+		t.Fatal("StreamingFunc should not be called yet")
+	}
+
+	// Call the function to verify it was set correctly
+	_ = opts.StreamingFunc(context.Background(), []byte("test"))
+	if !called {
+		t.Fatal("StreamingFunc should have been called")
+	}
+}
+
+func TestApplyOptionsEmpty(t *testing.T) {
+	opts := applyOptions()
+	if opts == nil {
+		t.Fatal("opts should not be nil")
+	}
+	if opts.StreamingFunc != nil {
+		t.Fatal("StreamingFunc should be nil when no options are provided")
+	}
 }

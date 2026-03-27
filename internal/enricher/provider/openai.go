@@ -34,7 +34,10 @@ func newOpenAIProvider(apiKey, model string) (*OpenAIProvider, error) {
 }
 
 // Generate generates a response for the given prompt
-func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, error) {
+func (p *OpenAIProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
+	cfg := applyOptions(opts...)
+	_ = cfg // Will use in next task for streaming
+
 	response, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
 	if err != nil {
 		return "", fmt.Errorf("OpenAI generation failed: %w", err)
