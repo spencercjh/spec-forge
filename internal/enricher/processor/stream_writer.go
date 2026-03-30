@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 )
 
 const (
@@ -83,14 +82,14 @@ func (sw *StreamWriter) WriteWithPrefix(prefix string, chunk []byte) error {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 
-	// Update metrics
-	atomic.AddInt64(&sw.metrics.TotalChunks, 1)
-	atomic.AddInt64(&sw.metrics.TotalBytes, int64(len(chunk)))
+	// Update metrics (protected by mutex)
+	sw.metrics.TotalChunks++
+	sw.metrics.TotalBytes += int64(len(chunk))
 
 	// Track unique prefixes
 	if !sw.prefixSet[prefix] {
 		sw.prefixSet[prefix] = true
-		atomic.AddInt64(&sw.metrics.PrefixCount, 1)
+		sw.metrics.PrefixCount++
 	}
 
 	// Debug logging
@@ -99,8 +98,8 @@ func (sw *StreamWriter) WriteWithPrefix(prefix string, chunk []byte) error {
 			"prefix", prefix,
 			"chunk_size", len(chunk),
 			"buffer_size", sw.buffer.Len(),
-			"total_chunks", atomic.LoadInt64(&sw.metrics.TotalChunks),
-			"total_bytes", atomic.LoadInt64(&sw.metrics.TotalBytes),
+			"total_chunks", sw.metrics.TotalChunks,
+			"total_bytes", sw.metrics.TotalBytes,
 		)
 	}
 
@@ -138,23 +137,33 @@ func (sw *StreamWriter) flushLocked() error {
 		return nil
 	}
 
-	atomic.AddInt64(&sw.metrics.FlushCount, 1)
+	sw.metrics.FlushCount++
 
 	// Debug logging
 	if sw.debug {
 		slog.Debug("stream buffer flushed",
 			"prefix", sw.currentPrefix,
 			"buffer_size", sw.buffer.Len(),
-			"flush_count", atomic.LoadInt64(&sw.metrics.FlushCount),
+			"flush_count", sw.metrics.FlushCount,
 		)
 	}
 
-	// Write prefix and buffered content
+	// Write prefix
 	if _, err := fmt.Fprintf(sw.writer, "[%s] ", sw.currentPrefix); err != nil {
 		return err
 	}
-	if _, err := sw.writer.Write(sw.buffer.Bytes()); err != nil {
-		return err
+
+	// Write buffered content, handling potential short writes
+	data := sw.buffer.Bytes()
+	for len(data) > 0 {
+		n, err := sw.writer.Write(data)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+		data = data[n:]
 	}
 
 	// Reset buffer
@@ -164,10 +173,7 @@ func (sw *StreamWriter) flushLocked() error {
 
 // GetMetrics returns current streaming metrics
 func (sw *StreamWriter) GetMetrics() StreamWriterMetrics {
-	return StreamWriterMetrics{
-		TotalChunks: atomic.LoadInt64(&sw.metrics.TotalChunks),
-		TotalBytes:  atomic.LoadInt64(&sw.metrics.TotalBytes),
-		FlushCount:  atomic.LoadInt64(&sw.metrics.FlushCount),
-		PrefixCount: atomic.LoadInt64(&sw.metrics.PrefixCount),
-	}
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+	return sw.metrics
 }

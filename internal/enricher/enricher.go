@@ -2,7 +2,6 @@ package enricher
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -114,10 +113,11 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 		return spec, err
 	}
 
-	// Flush any remaining buffered content in StreamWriter
+	// Flush any remaining buffered content in StreamWriter.
+	// Streaming output is ancillary; a flush failure should not cause enrichment to fail.
 	if streamWriter != nil {
 		if flushErr := streamWriter.Flush(); flushErr != nil {
-			return spec, fmt.Errorf("failed to flush stream writer: %w", flushErr)
+			slog.Warn("failed to flush stream writer after successful enrichment", "error", flushErr)
 		}
 	}
 
