@@ -60,7 +60,7 @@ func TestEstimateCost_Anthropic(t *testing.T) {
 	}
 
 	// $3.00/1M input + $15.00/1M output = 18.00
-	if cost < 17.00 || cost > 19.00 {
+	if cost < 17.99 || cost > 18.01 {
 		t.Errorf("cost = %f, want ~18.00", cost)
 	}
 }
