@@ -1,6 +1,7 @@
 package processor_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -142,5 +143,57 @@ func TestCollectSchemaFields_SkipFieldsWithDescription(t *testing.T) {
 	// Should have 2 fields (id and description), not 3 (name already has description)
 	if len(userSchema.Fields) != 2 {
 		t.Errorf("expected 2 fields (id, description), got %d", len(userSchema.Fields))
+	}
+}
+
+func TestCollectSchemaFields_EnrichedContext(t *testing.T) {
+	maxLen := uint64(255)
+	spec := &openapi3.T{
+		Components: &openapi3.Components{
+			Schemas: openapi3.Schemas{
+				"User": &openapi3.SchemaRef{
+					Value: &openapi3.Schema{
+						Type: &openapi3.Types{"object"},
+						Properties: openapi3.Schemas{
+							"email": &openapi3.SchemaRef{Value: &openapi3.Schema{
+								Type:      &openapi3.Types{"string"},
+								Format:    "email",
+								MaxLength: &maxLen,
+							}},
+							"role": &openapi3.SchemaRef{Value: &openapi3.Schema{
+								Type: &openapi3.Types{"string"},
+								Enum: []any{"admin", "user", "guest"},
+							}},
+						},
+						Required: []string{"email"},
+					},
+				},
+			},
+		},
+	}
+
+	collector := &processor.SpecCollector{}
+	processed := make(map[string]bool)
+	processor.CollectSchemaFields("User", spec.Components.Schemas["User"], collector, processed, "en", 0, false)
+
+	schemas := collector.GetSchemas()
+	if len(schemas) != 1 {
+		t.Fatalf("expected 1 schema, got %d", len(schemas))
+	}
+
+	for _, f := range schemas[0].Fields {
+		if f.FieldName == "email" {
+			if f.Format != "email" {
+				t.Errorf("email Format = %q, want %q", f.Format, "email")
+			}
+			if !strings.Contains(f.Constraints, "maxLength: 255") {
+				t.Errorf("email Constraints = %q, want to contain maxLength: 255", f.Constraints)
+			}
+		}
+		if f.FieldName == "role" {
+			if len(f.Enum) != 3 {
+				t.Errorf("role Enum = %d, want 3", len(f.Enum))
+			}
+		}
 	}
 }
