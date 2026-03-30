@@ -64,7 +64,7 @@ func NewProvider(cfg Config) (Provider, error) { //nolint:gocritic // copying co
 	switch cfg.Provider {
 	case OpenAIProviderName:
 		return newOpenAIProvider(cfg.APIKey, cfg.Model)
-	case "anthropic":
+	case AnthropicProviderName:
 		return newAnthropicProvider(cfg.APIKey, cfg.Model)
 	case OllamaProviderName:
 		baseURL := cfg.BaseURL
@@ -72,7 +72,7 @@ func NewProvider(cfg Config) (Provider, error) { //nolint:gocritic // copying co
 			baseURL = "http://localhost:11434"
 		}
 		return newOllamaProvider(baseURL, cfg.Model)
-	case "custom":
+	case CustomProviderName:
 		return newCustomProvider(CustomProviderConfig{
 			BaseURL: cfg.BaseURL,
 			APIKey:  cfg.APIKey,

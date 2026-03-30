@@ -38,10 +38,15 @@ type StreamWriter struct {
 // StreamWriterOption configures StreamWriter
 type StreamWriterOption func(*StreamWriter)
 
-// WithFlushThreshold sets the buffer flush threshold
+// WithFlushThreshold sets the buffer flush threshold.
+// If threshold <= 0, DefaultFlushThreshold is used instead.
 func WithFlushThreshold(threshold int) StreamWriterOption {
 	return func(sw *StreamWriter) {
-		sw.flushThreshold = threshold
+		if threshold <= 0 {
+			sw.flushThreshold = DefaultFlushThreshold
+		} else {
+			sw.flushThreshold = threshold
+		}
 	}
 }
 

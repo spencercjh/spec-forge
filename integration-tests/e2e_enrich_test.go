@@ -193,6 +193,10 @@ paths:
 	if cfg.Enrich.Provider == "custom" && cfg.Enrich.APIKeyEnv != "" {
 		args = append(args, "--custom-api-key-env", cfg.Enrich.APIKeyEnv)
 	}
+	// Pass timeout if configured
+	if cfg.Enrich.Timeout != "" {
+		args = append(args, "--timeout", cfg.Enrich.Timeout)
+	}
 	rootCmd.SetArgs(args)
 
 	err := rootCmd.Execute()
@@ -292,6 +296,10 @@ components:
 	// Pass custom API key env if provider is custom
 	if cfg.Enrich.Provider == "custom" && cfg.Enrich.APIKeyEnv != "" {
 		args = append(args, "--custom-api-key-env", cfg.Enrich.APIKeyEnv)
+	}
+	// Pass timeout if configured
+	if cfg.Enrich.Timeout != "" {
+		args = append(args, "--timeout", cfg.Enrich.Timeout)
 	}
 	rootCmd.SetArgs(args)
 
