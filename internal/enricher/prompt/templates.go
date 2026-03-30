@@ -22,6 +22,14 @@ type FieldContext struct {
 	Required bool
 }
 
+// ParamFieldContext provides specctx for a parameter in a group.
+type ParamFieldContext struct {
+	Name     string
+	Type     string
+	ParamIn  string // path, query, header, cookie
+	Required bool
+}
+
 // TemplateContext provides specctx for template rendering
 type TemplateContext struct {
 	Type     TemplateType
@@ -41,8 +49,9 @@ type TemplateContext struct {
 	Required  bool
 
 	// Parameter specctx
-	ParamName string
-	ParamIn   string // path, query, header, cookie
+	ParamName  string
+	ParamIn    string // path, query, header, cookie
+	ParamFields []ParamFieldContext
 
 	// Response specctx
 	ResponseCode string
@@ -117,12 +126,13 @@ Generate a description for each field.`,
 			TemplateTypeParam: {
 				System: `You are an API documentation expert. Generate concise parameter descriptions.
 Respond in {{.Language}} language.
-Output format: JSON with "description" field.`,
-				User: `Parameter: {{.ParamName}}
-Type: {{.FieldType}}
-Required: {{.Required}}
+Output format: JSON mapping parameter names to descriptions.`,
+				User: `API: {{.Method}} {{.Path}}
+Parameters:
+{{range .ParamFields}}- {{.Name}} ({{.Type}}, in: {{.ParamIn}}, {{if .Required}}required{{else}}optional{{end}})
+{{end}}
 
-Generate a brief description for this parameter.`,
+Generate a description for each parameter.`,
 			},
 			TemplateTypeResponse: {
 				System: `You are an API documentation expert. Generate concise response descriptions.

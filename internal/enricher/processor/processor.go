@@ -15,6 +15,9 @@ type EnrichmentElement struct {
 
 	// Schema-specific: fields to set descriptions for
 	SchemaFields []FieldElement
+
+	// Param group-specific: fields to set descriptions for
+	ParamGroupFields []ParamFieldItem
 }
 
 // Batch represents a group of elements to process together
@@ -95,6 +98,22 @@ type ParamElement struct {
 	SetValue  func(description string)
 }
 
+// ParamGroupElement represents a group of parameters from the same API endpoint.
+type ParamGroupElement struct {
+	Path   string
+	Method string
+	Params []ParamFieldItem
+}
+
+// ParamFieldItem represents a single parameter within a group.
+type ParamFieldItem struct {
+	ParamName string
+	ParamIn   string
+	FieldType string
+	Required  bool
+	SetValue  func(description string)
+}
+
 // AddSchemaElement adds a schema element to the collector.
 func (c *SpecCollector) AddSchemaElement(schema SchemaElement, language string) { //nolint:gocritic
 	c.schemas = append(c.schemas, schema)
@@ -159,6 +178,20 @@ func convertFieldElements(fields []FieldElement) []prompt.FieldContext {
 	return result
 }
 
+// convertParamFieldItems converts ParamFieldItem slice to ParamFieldContext slice.
+func convertParamFieldItems(items []ParamFieldItem) []prompt.ParamFieldContext {
+	result := make([]prompt.ParamFieldContext, len(items))
+	for i, p := range items {
+		result[i] = prompt.ParamFieldContext{
+			Name:     p.ParamName,
+			Type:     p.FieldType,
+			ParamIn:  p.ParamIn,
+			Required: p.Required,
+		}
+	}
+	return result
+}
+
 // GetSchemas returns collected schemas.
 func (c *SpecCollector) GetSchemas() []SchemaElement {
 	return c.schemas
@@ -167,4 +200,20 @@ func (c *SpecCollector) GetSchemas() []SchemaElement {
 // GetParams returns collected parameters.
 func (c *SpecCollector) GetParams() []ParamElement {
 	return c.params
+}
+
+// AddParamGroupElement adds a parameter group to the collector.
+func (c *SpecCollector) AddParamGroupElement(group ParamGroupElement, language string) {
+	c.elements = append(c.elements, EnrichmentElement{
+		Type: prompt.TemplateTypeParam,
+		Path: group.Method + " " + group.Path + " [params]",
+		Context: prompt.TemplateContext{
+			Type:        prompt.TemplateTypeParam,
+			Language:    language,
+			Method:      group.Method,
+			Path:        group.Path,
+			ParamFields: convertParamFieldItems(group.Params),
+		},
+		ParamGroupFields: group.Params,
+	})
 }
