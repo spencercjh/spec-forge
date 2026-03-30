@@ -20,8 +20,45 @@ func NewConcurrentProcessor(bp *BatchProcessor, concurrency int) *ConcurrentProc
 	}
 }
 
-// ProcessAll processes all batches with controlled concurrency
+// ProcessAll processes all batches with controlled concurrency.
+// When streaming is enabled, batches are processed sequentially to avoid
+// interleaved output. Otherwise, batches are processed concurrently.
 func (p *ConcurrentProcessor) ProcessAll(ctx context.Context, batches []*Batch) error {
+	// Sequential processing when streaming to avoid interleaved output
+	if p.batchProcessor.HasStreamWriter() {
+		return p.processSequential(ctx, batches)
+	}
+	return p.processConcurrent(ctx, batches)
+}
+
+// processSequential processes batches one at a time
+func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*Batch) error {
+	var failedCount int
+	var failedErrors []error
+
+	for i, batch := range batches {
+		if err := p.batchProcessor.ProcessBatch(ctx, batch); err != nil {
+			failedCount++
+			failedErrors = append(failedErrors, err)
+			slog.Warn("batch processing failed",
+				"batch_index", i,
+				"batch_type", batch.Type,
+				"error", err)
+		}
+	}
+
+	if failedCount > 0 {
+		return &PartialEnrichmentError{
+			TotalBatches:  len(batches),
+			FailedBatches: failedCount,
+			Errors:        failedErrors,
+		}
+	}
+	return nil
+}
+
+// processConcurrent processes batches with controlled concurrency
+func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*Batch) error {
 	var (
 		wg           sync.WaitGroup
 		mu           sync.Mutex

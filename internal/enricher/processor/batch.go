@@ -41,6 +41,11 @@ func NewBatchProcessor(p provider.Provider, tm *prompt.TemplateManager, opts ...
 	return bp
 }
 
+// HasStreamWriter returns true if streaming output is configured
+func (p *BatchProcessor) HasStreamWriter() bool {
+	return p.streamWriter != nil
+}
+
 // ProcessBatch processes a single batch of elements
 func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 	tmpl, err := p.templateMgr.Get(batch.Type)

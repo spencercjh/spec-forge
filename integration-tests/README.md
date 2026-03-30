@@ -4,22 +4,22 @@ This directory contains end-to-end tests for the spec-forge CLI tool.
 
 ## Test Categories
 
-| Category | Build Tag | Description |
-|----------|-----------|-------------|
-| **E2E Tests** | `e2e` | Test complete CLI workflow via Cobra ExecuteContext |
-| **Unit Tests** | (none) | Fast unit tests without external dependencies |
+| Category       | Build Tag | Description                                         |
+|----------------|-----------|-----------------------------------------------------|
+| **E2E Tests**  | `e2e`     | Test complete CLI workflow via Cobra ExecuteContext |
+| **Unit Tests** | (none)    | Fast unit tests without external dependencies       |
 
 ## Test Projects
 
-| Project | Build Tool | Description |
-|---------|------------|-------------|
-| `maven-springboot-openapi-demo` | Maven | Single module Spring Boot project |
-| `gradle-springboot-openapi-demo` | Gradle | Single module Spring Boot project |
-| `maven-multi-module-demo` | Maven | Multi-module Spring Boot project |
-| `gradle-multi-module-demo` | Gradle | Multi-module Gradle project |
-| `gozero-demo` | Go Modules | go-zero framework project |
-| `gin-demo` | Go Modules | Gin framework project |
-| `grpc-protoc-demo` | protoc | gRPC project with native protoc (not buf) |
+| Project                          | Build Tool | Description                               |
+|----------------------------------|------------|-------------------------------------------|
+| `maven-springboot-openapi-demo`  | Maven      | Single module Spring Boot project         |
+| `gradle-springboot-openapi-demo` | Gradle     | Single module Spring Boot project         |
+| `maven-multi-module-demo`        | Maven      | Multi-module Spring Boot project          |
+| `gradle-multi-module-demo`       | Gradle     | Multi-module Gradle project               |
+| `gozero-demo`                    | Go Modules | go-zero framework project                 |
+| `gin-demo`                       | Go Modules | Gin framework project                     |
+| `grpc-protoc-demo`               | protoc     | gRPC project with native protoc (not buf) |
 
 ## Prerequisites
 
@@ -66,7 +66,7 @@ Some E2E tests require a real LLM API key to test the enrichment functionality w
 
 ```bash
 # 1. Copy the example config
-cp integration-tests/.spec-forge.e2e.example.yaml integration-tests/.spec-forge.e2e.local.yaml
+cp .spec-forge.e2e.example.yaml .spec-forge.e2e.local.yaml
 
 # 2. Edit the config with your preferred LLM settings
 # (provider, model, baseUrl, apiKeyEnv, language)
@@ -81,9 +81,9 @@ make test-e2e
 
 **Tests that require config:**
 
-| Test | Description |
-|------|-------------|
-| `TestE2E_Enrich_NoStreamFlag` | Tests `--no-stream` flag disables streaming prefixes |
+| Test                           | Description                                                  |
+|--------------------------------|--------------------------------------------------------------|
+| `TestE2E_Enrich_NoStreamFlag`  | Tests `--no-stream` flag enables concurrent processing       |
 | `TestE2E_Enrich_WithStreaming` | Tests real LLM enrichment with streaming output verification |
 
 **Without config:** These tests will be **skipped** with a clear message:
@@ -140,11 +140,11 @@ Golden fixtures are JSON snapshots of expected OpenAPI output, used to detect re
 
 ### Available Golden Suites
 
-| Package | Golden Dir | Description |
-|---------|-----------|-------------|
-| `spring/` | `spring/fixtures/golden/` | Spring Boot (Maven) golden snapshots |
-| `gin/` | `gin/fixtures/golden/` | Gin framework golden snapshots |
-| `gozero/` | `gozero/fixtures/golden/` | go-zero framework golden snapshots |
+| Package       | Golden Dir                    | Description                            |
+|---------------|-------------------------------|----------------------------------------|
+| `spring/`     | `spring/fixtures/golden/`     | Spring Boot (Maven) golden snapshots   |
+| `gin/`        | `gin/fixtures/golden/`        | Gin framework golden snapshots         |
+| `gozero/`     | `gozero/fixtures/golden/`     | go-zero framework golden snapshots     |
 | `grpcprotoc/` | `grpcprotoc/fixtures/golden/` | gRPC-protoc framework golden snapshots |
 
 ### Spring Golden Fixtures
@@ -312,82 +312,82 @@ Spring Boot tests start an application on port 8080 during spec generation. Sinc
 
 ### Framework E2E Tests
 
-| Test File | Tests | Description |
-|-----------|-------|-------------|
-| `e2e_spring_maven_test.go` | `TestE2E_MavenSpringBoot_Generate` | Tests generate flow for Maven project with full spec validation |
-| `e2e_spring_maven_test.go` | `TestE2E_MavenSpringBoot_GenerateEnrich` | Tests complete generate flow |
-| `e2e_spring_gradle_test.go` | `TestE2E_GradleSpringBoot_Generate` | Tests generate flow for Gradle project with full spec validation |
-| `e2e_gozero_test.go` | `TestE2E_GoZero_Generate` | Tests generate flow for go-zero project with full spec validation |
-| `e2e_gin_test.go` | `TestE2E_GinDemo_Generate` | Tests generate flow for Gin project with full spec validation |
-| `e2e_grpc_protoc_test.go` | `TestE2E_GrpcProtoc_Generate` | Tests generate flow for gRPC-protoc project with full spec validation |
+| Test File                   | Tests                                    | Description                                                           |
+|-----------------------------|------------------------------------------|-----------------------------------------------------------------------|
+| `e2e_spring_maven_test.go`  | `TestE2E_MavenSpringBoot_Generate`       | Tests generate flow for Maven project with full spec validation       |
+| `e2e_spring_maven_test.go`  | `TestE2E_MavenSpringBoot_GenerateEnrich` | Tests complete generate flow                                          |
+| `e2e_spring_gradle_test.go` | `TestE2E_GradleSpringBoot_Generate`      | Tests generate flow for Gradle project with full spec validation      |
+| `e2e_gozero_test.go`        | `TestE2E_GoZero_Generate`                | Tests generate flow for go-zero project with full spec validation     |
+| `e2e_gin_test.go`           | `TestE2E_GinDemo_Generate`               | Tests generate flow for Gin project with full spec validation         |
+| `e2e_grpc_protoc_test.go`   | `TestE2E_GrpcProtoc_Generate`            | Tests generate flow for gRPC-protoc project with full spec validation |
 
 ### Multi-Module E2E Tests
 
-| Test File | Tests | Description |
-|-----------|-------|-------------|
-| `e2e_multi_module_test.go` | `TestE2E_MavenMultiModule_Generate` | Tests generate flow for Maven multi-module project |
+| Test File                  | Tests                                | Description                                         |
+|----------------------------|--------------------------------------|-----------------------------------------------------|
+| `e2e_multi_module_test.go` | `TestE2E_MavenMultiModule_Generate`  | Tests generate flow for Maven multi-module project  |
 | `e2e_multi_module_test.go` | `TestE2E_GradleMultiModule_Generate` | Tests generate flow for Gradle multi-module project |
 
 ### Spring Boot Golden & Invariant Tests
 
-| Test File | Tests | Description |
-|-----------|-------|-------------|
-| `spring/golden_test.go` | `TestGoldenSnapshots` | Compares generated spec (full + extracted) against golden fixtures |
-| `spring/golden_test.go` | `TestRegenerateGolden` | Regenerates golden files (gated by `REGENERATE_GOLDEN=true`) |
-| `spring/invariant_test.go` | `TestCriticalInvariants` | Validates semantic invariants (field types, required params, refs) |
-| `spring/edge_cases_test.go` | `TestMalformedPomGracefulDegradation` | Tests graceful error on malformed pom.xml |
-| `spring/edge_cases_test.go` | `TestMissingSpringdocDependency` | Tests patcher behavior without springdoc dependency |
+| Test File                   | Tests                                 | Description                                                        |
+|-----------------------------|---------------------------------------|--------------------------------------------------------------------|
+| `spring/golden_test.go`     | `TestGoldenSnapshots`                 | Compares generated spec (full + extracted) against golden fixtures |
+| `spring/golden_test.go`     | `TestRegenerateGolden`                | Regenerates golden files (gated by `REGENERATE_GOLDEN=true`)       |
+| `spring/invariant_test.go`  | `TestCriticalInvariants`              | Validates semantic invariants (field types, required params, refs) |
+| `spring/edge_cases_test.go` | `TestMalformedPomGracefulDegradation` | Tests graceful error on malformed pom.xml                          |
+| `spring/edge_cases_test.go` | `TestMissingSpringdocDependency`      | Tests patcher behavior without springdoc dependency                |
 
 ### go-zero Golden & Invariant Tests
 
-| Test File | Tests | Description |
-|-----------|-------|-------------|
-| `gozero/golden_test.go` | `TestGoldenSnapshots` | Compares generated spec (full + extracted) against golden fixtures |
-| `gozero/golden_test.go` | `TestRegenerateGolden` | Regenerates golden files (gated by `REGENERATE_GOLDEN=true`) |
-| `gozero/invariant_test.go` | `TestAPITypeDefinitions` | Validates API type definitions are correctly parsed |
-| `gozero/invariant_test.go` | `TestGoSwaggerFormatCompatibility` | Validates go-swagger format compatibility |
-| `gozero/invariant_test.go` | `TestRouteGeneration` | Validates routes are correctly generated from .api files |
-| `gozero/edge_cases_test.go` | `TestMissingGoctlGracefulSkip` | Tests graceful skip when goctl is not installed |
-| `gozero/edge_cases_test.go` | `TestNonGoZeroProject` | Tests error handling for non-go-zero projects |
-| `gozero/edge_cases_test.go` | `TestYAMLOutputFormat` | Tests YAML output format generation |
-| `gozero/edge_cases_test.go` | `TestFormDataEndpoint` | Tests form-data endpoint handling |
-| `gozero/edge_cases_test.go` | `TestUploadEndpoint` | Tests file upload endpoint handling |
+| Test File                   | Tests                              | Description                                                        |
+|-----------------------------|------------------------------------|--------------------------------------------------------------------|
+| `gozero/golden_test.go`     | `TestGoldenSnapshots`              | Compares generated spec (full + extracted) against golden fixtures |
+| `gozero/golden_test.go`     | `TestRegenerateGolden`             | Regenerates golden files (gated by `REGENERATE_GOLDEN=true`)       |
+| `gozero/invariant_test.go`  | `TestAPITypeDefinitions`           | Validates API type definitions are correctly parsed                |
+| `gozero/invariant_test.go`  | `TestGoSwaggerFormatCompatibility` | Validates go-swagger format compatibility                          |
+| `gozero/invariant_test.go`  | `TestRouteGeneration`              | Validates routes are correctly generated from .api files           |
+| `gozero/edge_cases_test.go` | `TestMissingGoctlGracefulSkip`     | Tests graceful skip when goctl is not installed                    |
+| `gozero/edge_cases_test.go` | `TestNonGoZeroProject`             | Tests error handling for non-go-zero projects                      |
+| `gozero/edge_cases_test.go` | `TestYAMLOutputFormat`             | Tests YAML output format generation                                |
+| `gozero/edge_cases_test.go` | `TestFormDataEndpoint`             | Tests form-data endpoint handling                                  |
+| `gozero/edge_cases_test.go` | `TestUploadEndpoint`               | Tests file upload endpoint handling                                |
 
 ### gRPC-protoc Golden & Invariant Tests
 
-| Test File | Tests | Description |
-|-----------|-------|-------------|
-| `grpcprotoc/golden_test.go` | `TestGoldenSnapshots` | Compares generated spec (full + extracted) against golden fixtures |
-| `grpcprotoc/golden_test.go` | `TestCriticalInvariants` | Validates semantic invariants (schema fields, operationIds, request bodies) |
-| `grpcprotoc/golden_test.go` | `TestRegenerateGolden` | Regenerates golden files (gated by `REGENERATE_GOLDEN=true`) |
-| `grpcprotoc/invariant_test.go` | `TestGRPCServiceMapping` | Validates gRPC service methods map to correct REST endpoints |
-| `grpcprotoc/invariant_test.go` | `TestProtoFieldMapping` | Validates proto field name/type mapping (snake_case to camelCase) |
-| `grpcprotoc/invariant_test.go` | `TestProtoMessageReferences` | Validates proto message $ref references (nested, cross-package) |
-| `grpcprotoc/invariant_test.go` | `TestConnectProtocolSupport` | Validates Connect protocol features (error schema, responses) |
-| `grpcprotoc/edge_cases_test.go` | `TestBufYAMLRejection` | Tests rejection of buf.yaml managed projects |
-| `grpcprotoc/edge_cases_test.go` | `TestMissingProtocGracefulSkip` | Tests graceful skip when protoc is not installed |
-| `grpcprotoc/edge_cases_test.go` | `TestYAMLOutputFormat` | Tests YAML output format generation |
-| `grpcprotoc/edge_cases_test.go` | `TestMultipleProtoFiles` | Tests correct handling of multiple proto files |
-| `grpcprotoc/edge_cases_test.go` | `TestNonProtocProject` | Tests error handling for non-protoc projects |
+| Test File                       | Tests                           | Description                                                                 |
+|---------------------------------|---------------------------------|-----------------------------------------------------------------------------|
+| `grpcprotoc/golden_test.go`     | `TestGoldenSnapshots`           | Compares generated spec (full + extracted) against golden fixtures          |
+| `grpcprotoc/golden_test.go`     | `TestCriticalInvariants`        | Validates semantic invariants (schema fields, operationIds, request bodies) |
+| `grpcprotoc/golden_test.go`     | `TestRegenerateGolden`          | Regenerates golden files (gated by `REGENERATE_GOLDEN=true`)                |
+| `grpcprotoc/invariant_test.go`  | `TestGRPCServiceMapping`        | Validates gRPC service methods map to correct REST endpoints                |
+| `grpcprotoc/invariant_test.go`  | `TestProtoFieldMapping`         | Validates proto field name/type mapping (snake_case to camelCase)           |
+| `grpcprotoc/invariant_test.go`  | `TestProtoMessageReferences`    | Validates proto message $ref references (nested, cross-package)             |
+| `grpcprotoc/invariant_test.go`  | `TestConnectProtocolSupport`    | Validates Connect protocol features (error schema, responses)               |
+| `grpcprotoc/edge_cases_test.go` | `TestBufYAMLRejection`          | Tests rejection of buf.yaml managed projects                                |
+| `grpcprotoc/edge_cases_test.go` | `TestMissingProtocGracefulSkip` | Tests graceful skip when protoc is not installed                            |
+| `grpcprotoc/edge_cases_test.go` | `TestYAMLOutputFormat`          | Tests YAML output format generation                                         |
+| `grpcprotoc/edge_cases_test.go` | `TestMultipleProtoFiles`        | Tests correct handling of multiple proto files                              |
+| `grpcprotoc/edge_cases_test.go` | `TestNonProtocProject`          | Tests error handling for non-protoc projects                                |
 
 ### CLI E2E Tests
 
-| Test File | Tests | Description |
-|-----------|-------|-------------|
-| `e2e_generate_test.go` | `TestE2E_Generate_Help` | Tests generate command help |
-| `e2e_generate_test.go` | `TestE2E_Generate_Version` | Tests CLI version output |
-| `e2e_generate_test.go` | `TestE2E_Generate_InvalidProject` | Tests error handling for non-existent project |
-| `e2e_enrich_test.go` | `TestE2E_Enrich_Help` | Tests enrich command help |
-| `e2e_enrich_test.go` | `TestE2E_Enrich_MissingArgs` | Tests error handling for missing spec file |
-| `e2e_enrich_test.go` | `TestE2E_Enrich_NonExistentFile` | Tests error handling for non-existent file |
-| `e2e_enrich_test.go` | `TestE2E_Enrich_NoStreamFlag` | Tests `--no-stream` flag disables streaming (requires config) |
-| `e2e_enrich_test.go` | `TestE2E_Enrich_WithStreaming` | Tests real LLM enrichment with streaming (requires config) |
-| `e2e_publish_test.go` | `TestE2E_Publish_Help` | Tests publish command help |
-| `e2e_publish_test.go` | `TestE2E_Publish_MissingAPIKey` | Tests error handling for missing API key |
-| `e2e_publish_test.go` | `TestE2E_Publish_MissingTarget` | Tests error handling for missing --to flag |
-| `e2e_publish_test.go` | `TestE2E_Publish_InvalidTarget` | Tests error handling for invalid target |
-| `e2e_publish_test.go` | `TestE2E_Publish_NonExistentSpec` | Tests error handling for non-existent spec file |
-| `e2e_publish_test.go` | `TestE2E_Publish_InvalidSpec` | Tests error handling for invalid spec format |
+| Test File              | Tests                             | Description                                                   |
+|------------------------|-----------------------------------|---------------------------------------------------------------|
+| `e2e_generate_test.go` | `TestE2E_Generate_Help`           | Tests generate command help                                   |
+| `e2e_generate_test.go` | `TestE2E_Generate_Version`        | Tests CLI version output                                      |
+| `e2e_generate_test.go` | `TestE2E_Generate_InvalidProject` | Tests error handling for non-existent project                 |
+| `e2e_enrich_test.go`   | `TestE2E_Enrich_Help`             | Tests enrich command help                                     |
+| `e2e_enrich_test.go`   | `TestE2E_Enrich_MissingArgs`      | Tests error handling for missing spec file                    |
+| `e2e_enrich_test.go`   | `TestE2E_Enrich_NonExistentFile`  | Tests error handling for non-existent file                    |
+| `e2e_enrich_test.go`   | `TestE2E_Enrich_NoStreamFlag`     | Tests `--no-stream` flag enables concurrent processing (requires config) |
+| `e2e_enrich_test.go`   | `TestE2E_Enrich_WithStreaming`    | Tests real LLM enrichment with streaming (requires config)    |
+| `e2e_publish_test.go`  | `TestE2E_Publish_Help`            | Tests publish command help                                    |
+| `e2e_publish_test.go`  | `TestE2E_Publish_MissingAPIKey`   | Tests error handling for missing API key                      |
+| `e2e_publish_test.go`  | `TestE2E_Publish_MissingTarget`   | Tests error handling for missing --to flag                    |
+| `e2e_publish_test.go`  | `TestE2E_Publish_InvalidTarget`   | Tests error handling for invalid target                       |
+| `e2e_publish_test.go`  | `TestE2E_Publish_NonExistentSpec` | Tests error handling for non-existent spec file               |
+| `e2e_publish_test.go`  | `TestE2E_Publish_InvalidSpec`     | Tests error handling for invalid spec format                  |
 
 ### Spec Assertion Helpers
 

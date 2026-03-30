@@ -292,7 +292,7 @@ Examples:
 	c.Flags().Duration("timeout", 30*time.Second, "Timeout for single LLM call")
 	c.Flags().String("custom-base-url", "", "Custom provider API URL")
 	c.Flags().String("custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
-	c.Flags().Bool("no-stream", false, "Disable streaming output")
+	c.Flags().Bool("no-stream", false, "Disable streaming output to enable concurrent LLM calls (faster)")
 
 	return c
 }
@@ -321,5 +321,5 @@ func init() {
 	enrichCmd.Flags().DurationVar(&enrichTimeout, "timeout", 30*time.Second, "Timeout for single LLM call")
 	enrichCmd.Flags().StringVar(&enrichCustomBaseURL, "custom-base-url", "", "Custom provider API URL")
 	enrichCmd.Flags().StringVar(&enrichCustomAPIKeyEnv, "custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
-	enrichCmd.Flags().BoolVar(&enrichNoStream, "no-stream", false, "Disable streaming output")
+	enrichCmd.Flags().BoolVar(&enrichNoStream, "no-stream", false, "Disable streaming output to enable concurrent LLM calls (faster)")
 }
