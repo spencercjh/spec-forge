@@ -14,20 +14,20 @@ import (
 // mockProvider for testing
 type mockProvider struct {
 	response     string
-	responseFunc func() (string, error)
+	responseFunc func() (string, *TokenUsage, error)
 	err          error
 	called       atomic.Int32
 }
 
-func (m *mockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
+func (m *mockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *TokenUsage, error) {
 	m.called.Add(1)
 	if m.responseFunc != nil {
 		return m.responseFunc()
 	}
 	if m.err != nil {
-		return "", m.err
+		return "", nil, m.err
 	}
-	return m.response, nil
+	return m.response, nil, nil
 }
 
 func (m *mockProvider) Name() string {
@@ -150,12 +150,12 @@ func TestConcurrentProcessor_ProcessAll(t *testing.T) {
 func TestConcurrentProcessor_ProcessAll_PartialFailure(t *testing.T) {
 	callCount := 0
 	mock := &mockProvider{
-		responseFunc: func() (string, error) {
+		responseFunc: func() (string, *TokenUsage, error) {
 			callCount++
 			if callCount == 1 {
-				return "", errors.New("first call fails")
+				return "", nil, errors.New("first call fails")
 			}
-			return `{"description": "test"}`, nil
+			return `{"description": "test"}`, nil, nil
 		},
 	}
 
@@ -264,14 +264,14 @@ func TestParseSchemaResponse(t *testing.T) {
 
 // MockProvider for schema batch test
 type MockProvider struct {
-	GenerateFunc func(ctx context.Context, p string, opts ...provider.Option) (string, error)
+	GenerateFunc func(ctx context.Context, p string, opts ...provider.Option) (string, *TokenUsage, error)
 }
 
-func (m *MockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
+func (m *MockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *TokenUsage, error) {
 	if m.GenerateFunc != nil {
 		return m.GenerateFunc(ctx, p, opts...)
 	}
-	return "", nil
+	return "", nil, nil
 }
 
 func (m *MockProvider) Name() string {
@@ -340,7 +340,7 @@ type mockStreamingAwareProvider struct {
 	streamingChunks [][]byte
 }
 
-func (m *mockStreamingAwareProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
+func (m *mockStreamingAwareProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *TokenUsage, error) {
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -352,11 +352,11 @@ func (m *mockStreamingAwareProvider) Generate(ctx context.Context, p string, opt
 		for _, chunk := range chunks {
 			m.streamingChunks = append(m.streamingChunks, chunk)
 			if err := cfg.StreamingFunc(ctx, chunk); err != nil {
-				return "", err
+				return "", nil, err
 			}
 		}
 	}
-	return m.response, nil
+	return m.response, nil, nil
 }
 
 func (m *mockStreamingAwareProvider) Name() string {

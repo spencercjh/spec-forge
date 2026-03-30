@@ -21,11 +21,11 @@ type mockProvider struct {
 	err      error
 }
 
-func (m *mockProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
+func (m *mockProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *TokenUsage, error) {
 	if m.err != nil {
-		return "", m.err
+		return "", nil, m.err
 	}
-	return m.response, nil
+	return m.response, nil, nil
 }
 
 func (m *mockProvider) Name() string {
@@ -308,7 +308,7 @@ type mockStreamingProvider struct {
 	response string
 }
 
-func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
+func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *TokenUsage, error) {
 	// Apply options to get streaming config
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
@@ -317,11 +317,11 @@ func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opt
 	if cfg.StreamingFunc != nil {
 		for _, chunk := range m.chunks {
 			if err := cfg.StreamingFunc(ctx, []byte(chunk)); err != nil {
-				return "", err
+				return "", nil, err
 			}
 		}
 	}
-	return m.response, nil
+	return m.response, nil, nil
 }
 
 func (m *mockStreamingProvider) Name() string {
@@ -334,7 +334,7 @@ type mockStreamingDisabledProvider struct {
 	streamingCalled bool
 }
 
-func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
+func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *TokenUsage, error) {
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -342,7 +342,7 @@ func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt str
 	if cfg.StreamingFunc != nil {
 		m.streamingCalled = true
 	}
-	return m.response, nil
+	return m.response, nil, nil
 }
 
 func (m *mockStreamingDisabledProvider) Name() string {
