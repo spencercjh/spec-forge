@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -199,10 +200,13 @@ func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContex
 					Type: prompt.TemplateTypeAPI,
 					Path: item.method + " " + pathStr,
 					Context: prompt.TemplateContext{
-						Type:     prompt.TemplateTypeAPI,
-						Language: language,
-						Method:   item.method,
-						Path:     pathStr,
+						Type:                prompt.TemplateTypeAPI,
+						Language:            language,
+						Method:              item.method,
+						Path:                pathStr,
+						Tags:                op.Tags,
+						ExistingSummary:     op.Summary,
+						ExistingDescription: op.Description,
 					},
 					SetValue: func(desc string) {
 						// Parse response and set summary/description
@@ -270,17 +274,27 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 				}
 				param := paramRef.Value
 				fieldType := ""
+				format := ""
+				var enum []string
+				var constraints string
 				if param.Schema != nil && param.Schema.Value != nil {
-					fieldType = getSchemaTypeString(param.Schema.Value)
+					schemaVal := param.Schema.Value
+					fieldType = getSchemaTypeString(schemaVal)
+					format = schemaVal.Format
+					enum = buildParamEnumStrings(schemaVal.Enum)
+					constraints = buildParamConstraintsString(schemaVal)
 				}
 
 				// Capture for closure
 				p := param
 				params = append(params, processor.ParamFieldItem{
-					ParamName: param.Name,
-					ParamIn:   param.In,
-					FieldType: fieldType,
-					Required:  param.Required,
+					ParamName:   param.Name,
+					ParamIn:     param.In,
+					FieldType:   fieldType,
+					Required:    param.Required,
+					Format:      format,
+					Enum:        enum,
+					Constraints: constraints,
 					SetValue: func(desc string) {
 						p.Description = desc
 					},
@@ -307,6 +321,39 @@ func getSchemaTypeString(schema *openapi3.Schema) string {
 		return typeStr
 	}
 	return "object"
+}
+
+// buildParamConstraintsString builds a human-readable constraints string from a schema.
+func buildParamConstraintsString(schema *openapi3.Schema) string {
+	var parts []string
+	if schema.Min != nil {
+		parts = append(parts, fmt.Sprintf("min: %v", *schema.Min))
+	}
+	if schema.Max != nil {
+		parts = append(parts, fmt.Sprintf("max: %v", *schema.Max))
+	}
+	if schema.MinLength > 0 {
+		parts = append(parts, fmt.Sprintf("minLength: %d", schema.MinLength))
+	}
+	if schema.MaxLength != nil {
+		parts = append(parts, fmt.Sprintf("maxLength: %d", *schema.MaxLength))
+	}
+	if schema.Pattern != "" {
+		parts = append(parts, fmt.Sprintf("pattern: %s", schema.Pattern))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// buildParamEnumStrings converts []any to []string for enum values.
+func buildParamEnumStrings(enum []any) []string {
+	if len(enum) == 0 {
+		return nil
+	}
+	result := make([]string, len(enum))
+	for i, v := range enum {
+		result[i] = fmt.Sprintf("%v", v)
+	}
+	return result
 }
 
 // parseSummaryDescription splits a description into summary and full description

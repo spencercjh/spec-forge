@@ -449,3 +449,77 @@ func TestEnricher_WithStreamingDisabled(t *testing.T) {
 	// Buffer should be empty since no streaming occurred
 	assert.Empty(t, buf.String(), "Buffer should be empty when streaming is disabled")
 }
+
+func TestEnricher_CollectParameters_EnrichedContext(t *testing.T) {
+	maxLen := uint64(50)
+	paths := openapi3.NewPaths()
+	paths.Set("/users", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Parameters: openapi3.Parameters{
+				&openapi3.ParameterRef{
+					Value: &openapi3.Parameter{
+						Name:     "status",
+						In:       "query",
+						Required: false,
+						Schema: &openapi3.SchemaRef{Value: &openapi3.Schema{
+							Type:      &openapi3.Types{"string"},
+							Enum:      []any{"active", "inactive"},
+							MaxLength: &maxLen,
+						}},
+					},
+				},
+			},
+		},
+	})
+	spec := &openapi3.T{Paths: paths}
+
+	collector := &processor.SpecCollector{}
+	collectParameterGroups(spec, collector, "en", false)
+
+	batches := collector.GroupByType()
+	for _, batch := range batches {
+		if batch.Type == prompt.TemplateTypeParam {
+			for _, elem := range batch.Elements {
+				if len(elem.Context.ParamFields) > 0 {
+					pf := elem.Context.ParamFields[0]
+					if len(pf.Enum) != 2 {
+						t.Errorf("param enum count = %d, want 2", len(pf.Enum))
+					}
+					if pf.Constraints == "" {
+						t.Error("param constraints should not be empty")
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestEnricher_CollectElements_APITags(t *testing.T) {
+	paths := openapi3.NewPaths()
+	paths.Set("/users/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Tags:    []string{"users", "admin"},
+			Summary: "",
+		},
+	})
+	spec := &openapi3.T{Paths: paths}
+
+	cfg := Config{Provider: "openai", Model: "gpt-4o", Concurrency: 1}
+	cfg = cfg.MergeWithDefaults()
+	e, _ := NewEnricher(cfg, &mockProvider{response: `{"summary": "test"}`})
+
+	collector := e.collectElements(spec, &specctx.EnrichmentContext{Schemas: make(map[string]*specctx.SchemaContext)}, "en", false)
+	batches := collector.GroupByType()
+
+	for _, batch := range batches {
+		if batch.Type == prompt.TemplateTypeAPI {
+			for _, elem := range batch.Elements {
+				if elem.Context.Path == "/users/{id}" {
+					if len(elem.Context.Tags) != 2 {
+						t.Errorf("Tags = %d, want 2", len(elem.Context.Tags))
+					}
+				}
+			}
+		}
+	}
+}
