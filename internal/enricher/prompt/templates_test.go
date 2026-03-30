@@ -167,3 +167,74 @@ func containsAll(s string, substrs ...string) bool {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && s[0:len(substr)] == substr || len(s) > len(substr) && contains(s[1:], substr)
 }
+
+func TestTemplateContext_EnrichedFields(t *testing.T) {
+	ctx := TemplateContext{
+		Type:                TemplateTypeAPI,
+		Language:            "en",
+		Method:              "GET",
+		Path:                "/users/{id}",
+		Tags:                []string{"users", "admin"},
+		ExistingSummary:     "Get user",
+		ExistingDescription: "Returns a user by ID",
+		Fields: []FieldContext{
+			{
+				Name:        "email",
+				Type:        "string",
+				Required:    true,
+				Format:      "email",
+				Enum:        []string{},
+				Constraints: "maxLength: 255",
+			},
+		},
+		ParamFields: []ParamFieldContext{
+			{
+				Name:    "status",
+				Type:    "string",
+				ParamIn: "query",
+				Enum:    []string{"active", "inactive"},
+			},
+		},
+	}
+
+	if len(ctx.Tags) != 2 {
+		t.Errorf("Tags = %d, want 2", len(ctx.Tags))
+	}
+	if ctx.ExistingSummary != "Get user" {
+		t.Errorf("ExistingSummary = %q, want %q", ctx.ExistingSummary, "Get user")
+	}
+	if ctx.Fields[0].Format != "email" {
+		t.Errorf("Field Format = %q, want %q", ctx.Fields[0].Format, "email")
+	}
+	if len(ctx.ParamFields[0].Enum) != 2 {
+		t.Errorf("Param Enum = %d, want 2", len(ctx.ParamFields[0].Enum))
+	}
+}
+
+func TestTemplate_RenderWithEnrichedFieldContext(t *testing.T) {
+	tmpl := &Template{
+		User: `Schema: {{.SchemaName}}
+{{range .Fields}}- {{.Name}} ({{.Type}}, {{if .Format}}format: {{.Format}}, {{end}}{{if .Required}}required{{else}}optional{{end}}{{if .Constraints}}, {{.Constraints}}{{end}}{{if .Enum}}, enum: [{{join .Enum ", "}}]{{end}})
+{{end}}`,
+	}
+
+	ctx := TemplateContext{
+		SchemaName: "User",
+		Fields: []FieldContext{
+			{Name: "email", Type: "string", Required: true, Format: "email", Constraints: "maxLength: 255"},
+			{Name: "role", Type: "string", Required: false, Enum: []string{"admin", "user", "guest"}},
+		},
+	}
+
+	_, user, err := tmpl.Render(ctx)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	if !containsAll(user, "email", "format: email", "required", "maxLength: 255") {
+		t.Errorf("User prompt missing expected enriched content: %s", user)
+	}
+	if !containsAll(user, "role", "enum: [admin, user, guest]") {
+		t.Errorf("User prompt missing enum content: %s", user)
+	}
+}

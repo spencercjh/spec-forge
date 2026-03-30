@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"bytes"
+	"strings"
 	"text/template"
 )
 
@@ -17,17 +18,25 @@ const (
 
 // FieldContext provides specctx for a schema field
 type FieldContext struct {
-	Name     string
-	Type     string
-	Required bool
+	Name                string
+	Type                string
+	Required            bool
+	Format              string   // e.g., "email", "date-time", "uuid"
+	Enum                []string // allowed values, e.g., ["active", "inactive"]
+	Constraints         string   // human-readable: "min: 0, max: 100, pattern: ^[a-z]+$"
+	ExistingDescription string   // existing description from the spec, if any
 }
 
 // ParamFieldContext provides specctx for a parameter in a group.
 type ParamFieldContext struct {
-	Name     string
-	Type     string
-	ParamIn  string // path, query, header, cookie
-	Required bool
+	Name                string
+	Type                string
+	ParamIn             string   // path, query, header, cookie
+	Required            bool
+	Format              string   // e.g., "int32", "uuid"
+	Enum                []string // allowed values
+	Constraints         string   // human-readable validation rules
+	ExistingDescription string   // existing description from the spec, if any
 }
 
 // TemplateContext provides specctx for template rendering
@@ -36,8 +45,11 @@ type TemplateContext struct {
 	Language string
 
 	// API specctx
-	Path   string
-	Method string
+	Path                string
+	Method              string
+	Tags                []string
+	ExistingSummary     string
+	ExistingDescription string
 
 	// Schema specctx
 	SchemaName string
@@ -81,7 +93,9 @@ func (t *Template) Render(ctx TemplateContext) (system, user string, err error) 
 }
 
 func renderString(tmpl string, data any) (string, error) {
-	t, err := template.New("prompt").Parse(tmpl)
+	t, err := template.New("prompt").Funcs(template.FuncMap{
+		"join": strings.Join,
+	}).Parse(tmpl)
 	if err != nil {
 		return "", err
 	}
