@@ -2,10 +2,30 @@ package provider
 
 import "context"
 
+// TokenUsage represents token consumption for a single LLM call.
+type TokenUsage struct {
+	InputTokens  int
+	OutputTokens int
+}
+
+// Add returns the sum of two TokenUsage values.
+func (u *TokenUsage) Add(other *TokenUsage) {
+	if other == nil {
+		return
+	}
+	u.InputTokens += other.InputTokens
+	u.OutputTokens += other.OutputTokens
+}
+
+// Total returns the total number of tokens.
+func (u *TokenUsage) Total() int {
+	return u.InputTokens + u.OutputTokens
+}
+
 // Provider defines the interface for LLM providers
 type Provider interface {
 	// Generate generates a response for the given prompt
-	Generate(ctx context.Context, prompt string, opts ...Option) (string, error)
+	Generate(ctx context.Context, prompt string, opts ...Option) (string, *TokenUsage, error)
 	// Name returns the provider name
 	Name() string
 }

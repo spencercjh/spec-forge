@@ -7,15 +7,15 @@ import (
 
 // MockProvider for testing
 type MockProvider struct {
-	GenerateFunc func(ctx context.Context, prompt string, opts ...Option) (string, error)
+	GenerateFunc func(ctx context.Context, prompt string, opts ...Option) (string, *TokenUsage, error)
 	name         string
 }
 
-func (m *MockProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
+func (m *MockProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, *TokenUsage, error) {
 	if m.GenerateFunc != nil {
 		return m.GenerateFunc(ctx, prompt, opts...)
 	}
-	return "", nil
+	return "", nil, nil
 }
 
 func (m *MockProvider) Name() string {
@@ -28,20 +28,24 @@ func TestProvider_Interface(t *testing.T) {
 }
 
 func TestMockProvider_Generate(t *testing.T) {
+	usage := &TokenUsage{InputTokens: 10, OutputTokens: 20}
 	mock := &MockProvider{
 		name: "test",
-		GenerateFunc: func(ctx context.Context, prompt string, opts ...Option) (string, error) {
-			return "response: " + prompt, nil
+		GenerateFunc: func(ctx context.Context, prompt string, opts ...Option) (string, *TokenUsage, error) {
+			return "response: " + prompt, usage, nil
 		},
 	}
 
 	ctx := context.Background()
-	result, err := mock.Generate(ctx, "hello")
+	result, gotUsage, err := mock.Generate(ctx, "hello")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result != "response: hello" {
 		t.Errorf("Generate() = %q, want %q", result, "response: hello")
+	}
+	if gotUsage.InputTokens != 10 || gotUsage.OutputTokens != 20 {
+		t.Errorf("usage = %+v, want InputTokens=10 OutputTokens=20", gotUsage)
 	}
 	if mock.Name() != "test" {
 		t.Errorf("Name() = %q, want %q", mock.Name(), "test")
@@ -214,6 +218,29 @@ func containsString(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestTokenUsage_Add(t *testing.T) {
+	u := &TokenUsage{InputTokens: 10, OutputTokens: 20}
+	u.Add(&TokenUsage{InputTokens: 5, OutputTokens: 10})
+	if u.InputTokens != 15 || u.OutputTokens != 30 {
+		t.Errorf("Add() = %+v, want InputTokens=15 OutputTokens=30", u)
+	}
+}
+
+func TestTokenUsage_Add_Nil(t *testing.T) {
+	u := &TokenUsage{InputTokens: 10, OutputTokens: 20}
+	u.Add(nil)
+	if u.InputTokens != 10 || u.OutputTokens != 20 {
+		t.Errorf("Add(nil) should be no-op, got %+v", u)
+	}
+}
+
+func TestTokenUsage_Total(t *testing.T) {
+	u := &TokenUsage{InputTokens: 100, OutputTokens: 50}
+	if u.Total() != 150 {
+		t.Errorf("Total() = %d, want 150", u.Total())
+	}
 }
 
 func TestWithStreamingFunc(t *testing.T) {
