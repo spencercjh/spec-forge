@@ -118,7 +118,16 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	slog.Info("Enriching spec", "batches", len(batches), "language", language)
 
 	// Process batches
+	// Create template manager and apply custom prompts if configured
 	tmplMgr := prompt.NewTemplateManager()
+	for typeKey, customPrompt := range e.config.CustomPrompts {
+		ttype := prompt.TemplateType(typeKey)
+		tmplMgr.Set(ttype, &prompt.Template{
+			System: customPrompt.System,
+			User:   customPrompt.User,
+		})
+		slog.Debug("applied custom prompt", "type", typeKey)
+	}
 	batchProcessor := processor.NewBatchProcessor(e.provider, tmplMgr,
 		processor.WithStreamWriter(streamWriter))
 	concurrentProcessor := processor.NewConcurrentProcessor(batchProcessor, e.config.Concurrency)

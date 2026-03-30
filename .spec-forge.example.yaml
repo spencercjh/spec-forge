@@ -16,6 +16,15 @@ enrich:
   language: zh
   # Request timeout
   timeout: 60s
+  # Custom prompt templates (optional)
+  # Override built-in prompt templates for any type: api, schema, param, response
+  # Supports Go template syntax (same as built-in templates)
+  # customPrompts:
+  #   api:
+  #     system: "You are a REST API documentation writer..."
+  #     user: "API: {{.Method}} {{.Path}}\nDescribe this endpoint."
+  #   schema:
+  #     system: "You are a data model documenter..."
 
 # Output Settings
 output:

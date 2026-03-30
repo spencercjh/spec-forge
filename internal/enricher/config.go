@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// CustomPromptConfig holds custom prompt overrides for a template type.
+type CustomPromptConfig struct {
+	System string
+	User   string
+}
+
 // Config Enricher configuration
 type Config struct {
 	// Provider type: "openai", "anthropic", "ollama", "custom"
@@ -29,6 +35,9 @@ type Config struct {
 
 	// Advanced configuration
 	PromptTemplateDir string
+
+	// Custom prompt overrides keyed by template type name (e.g., "api", "schema")
+	CustomPrompts map[string]CustomPromptConfig
 }
 
 // DefaultConfig provides sensible defaults

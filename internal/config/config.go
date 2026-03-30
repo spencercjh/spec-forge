@@ -26,16 +26,23 @@ type ReadMeConfig struct {
 
 // EnrichConfig contains LLM enrichment settings.
 type EnrichConfig struct {
-	Enabled    bool              `mapstructure:"enabled"`
-	Provider   string            `mapstructure:"provider"`
-	Model      string            `mapstructure:"model"`
-	Language   string            `mapstructure:"language"`
-	APIKey     string            `mapstructure:"apiKey"`
-	Headers    map[string]string `mapstructure:"headers"`
-	BaseURL    string            `mapstructure:"baseUrl"`
-	APIKeyEnv  string            `mapstructure:"apiKeyEnv"`
-	Timeout    string            `mapstructure:"timeout"`
-	SkipEnrich bool              `mapstructure:"skipEnrich"`
+	Enabled       bool                       `mapstructure:"enabled"`
+	Provider      string                     `mapstructure:"provider"`
+	Model         string                     `mapstructure:"model"`
+	Language      string                     `mapstructure:"language"`
+	APIKey        string                     `mapstructure:"apiKey"`
+	Headers       map[string]string          `mapstructure:"headers"`
+	BaseURL       string                     `mapstructure:"baseUrl"`
+	APIKeyEnv     string                     `mapstructure:"apiKeyEnv"`
+	Timeout       string                     `mapstructure:"timeout"`
+	SkipEnrich    bool                       `mapstructure:"skipEnrich"`
+	CustomPrompts map[string]CustomPromptCfg `mapstructure:"customPrompts"`
+}
+
+// CustomPromptCfg holds custom system/user prompt overrides for a template type.
+type CustomPromptCfg struct {
+	System string `mapstructure:"system"`
+	User   string `mapstructure:"user"`
 }
 
 // OutputConfig contains output settings.

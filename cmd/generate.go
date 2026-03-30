@@ -409,6 +409,18 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 		}
 	}
 
+	// Map custom prompts from config
+	var customPrompts map[string]enricher.CustomPromptConfig
+	if cfg.Enrich.CustomPrompts != nil {
+		customPrompts = make(map[string]enricher.CustomPromptConfig)
+		for k, v := range cfg.Enrich.CustomPrompts {
+			customPrompts[k] = enricher.CustomPromptConfig{
+				System: v.System,
+				User:   v.User,
+			}
+		}
+	}
+
 	// Create enricher config
 	enricherCfg := enricher.Config{
 		Provider:      cfg.Enrich.Provider,
@@ -416,6 +428,7 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 		Language:      lang,
 		Timeout:       timeout,
 		CustomBaseURL: cfg.Enrich.BaseURL,
+		CustomPrompts: customPrompts,
 	}
 	enricherCfg = enricherCfg.MergeWithDefaults()
 
