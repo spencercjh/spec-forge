@@ -49,6 +49,7 @@ func CollectSchemaFields(
 
 		// Skip fields that already have descriptions (unless force is true)
 		if !force && prop.Description != "" {
+			collector.Skipped.Schemas++
 			continue
 		}
 

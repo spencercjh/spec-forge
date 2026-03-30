@@ -46,6 +46,11 @@ type SpecCollector struct {
 	elements []EnrichmentElement
 	schemas  []SchemaElement
 	params   []ParamElement
+	Skipped  struct {
+		APIs    int
+		Params  int
+		Schemas int
+	}
 }
 
 // AddElement adds an element to the collector

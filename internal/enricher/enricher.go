@@ -97,6 +97,15 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	// Collect elements to enrich
 	collector := e.collectElements(spec, enrichCtx, language, force)
 
+	// Log skipped items
+	if collector.Skipped.APIs > 0 || collector.Skipped.Params > 0 || collector.Skipped.Schemas > 0 {
+		slog.Info("Skipped items with existing descriptions",
+			"apis", collector.Skipped.APIs,
+			"params", collector.Skipped.Params,
+			"schemas", collector.Skipped.Schemas,
+		)
+	}
+
 	// Group elements into batches
 	batches := collector.GroupByType()
 
@@ -181,6 +190,7 @@ func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContex
 
 				// Only enrich if description is missing (or force is true)
 				if !force && item.op.Summary != "" && item.op.Description != "" {
+					collector.Skipped.APIs++
 					continue
 				}
 
@@ -240,6 +250,8 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 			{http.MethodPut, pathItem.Put},
 			{http.MethodDelete, pathItem.Delete},
 			{http.MethodPatch, pathItem.Patch},
+			{http.MethodHead, pathItem.Head},
+			{http.MethodOptions, pathItem.Options},
 		}
 
 		for _, item := range operations {
@@ -253,6 +265,7 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 					continue
 				}
 				if !force && paramRef.Value.Description != "" {
+					collector.Skipped.Params++
 					continue
 				}
 				param := paramRef.Value
