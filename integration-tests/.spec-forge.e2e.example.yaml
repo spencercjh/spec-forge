@@ -1,0 +1,24 @@
+# Spec Forge E2E Test Configuration
+# Copy this file to .spec-forge.e2e.local.yaml and customize for local E2E testing
+#
+# Usage:
+#   1. Copy this file: cp .spec-forge.e2e.example.yaml .spec-forge.e2e.local.yaml
+#   2. Set your API key: export LLM_API_KEY="your-api-key"
+#   3. Run E2E tests: make test-e2e
+#
+# Note: .spec-forge.e2e.local.yaml is gitignored and will NOT be committed.
+
+enrich:
+  enabled: true
+  # LLM provider: openai, anthropic, ollama, custom
+  provider: custom
+  # Model to use for enrichment
+  model: deepseek-chat
+  # Base URL for custom/ollama providers
+  baseUrl: https://api.deepseek.com/v1
+  # Environment variable name for API key (default: LLM_API_KEY)
+  apiKeyEnv: LLM_API_KEY
+  # Language for generated descriptions: en, zh
+  language: zh
+  # Request timeout
+  timeout: 60s

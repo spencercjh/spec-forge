@@ -2,11 +2,15 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/anthropic"
 )
+
+// AnthropicProviderName is the name of the Anthropic provider.
+const AnthropicProviderName = "anthropic"
 
 // AnthropicProvider implements Provider for Anthropic Claude using langchaingo
 type AnthropicProvider struct {
@@ -30,16 +34,31 @@ func newAnthropicProvider(apiKey, model string) (*AnthropicProvider, error) {
 	}, nil
 }
 
-// Generate generates a response for the given prompt
-func (p *AnthropicProvider) Generate(ctx context.Context, prompt string) (string, error) {
-	response, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
-	if err != nil {
-		return "", fmt.Errorf("anthropic generation failed: %w", err)
+// Generate generates a response for the given prompt with optional streaming
+func (p *AnthropicProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
+	cfg := applyOptions(opts...)
+
+	messages := []llms.MessageContent{
+		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
 	}
-	return response, nil
+
+	var callOpts []llms.CallOption
+	if cfg.StreamingFunc != nil {
+		callOpts = append(callOpts, llms.WithStreamingFunc(cfg.StreamingFunc))
+	}
+
+	response, err := p.llm.GenerateContent(ctx, messages, callOpts...)
+	if err != nil {
+		return "", fmt.Errorf("%s generation failed: %w", AnthropicProviderName, err)
+	}
+
+	if len(response.Choices) == 0 {
+		return "", errors.New("anthropic generation returned no choices")
+	}
+	return response.Choices[0].Content, nil
 }
 
 // Name returns the provider name
 func (p *AnthropicProvider) Name() string {
-	return "anthropic"
+	return AnthropicProviderName
 }

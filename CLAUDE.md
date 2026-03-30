@@ -27,6 +27,10 @@ make fmt
 make verify
 ```
 
+> **Important:** `make verify` checks for uncommitted changes (git diff) and will fail if there are pending changes.
+> Before committing code, use individual commands: `make fmt`, `make lint`, `make test`.
+> Only use `make verify` after committing or in CI environments where working tree is clean.
+
 ## Architecture Overview
 
 Spec Forge is a CLI tool that generates enriched OpenAPI specifications from various frameworks (Spring Boot, go-zero, gRPC-protoc).
@@ -239,7 +243,7 @@ Test schema field and API parameter enrichment with DeepSeek:
 # Build the binary first
 go build -o ./build/spec-forge .
 
-# Run enrichment with Chinese descriptions
+# Run enrichment with Chinese descriptions (streaming enabled by default)
 LLM_API_KEY="your-deepseek-api-key" ./build/spec-forge enrich \
     ./integration-tests/maven-springboot-openapi-demo/target/openapi.json \
     --provider custom \
@@ -247,7 +251,21 @@ LLM_API_KEY="your-deepseek-api-key" ./build/spec-forge enrich \
     --custom-base-url https://api.deepseek.com/v1 \
     --language zh \
     -v
+
+# Or use --no-stream for faster processing (enables concurrent LLM calls)
+LLM_API_KEY="your-deepseek-api-key" ./build/spec-forge enrich \
+    ./integration-tests/maven-springboot-openapi-demo/target/openapi.json \
+    --provider custom \
+    --model deepseek-chat \
+    --custom-base-url https://api.deepseek.com/v1 \
+    --language zh \
+    -v \
+    --no-stream
 ```
+
+> **Note:** Streaming is enabled by default, showing real-time LLM output with batch-type prefixes
+> (`[api]`, `[schema]`, `[param]`). With streaming on, batches are processed sequentially for readable output.
+> Use `--no-stream` to enable concurrent processing across batches for faster enrichment.
 
 Expected output:
 - Schema fields get Chinese descriptions (e.g., `User.id` → "用户唯一标识符")

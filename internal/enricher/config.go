@@ -11,8 +11,10 @@ type Config struct {
 	Provider string
 
 	// Common configuration
-	Model       string
-	Language    string
+	Model    string
+	Language string
+	// Number of concurrent LLM calls. Only effective with --no-stream;
+	// streaming mode processes batches sequentially for readable output.
 	Concurrency int
 	MaxRetries  int
 	Timeout     time.Duration

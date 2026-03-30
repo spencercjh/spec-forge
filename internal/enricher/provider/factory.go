@@ -5,9 +5,33 @@ import "context"
 // Provider defines the interface for LLM providers
 type Provider interface {
 	// Generate generates a response for the given prompt
-	Generate(ctx context.Context, prompt string) (string, error)
+	Generate(ctx context.Context, prompt string, opts ...Option) (string, error)
 	// Name returns the provider name
 	Name() string
+}
+
+// GenerateOptions contains options for generation
+type GenerateOptions struct {
+	StreamingFunc func(ctx context.Context, chunk []byte) error
+}
+
+// Option is a functional option for Generate
+type Option func(*GenerateOptions)
+
+// WithStreamingFunc sets a streaming callback function
+func WithStreamingFunc(fn func(ctx context.Context, chunk []byte) error) Option {
+	return func(o *GenerateOptions) {
+		o.StreamingFunc = fn
+	}
+}
+
+// applyOptions applies options and returns the configured GenerateOptions
+func applyOptions(opts ...Option) *GenerateOptions {
+	cfg := &GenerateOptions{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	return cfg
 }
 
 // Config contains configuration for creating a provider
@@ -40,7 +64,7 @@ func NewProvider(cfg Config) (Provider, error) { //nolint:gocritic // copying co
 	switch cfg.Provider {
 	case OpenAIProviderName:
 		return newOpenAIProvider(cfg.APIKey, cfg.Model)
-	case "anthropic":
+	case AnthropicProviderName:
 		return newAnthropicProvider(cfg.APIKey, cfg.Model)
 	case OllamaProviderName:
 		baseURL := cfg.BaseURL
@@ -48,7 +72,7 @@ func NewProvider(cfg Config) (Provider, error) { //nolint:gocritic // copying co
 			baseURL = "http://localhost:11434"
 		}
 		return newOllamaProvider(baseURL, cfg.Model)
-	case "custom":
+	case CustomProviderName:
 		return newCustomProvider(CustomProviderConfig{
 			BaseURL: cfg.BaseURL,
 			APIKey:  cfg.APIKey,

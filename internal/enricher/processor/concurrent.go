@@ -6,13 +6,17 @@ import (
 	"sync"
 )
 
-// ConcurrentProcessor processes batches concurrently
+// ConcurrentProcessor processes batches with configurable concurrency.
+// Note: When streaming is enabled (StreamWriter configured), processing is
+// sequential to ensure readable interleaved output. The concurrency setting
+// only applies when streaming is disabled via --no-stream.
 type ConcurrentProcessor struct {
 	batchProcessor *BatchProcessor
 	concurrency    int
 }
 
-// NewConcurrentProcessor creates a new concurrent processor
+// NewConcurrentProcessor creates a new concurrent processor.
+// The concurrency parameter is only used when streaming is disabled.
 func NewConcurrentProcessor(bp *BatchProcessor, concurrency int) *ConcurrentProcessor {
 	return &ConcurrentProcessor{
 		batchProcessor: bp,
@@ -20,8 +24,48 @@ func NewConcurrentProcessor(bp *BatchProcessor, concurrency int) *ConcurrentProc
 	}
 }
 
-// ProcessAll processes all batches with controlled concurrency
+// ProcessAll processes all batches.
+// When streaming is enabled, batches are processed sequentially to prevent
+// interleaved LLM output chunks from mixing together (which would be unreadable).
+// When streaming is disabled (--no-stream), batches are processed concurrently
+// up to the configured concurrency limit for faster processing.
 func (p *ConcurrentProcessor) ProcessAll(ctx context.Context, batches []*Batch) error {
+	// Sequential processing when streaming to avoid interleaved output
+	if p.batchProcessor.HasStreamWriter() {
+		return p.processSequential(ctx, batches)
+	}
+	return p.processConcurrent(ctx, batches)
+}
+
+// processSequential processes batches one at a time (streaming mode).
+// This ensures LLM output chunks are grouped by batch type for readability.
+func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*Batch) error {
+	var failedCount int
+	var failedErrors []error
+
+	for i, batch := range batches {
+		if err := p.batchProcessor.ProcessBatch(ctx, batch); err != nil {
+			failedCount++
+			failedErrors = append(failedErrors, err)
+			slog.Warn("batch processing failed",
+				"batch_index", i,
+				"batch_type", batch.Type,
+				"error", err)
+		}
+	}
+
+	if failedCount > 0 {
+		return &PartialEnrichmentError{
+			TotalBatches:  len(batches),
+			FailedBatches: failedCount,
+			Errors:        failedErrors,
+		}
+	}
+	return nil
+}
+
+// processConcurrent processes batches with controlled concurrency
+func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*Batch) error {
 	var (
 		wg           sync.WaitGroup
 		mu           sync.Mutex

@@ -43,6 +43,9 @@ Thumbs.db
 .spec-forge.yaml
 !.spec-forge.example.yaml
 
+# E2E test local config (in integration-tests/)
+integration-tests/.spec-forge.e2e.local.yaml
+
 # Environment files
 .env
 .env.local

@@ -67,6 +67,8 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	customBaseURLFlag, _ := cmd.Flags().GetString("custom-base-url")
 	//nolint:errcheck
 	customAPIKeyEnvFlag, _ := cmd.Flags().GetString("custom-api-key-env")
+	//nolint:errcheck
+	noStreamFlag, _ := cmd.Flags().GetBool("no-stream")
 
 	// Determine provider
 	prov := providerFlag
@@ -153,7 +155,11 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Enrich
-	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{Language: lang})
+	streamEnabled := !noStreamFlag // Streaming enabled by default
+	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{
+		Language: lang,
+		Stream:   &streamEnabled,
+	})
 	if err != nil {
 		// Check if partial enrichment
 		if partialErr, ok := errors.AsType[*processor.PartialEnrichmentError](err); ok {
@@ -282,10 +288,11 @@ Examples:
 	c.Flags().String("model", "", "LLM model name")
 	c.Flags().String("language", "en", "Output language for descriptions")
 	c.Flags().StringP("output", "o", "", "Output file (default: overwrite input)")
-	c.Flags().Int("concurrency", 3, "Number of concurrent LLM calls")
+	c.Flags().Int("concurrency", 3, "Max concurrent LLM calls (only effective with --no-stream)")
 	c.Flags().Duration("timeout", 30*time.Second, "Timeout for single LLM call")
 	c.Flags().String("custom-base-url", "", "Custom provider API URL")
 	c.Flags().String("custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
+	c.Flags().Bool("no-stream", false, "Disable streaming to enable concurrent processing (faster, but no real-time output)")
 
 	return c
 }
@@ -300,6 +307,7 @@ var (
 	enrichTimeout         time.Duration
 	enrichCustomBaseURL   string
 	enrichCustomAPIKeyEnv string
+	enrichNoStream        bool
 )
 
 func init() {
@@ -309,8 +317,9 @@ func init() {
 	enrichCmd.Flags().StringVar(&enrichModel, "model", "", "LLM model name")
 	enrichCmd.Flags().StringVar(&enrichLanguage, "language", "en", "Output language for descriptions")
 	enrichCmd.Flags().StringVarP(&enrichOutput, "output", "o", "", "Output file (default: overwrite input)")
-	enrichCmd.Flags().IntVar(&enrichConcurrency, "concurrency", 3, "Number of concurrent LLM calls")
+	enrichCmd.Flags().IntVar(&enrichConcurrency, "concurrency", 3, "Max concurrent LLM calls (only with --no-stream)")
 	enrichCmd.Flags().DurationVar(&enrichTimeout, "timeout", 30*time.Second, "Timeout for single LLM call")
 	enrichCmd.Flags().StringVar(&enrichCustomBaseURL, "custom-base-url", "", "Custom provider API URL")
 	enrichCmd.Flags().StringVar(&enrichCustomAPIKeyEnv, "custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
+	enrichCmd.Flags().BoolVar(&enrichNoStream, "no-stream", false, "Disable streaming output to enable concurrent LLM calls (faster)")
 }

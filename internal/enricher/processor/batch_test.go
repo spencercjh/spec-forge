@@ -19,7 +19,7 @@ type mockProvider struct {
 	called       atomic.Int32
 }
 
-func (m *mockProvider) Generate(ctx context.Context, p string) (string, error) {
+func (m *mockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
 	m.called.Add(1)
 	if m.responseFunc != nil {
 		return m.responseFunc()
@@ -264,12 +264,12 @@ func TestParseSchemaResponse(t *testing.T) {
 
 // MockProvider for schema batch test
 type MockProvider struct {
-	GenerateFunc func(ctx context.Context, p string) (string, error)
+	GenerateFunc func(ctx context.Context, p string, opts ...provider.Option) (string, error)
 }
 
-func (m *MockProvider) Generate(ctx context.Context, p string) (string, error) {
+func (m *MockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
 	if m.GenerateFunc != nil {
-		return m.GenerateFunc(ctx, p)
+		return m.GenerateFunc(ctx, p, opts...)
 	}
 	return "", nil
 }
@@ -280,7 +280,7 @@ func (m *MockProvider) Name() string {
 
 func TestBatchProcessor_ProcessSchemaBatch(t *testing.T) {
 	mockProvider := &MockProvider{
-		GenerateFunc: func(_ context.Context, prompt string) (string, error) {
+		GenerateFunc: func(_ context.Context, prompt string, opts ...provider.Option) (string, error) {
 			// Return mock schema field descriptions
 			if strings.Contains(prompt, "User") {
 				return `{"id": "User ID", "name": "User name"}`, nil
@@ -330,5 +330,87 @@ func TestBatchProcessor_ProcessSchemaBatch(t *testing.T) {
 
 	if len(setValues) != 2 {
 		t.Errorf("expected 2 SetValue calls, got %d", len(setValues))
+	}
+}
+
+// mockStreamingAwareProvider tracks if streaming options are passed
+type mockStreamingAwareProvider struct {
+	response        string
+	streamingCalled bool
+	streamingChunks [][]byte
+}
+
+func (m *mockStreamingAwareProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, error) {
+	cfg := &provider.GenerateOptions{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	if cfg.StreamingFunc != nil {
+		m.streamingCalled = true
+		// Simulate streaming chunks
+		chunks := [][]byte{[]byte("chunk1"), []byte("chunk2")}
+		for _, chunk := range chunks {
+			m.streamingChunks = append(m.streamingChunks, chunk)
+			if err := cfg.StreamingFunc(ctx, chunk); err != nil {
+				return "", err
+			}
+		}
+	}
+	return m.response, nil
+}
+
+func (m *mockStreamingAwareProvider) Name() string {
+	return "mock-streaming-aware"
+}
+
+func TestBatchProcessor_ProcessBatch_WithStreaming(t *testing.T) {
+	mockProvider := &mockStreamingAwareProvider{
+		response: `{"summary": "Get users", "description": "Retrieves user list"}`,
+	}
+
+	tmplMgr := prompt.NewTemplateManager()
+	var buf strings.Builder
+	sw := NewStreamWriter(&buf)
+
+	bp := NewBatchProcessor(mockProvider, tmplMgr, WithStreamWriter(sw))
+
+	batch := &Batch{
+		Type: prompt.TemplateTypeAPI,
+		Elements: []EnrichmentElement{
+			{
+				Type: prompt.TemplateTypeAPI,
+				Context: prompt.TemplateContext{
+					Method: "GET",
+					Path:   "/users",
+				},
+				SetValue: func(desc string) {},
+			},
+		},
+	}
+
+	err := bp.ProcessBatch(context.Background(), batch)
+	if err != nil {
+		t.Fatalf("ProcessBatch() error = %v", err)
+	}
+
+	// Verify streaming was called
+	if !mockProvider.streamingCalled {
+		t.Error("Expected streaming function to be called when StreamWriter is configured")
+	}
+
+	// Verify chunks were streamed
+	if len(mockProvider.streamingChunks) != 2 {
+		t.Errorf("Expected 2 streaming chunks, got %d", len(mockProvider.streamingChunks))
+	}
+
+	// Flush the buffer before checking output (StreamWriter uses buffering)
+	if err := sw.Flush(); err != nil {
+		t.Fatalf("Flush() error = %v", err)
+	}
+
+	// Verify output contains the prefix
+	output := buf.String()
+	if !strings.Contains(output, "[api]") {
+		t.Errorf("Expected output to contain '[api]' prefix, got: %s", output)
 	}
 }
