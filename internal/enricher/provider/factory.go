@@ -71,10 +71,16 @@ func extractTokenUsage(choices []*llms.ContentChoice) *TokenUsage {
 	}
 
 	var usage TokenUsage
+	// OpenAI-compatible providers use PromptTokens/CompletionTokens,
+	// Anthropic uses InputTokens/OutputTokens
 	if v, ok := info["PromptTokens"].(int); ok {
+		usage.InputTokens = v
+	} else if v, ok := info["InputTokens"].(int); ok {
 		usage.InputTokens = v
 	}
 	if v, ok := info["CompletionTokens"].(int); ok {
+		usage.OutputTokens = v
+	} else if v, ok := info["OutputTokens"].(int); ok {
 		usage.OutputTokens = v
 	}
 	if usage.InputTokens == 0 && usage.OutputTokens == 0 {

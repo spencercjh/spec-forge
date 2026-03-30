@@ -97,26 +97,19 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 			defer func() { <-semaphore }()
 
 			usage, err := p.batchProcessor.ProcessBatch(ctx, b)
+			mu.Lock()
+			if usage != nil {
+				totalUsage.Add(usage)
+			}
 			if err != nil {
-				mu.Lock()
-				if usage != nil {
-					totalUsage.Add(usage)
-				}
 				failedCount++
 				failedErrors = append(failedErrors, err)
-				mu.Unlock()
-
 				slog.Warn("batch processing failed",
 					"batch_index", idx,
 					"batch_type", b.Type,
 					"error", err)
-			} else {
-				mu.Lock()
-				if usage != nil {
-					totalUsage.Add(usage)
-				}
-				mu.Unlock()
 			}
+			mu.Unlock()
 		}(i, batch)
 	}
 
