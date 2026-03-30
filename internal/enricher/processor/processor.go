@@ -46,9 +46,9 @@ type SpecCollector struct {
 	elements []EnrichmentElement
 	schemas  []SchemaElement
 	Skipped  struct {
-		APIs    int
-		Params  int
-		Schemas int
+		APIs         int
+		Params       int
+		SchemaFields int
 	}
 }
 

@@ -98,11 +98,11 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	collector := e.collectElements(spec, enrichCtx, language, force)
 
 	// Log skipped items
-	if collector.Skipped.APIs > 0 || collector.Skipped.Params > 0 || collector.Skipped.Schemas > 0 {
+	if collector.Skipped.APIs > 0 || collector.Skipped.Params > 0 || collector.Skipped.SchemaFields > 0 {
 		slog.Info("Skipped items with existing descriptions",
 			"apis", collector.Skipped.APIs,
 			"params", collector.Skipped.Params,
-			"schemas", collector.Skipped.Schemas,
+			"schema_fields", collector.Skipped.SchemaFields,
 		)
 	}
 
