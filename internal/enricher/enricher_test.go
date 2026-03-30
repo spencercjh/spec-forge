@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
-	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
+	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 	"github.com/spencercjh/spec-forge/internal/enricher/specctx"
 )
 
@@ -23,7 +23,7 @@ type mockProvider struct {
 	err      error
 }
 
-func (m *mockProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
+func (m *mockProvider) Generate(_ context.Context, _ string, _ ...provider.Option) (string, *provider.TokenUsage, error) {
 	if m.err != nil {
 		return "", nil, m.err
 	}
@@ -320,7 +320,7 @@ type mockStreamingProvider struct {
 	response string
 }
 
-func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
+func (m *mockStreamingProvider) Generate(ctx context.Context, _ string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	// Apply options to get streaming config
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
@@ -346,7 +346,7 @@ type mockStreamingDisabledProvider struct {
 	streamingCalled bool
 }
 
-func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
+func (m *mockStreamingDisabledProvider) Generate(_ context.Context, _ string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
 		opt(cfg)

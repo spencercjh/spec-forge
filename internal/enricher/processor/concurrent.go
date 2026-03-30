@@ -44,9 +44,9 @@ func (p *ConcurrentProcessor) ProcessAll(ctx context.Context, batches []*Batch) 
 // This ensures LLM output chunks are grouped by batch type for readability.
 func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*Batch) (*provider.TokenUsage, error) {
 	var (
-		totalUsage    provider.TokenUsage
-		failedCount   int
-		failedErrors  []error
+		totalUsage   provider.TokenUsage
+		failedCount  int
+		failedErrors []error
 	)
 
 	for i, batch := range batches {
@@ -77,11 +77,11 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 // processConcurrent processes batches with controlled concurrency.
 func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*Batch) (*provider.TokenUsage, error) {
 	var (
-		wg            sync.WaitGroup
-		mu            sync.Mutex
-		totalUsage    provider.TokenUsage
-		failedCount   int
-		failedErrors  []error
+		wg           sync.WaitGroup
+		mu           sync.Mutex
+		totalUsage   provider.TokenUsage
+		failedCount  int
+		failedErrors []error
 	)
 
 	semaphore := make(chan struct{}, p.concurrency)

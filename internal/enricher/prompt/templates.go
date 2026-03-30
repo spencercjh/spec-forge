@@ -49,8 +49,8 @@ type TemplateContext struct {
 	Required  bool
 
 	// Parameter specctx
-	ParamName  string
-	ParamIn    string // path, query, header, cookie
+	ParamName   string
+	ParamIn     string // path, query, header, cookie
 	ParamFields []ParamFieldContext
 
 	// Response specctx
