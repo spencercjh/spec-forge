@@ -21,7 +21,7 @@ type mockProvider struct {
 	err      error
 }
 
-func (m *mockProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *TokenUsage, error) {
+func (m *mockProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	if m.err != nil {
 		return "", nil, m.err
 	}
@@ -192,23 +192,33 @@ func TestEnricher_CollectParameters(t *testing.T) {
 		Paths: paths,
 	}
 
-	cfg := &processor.SpecCollector{}
-	collectParametersFromSpec(spec, cfg, "en")
+	collector := &processor.SpecCollector{}
+	collectParameterGroups(spec, collector, "en", false)
 
-	params := cfg.GetParams()
-	if len(params) != 1 {
-		t.Fatalf("expected 1 parameter, got %d", len(params))
+	// Verify parameter group was added as an enrichment element
+	batches := collector.GroupByType()
+	paramBatches := 0
+	for _, batch := range batches {
+		if batch.Type == "param" {
+			paramBatches += len(batch.Elements)
+		}
 	}
-	if params[0].ParamName != "id" {
-		t.Errorf("expected param name 'id', got %s", params[0].ParamName)
+	if paramBatches != 1 {
+		t.Fatalf("expected 1 parameter group element, got %d", paramBatches)
 	}
-	if params[0].ParamIn != "path" {
-		t.Errorf("expected param in 'path', got %s", params[0].ParamIn)
-	}
-	// Test SetValue callback
-	params[0].SetValue("User ID")
-	if spec.Paths.Value("/users/{id}").Get.Parameters[0].Value.Description != "User ID" {
-		t.Errorf("expected description to be set via callback")
+
+	// Test that the callback works by finding the param group element
+	for _, batch := range batches {
+		if batch.Type == "param" {
+			for _, elem := range batch.Elements {
+				if len(elem.ParamGroupFields) > 0 {
+					elem.ParamGroupFields[0].SetValue("User ID")
+					if spec.Paths.Value("/users/{id}").Get.Parameters[0].Value.Description != "User ID" {
+						t.Errorf("expected description to be set via callback")
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -232,7 +242,7 @@ func TestEnricher_CollectSchemaFields(t *testing.T) {
 	collector := &processor.SpecCollector{}
 	processed := make(map[string]bool)
 
-	collectSchemasFromSpec(spec, collector, processed, "en")
+	collectSchemasFromSpec(spec, collector, processed, "en", false)
 
 	schemas := collector.GetSchemas()
 	if len(schemas) != 1 {
@@ -308,7 +318,7 @@ type mockStreamingProvider struct {
 	response string
 }
 
-func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *TokenUsage, error) {
+func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	// Apply options to get streaming config
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
@@ -334,7 +344,7 @@ type mockStreamingDisabledProvider struct {
 	streamingCalled bool
 }
 
-func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *TokenUsage, error) {
+func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
 		opt(cfg)

@@ -20,6 +20,7 @@ func CollectSchemaFields(
 	processed map[string]bool,
 	language string,
 	depth int,
+	force bool,
 ) {
 	// Prevent infinite recursion
 	if depth > MaxSchemaDepth {
@@ -46,8 +47,8 @@ func CollectSchemaFields(
 			continue
 		}
 
-		// Skip fields that already have descriptions
-		if prop.Description != "" {
+		// Skip fields that already have descriptions (unless force is true)
+		if !force && prop.Description != "" {
 			continue
 		}
 
@@ -67,13 +68,13 @@ func CollectSchemaFields(
 		// Recursively process nested objects
 		if prop.Type != nil && len(*prop.Type) > 0 && (*prop.Type)[0] == "object" && prop.Properties != nil {
 			nestedName := schemaName + "." + propName
-			CollectSchemaFields(nestedName, propRef, collector, processed, language, depth+1)
+			CollectSchemaFields(nestedName, propRef, collector, processed, language, depth+1, force)
 		}
 
 		// Recursively process array items
 		if prop.Type != nil && len(*prop.Type) > 0 && (*prop.Type)[0] == "array" && prop.Items != nil {
 			nestedName := schemaName + "." + propName + "[]"
-			CollectSchemaFields(nestedName, prop.Items, collector, processed, language, depth+1)
+			CollectSchemaFields(nestedName, prop.Items, collector, processed, language, depth+1, force)
 		}
 	}
 

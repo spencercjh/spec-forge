@@ -69,6 +69,8 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	customAPIKeyEnvFlag, _ := cmd.Flags().GetString("custom-api-key-env")
 	//nolint:errcheck
 	noStreamFlag, _ := cmd.Flags().GetBool("no-stream")
+	//nolint:errcheck
+	forceFlag, _ := cmd.Flags().GetBool("force")
 
 	// Determine provider
 	prov := providerFlag
@@ -159,6 +161,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{
 		Language: lang,
 		Stream:   &streamEnabled,
+		Force:    forceFlag,
 	})
 	if err != nil {
 		// Check if partial enrichment
@@ -293,6 +296,7 @@ Examples:
 	c.Flags().String("custom-base-url", "", "Custom provider API URL")
 	c.Flags().String("custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
 	c.Flags().Bool("no-stream", false, "Disable streaming to enable concurrent processing (faster, but no real-time output)")
+	c.Flags().Bool("force", false, "Force regeneration of all descriptions, ignoring existing ones")
 
 	return c
 }
@@ -308,6 +312,7 @@ var (
 	enrichCustomBaseURL   string
 	enrichCustomAPIKeyEnv string
 	enrichNoStream        bool
+	enrichForce           bool
 )
 
 func init() {
@@ -322,4 +327,5 @@ func init() {
 	enrichCmd.Flags().StringVar(&enrichCustomBaseURL, "custom-base-url", "", "Custom provider API URL")
 	enrichCmd.Flags().StringVar(&enrichCustomAPIKeyEnv, "custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
 	enrichCmd.Flags().BoolVar(&enrichNoStream, "no-stream", false, "Disable streaming output to enable concurrent LLM calls (faster)")
+	enrichCmd.Flags().BoolVar(&enrichForce, "force", false, "Force regeneration of all descriptions, ignoring existing ones")
 }

@@ -14,12 +14,12 @@ import (
 // mockProvider for testing
 type mockProvider struct {
 	response     string
-	responseFunc func() (string, *TokenUsage, error)
+	responseFunc func() (string, *provider.TokenUsage, error)
 	err          error
 	called       atomic.Int32
 }
 
-func (m *mockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *TokenUsage, error) {
+func (m *mockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	m.called.Add(1)
 	if m.responseFunc != nil {
 		return m.responseFunc()
@@ -58,7 +58,7 @@ func TestBatchProcessor_ProcessBatch(t *testing.T) {
 		},
 	}
 
-	err := processor.ProcessBatch(context.Background(), batch)
+	_, err := processor.ProcessBatch(context.Background(), batch)
 	if err != nil {
 		t.Fatalf("ProcessBatch() error = %v", err)
 	}
@@ -90,7 +90,7 @@ func TestBatchProcessor_ProcessBatch_ProviderError(t *testing.T) {
 		},
 	}
 
-	err := processor.ProcessBatch(context.Background(), batch)
+	_, err := processor.ProcessBatch(context.Background(), batch)
 	if err == nil {
 		t.Fatal("expected error for provider failure")
 	}
@@ -114,7 +114,7 @@ func TestBatchProcessor_ProcessBatch_InvalidJSON(t *testing.T) {
 	}
 
 	// Should not fail - invalid JSON means we use the raw response
-	err := processor.ProcessBatch(context.Background(), batch)
+	_, err := processor.ProcessBatch(context.Background(), batch)
 	if err != nil {
 		t.Fatalf("ProcessBatch() should handle invalid JSON, got error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestConcurrentProcessor_ProcessAll(t *testing.T) {
 		}},
 	}
 
-	err := concurrent.ProcessAll(context.Background(), batches)
+	_, err := concurrent.ProcessAll(context.Background(), batches)
 	if err != nil {
 		t.Fatalf("ProcessAll() error = %v", err)
 	}
@@ -150,7 +150,7 @@ func TestConcurrentProcessor_ProcessAll(t *testing.T) {
 func TestConcurrentProcessor_ProcessAll_PartialFailure(t *testing.T) {
 	callCount := 0
 	mock := &mockProvider{
-		responseFunc: func() (string, *TokenUsage, error) {
+		responseFunc: func() (string, *provider.TokenUsage, error) {
 			callCount++
 			if callCount == 1 {
 				return "", nil, errors.New("first call fails")
@@ -171,7 +171,7 @@ func TestConcurrentProcessor_ProcessAll_PartialFailure(t *testing.T) {
 		}},
 	}
 
-	err := concurrent.ProcessAll(context.Background(), batches)
+	_, err := concurrent.ProcessAll(context.Background(), batches)
 	if err == nil {
 		t.Fatal("expected PartialEnrichmentError")
 	}
@@ -264,10 +264,10 @@ func TestParseSchemaResponse(t *testing.T) {
 
 // MockProvider for schema batch test
 type MockProvider struct {
-	GenerateFunc func(ctx context.Context, p string, opts ...provider.Option) (string, *TokenUsage, error)
+	GenerateFunc func(ctx context.Context, p string, opts ...provider.Option) (string, *provider.TokenUsage, error)
 }
 
-func (m *MockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *TokenUsage, error) {
+func (m *MockProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	if m.GenerateFunc != nil {
 		return m.GenerateFunc(ctx, p, opts...)
 	}
@@ -280,12 +280,12 @@ func (m *MockProvider) Name() string {
 
 func TestBatchProcessor_ProcessSchemaBatch(t *testing.T) {
 	mockProvider := &MockProvider{
-		GenerateFunc: func(_ context.Context, prompt string, opts ...provider.Option) (string, error) {
+		GenerateFunc: func(_ context.Context, prompt string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 			// Return mock schema field descriptions
 			if strings.Contains(prompt, "User") {
-				return `{"id": "User ID", "name": "User name"}`, nil
+				return `{"id": "User ID", "name": "User name"}`, nil, nil
 			}
-			return "{}", nil
+			return "{}", nil, nil
 		},
 	}
 
@@ -323,7 +323,7 @@ func TestBatchProcessor_ProcessSchemaBatch(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err := bp.ProcessBatch(ctx, batch)
+	_, err := bp.ProcessBatch(ctx, batch)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -340,7 +340,7 @@ type mockStreamingAwareProvider struct {
 	streamingChunks [][]byte
 }
 
-func (m *mockStreamingAwareProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *TokenUsage, error) {
+func (m *mockStreamingAwareProvider) Generate(ctx context.Context, p string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -388,7 +388,7 @@ func TestBatchProcessor_ProcessBatch_WithStreaming(t *testing.T) {
 		},
 	}
 
-	err := bp.ProcessBatch(context.Background(), batch)
+	_, err := bp.ProcessBatch(context.Background(), batch)
 	if err != nil {
 		t.Fatalf("ProcessBatch() error = %v", err)
 	}

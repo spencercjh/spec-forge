@@ -2,6 +2,7 @@ package enricher
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -27,6 +28,7 @@ type EnrichOptions struct {
 	Language string    // Runtime language override
 	Stream   *bool     // Enable streaming output (nil = default true, false = disabled)
 	Writer   io.Writer // Custom writer for streaming (default: os.Stdout)
+	Force    bool      // Force regeneration of all descriptions, ignoring existing ones
 }
 
 // NewEnricher creates a new Enricher
@@ -63,6 +65,7 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	// Determine streaming settings
 	stream := true // default: streaming enabled
 	var writer io.Writer = os.Stdout
+	force := false
 	if opts != nil {
 		// Stream is a tri-state (*bool): nil means "use default" (true)
 		if opts.Stream != nil {
@@ -71,6 +74,7 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 		if opts.Writer != nil {
 			writer = opts.Writer
 		}
+		force = opts.Force
 	}
 	if writer == nil {
 		writer = os.Stdout
@@ -91,7 +95,7 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	}
 
 	// Collect elements to enrich
-	collector := e.collectElements(spec, enrichCtx, language)
+	collector := e.collectElements(spec, enrichCtx, language, force)
 
 	// Group elements into batches
 	batches := collector.GroupByType()
@@ -109,7 +113,12 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 		processor.WithStreamWriter(streamWriter))
 	concurrentProcessor := processor.NewConcurrentProcessor(batchProcessor, e.config.Concurrency)
 
-	if err := concurrentProcessor.ProcessAll(ctx, batches); err != nil {
+	totalUsage, err := concurrentProcessor.ProcessAll(ctx, batches)
+
+	// Display token usage (even on partial error)
+	e.displayTokenUsage(totalUsage)
+
+	if err != nil {
 		return spec, err
 	}
 
@@ -124,9 +133,24 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	return spec, nil
 }
 
+// displayTokenUsage logs token consumption and estimated cost.
+func (e *Enricher) displayTokenUsage(usage *provider.TokenUsage) {
+	if usage == nil || usage.Total() == 0 {
+		return
+	}
+	slog.Info("Token usage",
+		"input", usage.InputTokens,
+		"output", usage.OutputTokens,
+		"total", usage.Total(),
+	)
+	if cost, ok := provider.EstimateCost(e.config.Provider, e.config.Model, usage); ok {
+		slog.Info("Estimated cost", "cost", fmt.Sprintf("$%.4f", cost), "model", e.config.Model)
+	}
+}
+
 // collectElements collects elements from the spec that need enrichment.
 // The enrichCtx parameter provides additional context extracted from source code (currently unused, reserved for future enhancement).
-func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContext, language string) *processor.SpecCollector {
+func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContext, language string, force bool) *processor.SpecCollector {
 	collector := &processor.SpecCollector{}
 
 	// Collect API operations
@@ -155,46 +179,48 @@ func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContex
 					continue
 				}
 
-				// Only enrich if description is missing
-				if item.op.Summary == "" || item.op.Description == "" {
-					op := item.op // Capture for closure
-					collector.AddElement(processor.EnrichmentElement{
-						Type: prompt.TemplateTypeAPI,
-						Path: item.method + " " + pathStr,
-						Context: prompt.TemplateContext{
-							Type:     prompt.TemplateTypeAPI,
-							Language: language,
-							Method:   item.method,
-							Path:     pathStr,
-						},
-						SetValue: func(desc string) {
-							// Parse response and set summary/description
-							summary, description := parseSummaryDescription(desc)
-							if op.Summary == "" {
-								op.Summary = summary
-							}
-							if op.Description == "" {
-								op.Description = description
-							}
-						},
-					})
+				// Only enrich if description is missing (or force is true)
+				if !force && item.op.Summary != "" && item.op.Description != "" {
+					continue
 				}
+
+				op := item.op // Capture for closure
+				collector.AddElement(processor.EnrichmentElement{
+					Type: prompt.TemplateTypeAPI,
+					Path: item.method + " " + pathStr,
+					Context: prompt.TemplateContext{
+						Type:     prompt.TemplateTypeAPI,
+						Language: language,
+						Method:   item.method,
+						Path:     pathStr,
+					},
+					SetValue: func(desc string) {
+						// Parse response and set summary/description
+						summary, description := parseSummaryDescription(desc)
+						if op.Summary == "" {
+							op.Summary = summary
+						}
+						if op.Description == "" {
+							op.Description = description
+						}
+					},
+				})
 			}
 		}
 	}
 
-	// Collect API parameters
-	collectParametersFromSpec(spec, collector, language)
+	// Collect API parameters (grouped by endpoint)
+	collectParameterGroups(spec, collector, language, force)
 
 	// Collect schema fields
 	processedSchemas := make(map[string]bool)
-	collectSchemasFromSpec(spec, collector, processedSchemas, language)
+	collectSchemasFromSpec(spec, collector, processedSchemas, language, force)
 
 	return collector
 }
 
-// collectParametersFromSpec collects parameters from API operations.
-func collectParametersFromSpec(spec *openapi3.T, collector *processor.SpecCollector, language string) {
+// collectParameterGroups collects parameters from API operations, grouped by endpoint.
+func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector, language string, force bool) {
 	if spec.Paths == nil {
 		return
 	}
@@ -217,16 +243,18 @@ func collectParametersFromSpec(spec *openapi3.T, collector *processor.SpecCollec
 		}
 
 		for _, item := range operations {
-			if item.op == nil {
+			if item.op == nil || len(item.op.Parameters) == 0 {
 				continue
 			}
 
-			// Collect parameters from operation
+			var params []processor.ParamFieldItem
 			for _, paramRef := range item.op.Parameters {
-				if paramRef.Value == nil || paramRef.Value.Description != "" {
-					continue // Skip if already has description
+				if paramRef.Value == nil {
+					continue
 				}
-
+				if !force && paramRef.Value.Description != "" {
+					continue
+				}
 				param := paramRef.Value
 				fieldType := ""
 				if param.Schema != nil && param.Schema.Value != nil {
@@ -235,18 +263,22 @@ func collectParametersFromSpec(spec *openapi3.T, collector *processor.SpecCollec
 
 				// Capture for closure
 				p := param
-				collector.AddParamElement(
-					pathStr,
-					item.method,
-					param.Name,
-					param.In,
-					fieldType,
-					param.Required,
-					language,
-					func(desc string) {
+				params = append(params, processor.ParamFieldItem{
+					ParamName: param.Name,
+					ParamIn:   param.In,
+					FieldType: fieldType,
+					Required:  param.Required,
+					SetValue: func(desc string) {
 						p.Description = desc
 					},
-				)
+				})
+			}
+			if len(params) > 0 {
+				collector.AddParamGroupElement(processor.ParamGroupElement{
+					Path:   pathStr,
+					Method: item.method,
+					Params: params,
+				}, language)
 			}
 		}
 	}
@@ -277,14 +309,14 @@ func parseSummaryDescription(desc string) (summary, description string) {
 }
 
 // collectSchemasFromSpec collects schema fields from the OpenAPI spec
-func collectSchemasFromSpec(spec *openapi3.T, collector *processor.SpecCollector, processed map[string]bool, language string) {
+func collectSchemasFromSpec(spec *openapi3.T, collector *processor.SpecCollector, processed map[string]bool, language string, force bool) {
 	if spec.Components == nil || spec.Components.Schemas == nil {
 		return
 	}
 
 	for schemaName, schemaRef := range spec.Components.Schemas {
 		if !processed[schemaName] {
-			processor.CollectSchemaFields(schemaName, schemaRef, collector, processed, language, 0)
+			processor.CollectSchemaFields(schemaName, schemaRef, collector, processed, language, 0, force)
 		}
 	}
 }

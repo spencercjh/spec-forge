@@ -46,12 +46,15 @@ func (p *BatchProcessor) HasStreamWriter() bool {
 	return p.streamWriter != nil
 }
 
-// ProcessBatch processes a single batch of elements
-func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
+// ProcessBatch processes a single batch of elements.
+// Returns the accumulated token usage and any error encountered.
+func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) (*provider.TokenUsage, error) {
 	tmpl, err := p.templateMgr.Get(batch.Type)
 	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
+		return nil, fmt.Errorf("failed to get template: %w", err)
 	}
+
+	var totalUsage provider.TokenUsage
 
 	for _, elem := range batch.Elements { //nolint:gocritic // copying elements is acceptable here
 		systemPrompt, userPrompt, err := tmpl.Render(elem.Context)
@@ -71,9 +74,12 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 			}))
 		}
 
-		response, err := p.provider.Generate(ctx, fullPrompt, genOpts...)
+		response, usage, err := p.provider.Generate(ctx, fullPrompt, genOpts...)
 		if err != nil {
-			return fmt.Errorf("LLM call failed: %w", err)
+			return &totalUsage, fmt.Errorf("LLM call failed: %w", err)
+		}
+		if usage != nil {
+			totalUsage.Add(usage)
 		}
 
 		// Flush any buffered streamed output after each LLM call completes
@@ -92,13 +98,20 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 					field.SetValue(desc)
 				}
 			}
+		} else if batch.Type == prompt.TemplateTypeParam && len(elem.ParamGroupFields) > 0 {
+			paramDescriptions := parseSchemaResponse(response)
+			for _, param := range elem.ParamGroupFields {
+				if desc, ok := paramDescriptions[param.ParamName]; ok {
+					param.SetValue(desc)
+				}
+			}
 		} else {
 			description := parseDescriptionResponse(response)
 			elem.SetValue(description)
 		}
 	}
 
-	return nil
+	return &totalUsage, nil
 }
 
 // parseDescriptionResponse extracts description from LLM response
