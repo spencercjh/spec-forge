@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
+	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
+	"github.com/spencercjh/spec-forge/internal/enricher/specctx"
 )
 
 // mockProvider for testing
@@ -21,11 +23,11 @@ type mockProvider struct {
 	err      error
 }
 
-func (m *mockProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
+func (m *mockProvider) Generate(_ context.Context, _ string, _ ...provider.Option) (string, *provider.TokenUsage, error) {
 	if m.err != nil {
-		return "", m.err
+		return "", nil, m.err
 	}
-	return m.response, nil
+	return m.response, nil, nil
 }
 
 func (m *mockProvider) Name() string {
@@ -192,23 +194,33 @@ func TestEnricher_CollectParameters(t *testing.T) {
 		Paths: paths,
 	}
 
-	cfg := &processor.SpecCollector{}
-	collectParametersFromSpec(spec, cfg, "en")
+	collector := &processor.SpecCollector{}
+	collectParameterGroups(spec, collector, "en", false)
 
-	params := cfg.GetParams()
-	if len(params) != 1 {
-		t.Fatalf("expected 1 parameter, got %d", len(params))
+	// Verify parameter group was added as an enrichment element
+	batches := collector.GroupByType()
+	paramBatches := 0
+	for _, batch := range batches {
+		if batch.Type == "param" {
+			paramBatches += len(batch.Elements)
+		}
 	}
-	if params[0].ParamName != "id" {
-		t.Errorf("expected param name 'id', got %s", params[0].ParamName)
+	if paramBatches != 1 {
+		t.Fatalf("expected 1 parameter group element, got %d", paramBatches)
 	}
-	if params[0].ParamIn != "path" {
-		t.Errorf("expected param in 'path', got %s", params[0].ParamIn)
-	}
-	// Test SetValue callback
-	params[0].SetValue("User ID")
-	if spec.Paths.Value("/users/{id}").Get.Parameters[0].Value.Description != "User ID" {
-		t.Errorf("expected description to be set via callback")
+
+	// Test that the callback works by finding the param group element
+	for _, batch := range batches {
+		if batch.Type == "param" {
+			for _, elem := range batch.Elements {
+				if len(elem.ParamGroupFields) > 0 {
+					elem.ParamGroupFields[0].SetValue("User ID")
+					if spec.Paths.Value("/users/{id}").Get.Parameters[0].Value.Description != "User ID" {
+						t.Errorf("expected description to be set via callback")
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -232,7 +244,7 @@ func TestEnricher_CollectSchemaFields(t *testing.T) {
 	collector := &processor.SpecCollector{}
 	processed := make(map[string]bool)
 
-	collectSchemasFromSpec(spec, collector, processed, "en")
+	collectSchemasFromSpec(spec, collector, processed, "en", false)
 
 	schemas := collector.GetSchemas()
 	if len(schemas) != 1 {
@@ -308,7 +320,7 @@ type mockStreamingProvider struct {
 	response string
 }
 
-func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
+func (m *mockStreamingProvider) Generate(ctx context.Context, _ string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	// Apply options to get streaming config
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
@@ -317,11 +329,11 @@ func (m *mockStreamingProvider) Generate(ctx context.Context, prompt string, opt
 	if cfg.StreamingFunc != nil {
 		for _, chunk := range m.chunks {
 			if err := cfg.StreamingFunc(ctx, []byte(chunk)); err != nil {
-				return "", err
+				return "", nil, err
 			}
 		}
 	}
-	return m.response, nil
+	return m.response, nil, nil
 }
 
 func (m *mockStreamingProvider) Name() string {
@@ -334,7 +346,7 @@ type mockStreamingDisabledProvider struct {
 	streamingCalled bool
 }
 
-func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt string, opts ...provider.Option) (string, error) {
+func (m *mockStreamingDisabledProvider) Generate(_ context.Context, _ string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
 	cfg := &provider.GenerateOptions{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -342,11 +354,58 @@ func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt str
 	if cfg.StreamingFunc != nil {
 		m.streamingCalled = true
 	}
-	return m.response, nil
+	return m.response, nil, nil
 }
 
 func (m *mockStreamingDisabledProvider) Name() string {
 	return "mock-streaming-disabled"
+}
+
+func TestEnricher_ForceFlag_CollectsAllElements(t *testing.T) {
+	// Test that Force=true collects elements that would otherwise be skipped
+	paths := openapi3.NewPaths()
+	paths.Set("/users", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Summary:     "Existing summary",
+			Description: "Existing description",
+		},
+	})
+	spec := &openapi3.T{
+		Paths: paths,
+	}
+
+	// With force=false: collector should be empty (API already has descriptions)
+	cfg := Config{
+		Provider:    "openai",
+		Model:       "gpt-4o",
+		Concurrency: 1,
+	}
+	cfg = cfg.MergeWithDefaults()
+
+	e, _ := NewEnricher(cfg, &mockProvider{response: `{"summary": "test", "description": "test"}`})
+
+	// Force=false: should skip already-described API
+	collector1 := e.collectElements(spec, &specctx.EnrichmentContext{}, "en", false)
+	batches1 := collector1.GroupByType()
+	// API should NOT be in batches (already has description)
+	for _, b := range batches1 {
+		if b.Type == prompt.TemplateTypeAPI {
+			t.Error("expected no API batch when Force=false and descriptions exist")
+		}
+	}
+
+	// Force=true: should include the API
+	collector2 := e.collectElements(spec, &specctx.EnrichmentContext{}, "en", true)
+	batches2 := collector2.GroupByType()
+	found := false
+	for _, b := range batches2 {
+		if b.Type == prompt.TemplateTypeAPI {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected API batch when Force=true")
+	}
 }
 
 func TestEnricher_WithStreamingDisabled(t *testing.T) {

@@ -35,7 +35,7 @@ func newOpenAIProvider(apiKey, model string) (*OpenAIProvider, error) {
 }
 
 // Generate generates a response for the given prompt with optional streaming
-func (p *OpenAIProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
+func (p *OpenAIProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, *TokenUsage, error) {
 	cfg := applyOptions(opts...)
 
 	messages := []llms.MessageContent{
@@ -49,13 +49,13 @@ func (p *OpenAIProvider) Generate(ctx context.Context, prompt string, opts ...Op
 
 	response, err := p.llm.GenerateContent(ctx, messages, callOpts...)
 	if err != nil {
-		return "", fmt.Errorf("OpenAI generation failed: %w", err)
+		return "", nil, fmt.Errorf("OpenAI generation failed: %w", err)
 	}
 
 	if len(response.Choices) == 0 {
-		return "", errors.New("OpenAI generation returned no choices")
+		return "", nil, errors.New("OpenAI generation returned no choices")
 	}
-	return response.Choices[0].Content, nil
+	return response.Choices[0].Content, extractTokenUsage(response.Choices), nil
 }
 
 // Name returns the provider name

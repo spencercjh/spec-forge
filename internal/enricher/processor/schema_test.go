@@ -29,7 +29,7 @@ func TestCollectSchemaFields_SimpleSchema(t *testing.T) {
 	collector := &processor.SpecCollector{}
 	processed := make(map[string]bool)
 
-	processor.CollectSchemaFields("User", spec.Components.Schemas["User"], collector, processed, "en", 0)
+	processor.CollectSchemaFields("User", spec.Components.Schemas["User"], collector, processed, "en", 0, false)
 
 	if len(processed) != 1 {
 		t.Errorf("expected 1 processed schema, got %d", len(processed))
@@ -67,7 +67,7 @@ func TestCollectSchemaFields_NestedSchema(t *testing.T) {
 	collector := &processor.SpecCollector{}
 	processed := make(map[string]bool)
 
-	processor.CollectSchemaFields("Order", spec.Components.Schemas["Order"], collector, processed, "en", 0)
+	processor.CollectSchemaFields("Order", spec.Components.Schemas["Order"], collector, processed, "en", 0, false)
 
 	// Should process both Order and nested Order.customer
 	if len(processed) < 2 {
@@ -94,7 +94,7 @@ func TestCollectSchemaFields_MaxDepth(t *testing.T) {
 	collector := &processor.SpecCollector{}
 	processed := make(map[string]bool)
 
-	processor.CollectSchemaFields("Deep", spec.Components.Schemas["Deep"], collector, processed, "en", 0)
+	processor.CollectSchemaFields("Deep", spec.Components.Schemas["Deep"], collector, processed, "en", 0, false)
 
 	// Should stop at max depth (5)
 	if len(processed) > 6 {
@@ -123,7 +123,7 @@ func TestCollectSchemaFields_SkipFieldsWithDescription(t *testing.T) {
 	collector := &processor.SpecCollector{}
 	processed := make(map[string]bool)
 
-	processor.CollectSchemaFields("User", spec.Components.Schemas["User"], collector, processed, "en", 0)
+	processor.CollectSchemaFields("User", spec.Components.Schemas["User"], collector, processed, "en", 0, false)
 
 	// Find the User schema
 	schemas := collector.GetSchemas()

@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+
+	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 )
 
 // ConcurrentProcessor processes batches with configurable concurrency.
@@ -29,7 +31,8 @@ func NewConcurrentProcessor(bp *BatchProcessor, concurrency int) *ConcurrentProc
 // interleaved LLM output chunks from mixing together (which would be unreadable).
 // When streaming is disabled (--no-stream), batches are processed concurrently
 // up to the configured concurrency limit for faster processing.
-func (p *ConcurrentProcessor) ProcessAll(ctx context.Context, batches []*Batch) error {
+// Returns the accumulated token usage across all batches.
+func (p *ConcurrentProcessor) ProcessAll(ctx context.Context, batches []*Batch) (*provider.TokenUsage, error) {
 	// Sequential processing when streaming to avoid interleaved output
 	if p.batchProcessor.HasStreamWriter() {
 		return p.processSequential(ctx, batches)
@@ -39,12 +42,19 @@ func (p *ConcurrentProcessor) ProcessAll(ctx context.Context, batches []*Batch) 
 
 // processSequential processes batches one at a time (streaming mode).
 // This ensures LLM output chunks are grouped by batch type for readability.
-func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*Batch) error {
-	var failedCount int
-	var failedErrors []error
+func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*Batch) (*provider.TokenUsage, error) {
+	var (
+		totalUsage   provider.TokenUsage
+		failedCount  int
+		failedErrors []error
+	)
 
 	for i, batch := range batches {
-		if err := p.batchProcessor.ProcessBatch(ctx, batch); err != nil {
+		usage, err := p.batchProcessor.ProcessBatch(ctx, batch)
+		if usage != nil {
+			totalUsage.Add(usage)
+		}
+		if err != nil {
 			failedCount++
 			failedErrors = append(failedErrors, err)
 			slog.Warn("batch processing failed",
@@ -55,20 +65,21 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 	}
 
 	if failedCount > 0 {
-		return &PartialEnrichmentError{
+		return &totalUsage, &PartialEnrichmentError{
 			TotalBatches:  len(batches),
 			FailedBatches: failedCount,
 			Errors:        failedErrors,
 		}
 	}
-	return nil
+	return &totalUsage, nil
 }
 
-// processConcurrent processes batches with controlled concurrency
-func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*Batch) error {
+// processConcurrent processes batches with controlled concurrency.
+func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*Batch) (*provider.TokenUsage, error) {
 	var (
 		wg           sync.WaitGroup
 		mu           sync.Mutex
+		totalUsage   provider.TokenUsage
 		failedCount  int
 		failedErrors []error
 	)
@@ -85,17 +96,20 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			if err := p.batchProcessor.ProcessBatch(ctx, b); err != nil {
-				mu.Lock()
+			usage, err := p.batchProcessor.ProcessBatch(ctx, b)
+			mu.Lock()
+			if usage != nil {
+				totalUsage.Add(usage)
+			}
+			if err != nil {
 				failedCount++
 				failedErrors = append(failedErrors, err)
-				mu.Unlock()
-
 				slog.Warn("batch processing failed",
 					"batch_index", idx,
 					"batch_type", b.Type,
 					"error", err)
 			}
+			mu.Unlock()
 		}(i, batch)
 	}
 
@@ -103,12 +117,12 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 
 	// Return partial error if some batches failed
 	if failedCount > 0 {
-		return &PartialEnrichmentError{
+		return &totalUsage, &PartialEnrichmentError{
 			TotalBatches:  len(batches),
 			FailedBatches: failedCount,
 			Errors:        failedErrors,
 		}
 	}
 
-	return nil
+	return &totalUsage, nil
 }

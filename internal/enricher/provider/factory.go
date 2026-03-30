@@ -1,11 +1,35 @@
 package provider
 
-import "context"
+import (
+	"context"
+
+	"github.com/tmc/langchaingo/llms"
+)
+
+// TokenUsage represents token consumption for a single LLM call.
+type TokenUsage struct {
+	InputTokens  int
+	OutputTokens int
+}
+
+// Add adds the other usage into u.
+func (u *TokenUsage) Add(other *TokenUsage) {
+	if other == nil {
+		return
+	}
+	u.InputTokens += other.InputTokens
+	u.OutputTokens += other.OutputTokens
+}
+
+// Total returns the total number of tokens.
+func (u *TokenUsage) Total() int {
+	return u.InputTokens + u.OutputTokens
+}
 
 // Provider defines the interface for LLM providers
 type Provider interface {
 	// Generate generates a response for the given prompt
-	Generate(ctx context.Context, prompt string, opts ...Option) (string, error)
+	Generate(ctx context.Context, prompt string, opts ...Option) (string, *TokenUsage, error)
 	// Name returns the provider name
 	Name() string
 }
@@ -32,6 +56,37 @@ func applyOptions(opts ...Option) *GenerateOptions {
 		opt(cfg)
 	}
 	return cfg
+}
+
+// extractTokenUsage extracts TokenUsage from langchaingo GenerationInfo.
+// GenerationInfo is a map[string]any populated by langchaingo providers
+// with keys like "PromptTokens", "CompletionTokens", "TotalTokens".
+func extractTokenUsage(choices []*llms.ContentChoice) *TokenUsage {
+	if len(choices) == 0 {
+		return nil
+	}
+	info := choices[0].GenerationInfo
+	if info == nil {
+		return nil
+	}
+
+	var usage TokenUsage
+	// OpenAI-compatible providers use PromptTokens/CompletionTokens,
+	// Anthropic uses InputTokens/OutputTokens
+	if v, ok := info["PromptTokens"].(int); ok {
+		usage.InputTokens = v
+	} else if v, ok := info["InputTokens"].(int); ok {
+		usage.InputTokens = v
+	}
+	if v, ok := info["CompletionTokens"].(int); ok {
+		usage.OutputTokens = v
+	} else if v, ok := info["OutputTokens"].(int); ok {
+		usage.OutputTokens = v
+	}
+	if usage.InputTokens == 0 && usage.OutputTokens == 0 {
+		return nil
+	}
+	return &usage
 }
 
 // Config contains configuration for creating a provider

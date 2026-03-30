@@ -148,20 +148,45 @@ func TestSpecCollector_AddSchemaElement(t *testing.T) {
 	}
 }
 
-func TestSpecCollector_AddParamElement(t *testing.T) {
+func TestSpecCollector_AddParamGroupElement(t *testing.T) {
 	collector := &SpecCollector{}
 
 	var received string
-	collector.AddParamElement("/users/{id}", "GET", "id", "path", "string", true, "en", func(desc string) {
-		received = desc
-	})
+	collector.AddParamGroupElement(ParamGroupElement{
+		Path:   "/users/{id}",
+		Method: "GET",
+		Params: []ParamFieldItem{
+			{
+				ParamName: "id",
+				ParamIn:   "path",
+				FieldType: "string",
+				Required:  true,
+				SetValue: func(desc string) {
+					received = desc
+				},
+			},
+		},
+	}, "en")
 
-	if len(collector.params) != 1 {
-		t.Errorf("expected 1 param, got %d", len(collector.params))
+	batches := collector.GroupByType()
+	paramBatches := 0
+	for _, batch := range batches {
+		if batch.Type == prompt.TemplateTypeParam {
+			paramBatches += len(batch.Elements)
+		}
+	}
+	if paramBatches != 1 {
+		t.Errorf("expected 1 param group element, got %d", paramBatches)
 	}
 
-	// Test SetValue callback
-	collector.params[0].SetValue("test description")
+	// Test SetValue callback through ParamGroupFields
+	for _, batch := range batches {
+		for _, elem := range batch.Elements {
+			if len(elem.ParamGroupFields) > 0 {
+				elem.ParamGroupFields[0].SetValue("test description")
+			}
+		}
+	}
 	if received != "test description" {
 		t.Errorf("expected 'test description', got '%s'", received)
 	}

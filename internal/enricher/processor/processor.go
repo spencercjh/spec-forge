@@ -15,6 +15,9 @@ type EnrichmentElement struct {
 
 	// Schema-specific: fields to set descriptions for
 	SchemaFields []FieldElement
+
+	// Param group-specific: fields to set descriptions for
+	ParamGroupFields []ParamFieldItem
 }
 
 // Batch represents a group of elements to process together
@@ -42,7 +45,11 @@ func (e *PartialEnrichmentError) Error() string {
 type SpecCollector struct {
 	elements []EnrichmentElement
 	schemas  []SchemaElement
-	params   []ParamElement
+	Skipped  struct {
+		APIs         int
+		Params       int
+		SchemaFields int
+	}
 }
 
 // AddElement adds an element to the collector
@@ -84,12 +91,17 @@ type FieldElement struct {
 	SetValue  func(description string)
 }
 
-// ParamElement represents an API parameter to be enriched.
-type ParamElement struct {
-	Path      string
-	Method    string
+// ParamGroupElement represents a group of parameters from the same API endpoint.
+type ParamGroupElement struct {
+	Path   string
+	Method string
+	Params []ParamFieldItem
+}
+
+// ParamFieldItem represents a single parameter within a group.
+type ParamFieldItem struct {
 	ParamName string
-	ParamIn   string // path, query, header, cookie
+	ParamIn   string
 	FieldType string
 	Required  bool
 	SetValue  func(description string)
@@ -116,36 +128,6 @@ func (c *SpecCollector) AddSchemaElement(schema SchemaElement, language string) 
 	})
 }
 
-// AddParamElement adds a parameter element to the collector.
-func (c *SpecCollector) AddParamElement(path, method, paramName, paramIn, fieldType string, required bool, language string, setValue func(description string)) {
-	c.params = append(c.params, ParamElement{
-		Path:      path,
-		Method:    method,
-		ParamName: paramName,
-		ParamIn:   paramIn,
-		FieldType: fieldType,
-		Required:  required,
-		SetValue:  setValue,
-	})
-
-	// Also add as an enrichment element for processing
-	c.elements = append(c.elements, EnrichmentElement{
-		Type: prompt.TemplateTypeParam,
-		Path: method + " " + path + " [" + paramIn + "] " + paramName,
-		Context: prompt.TemplateContext{
-			Type:      prompt.TemplateTypeParam,
-			Language:  language,
-			Method:    method,
-			Path:      path,
-			ParamName: paramName,
-			ParamIn:   paramIn,
-			FieldType: fieldType,
-			Required:  required,
-		},
-		SetValue: setValue,
-	})
-}
-
 // convertFieldElements converts FieldElement slice to FieldContext slice.
 func convertFieldElements(fields []FieldElement) []prompt.FieldContext {
 	result := make([]prompt.FieldContext, len(fields))
@@ -159,12 +141,37 @@ func convertFieldElements(fields []FieldElement) []prompt.FieldContext {
 	return result
 }
 
+// convertParamFieldItems converts ParamFieldItem slice to ParamFieldContext slice.
+func convertParamFieldItems(items []ParamFieldItem) []prompt.ParamFieldContext {
+	result := make([]prompt.ParamFieldContext, len(items))
+	for i, p := range items {
+		result[i] = prompt.ParamFieldContext{
+			Name:     p.ParamName,
+			Type:     p.FieldType,
+			ParamIn:  p.ParamIn,
+			Required: p.Required,
+		}
+	}
+	return result
+}
+
 // GetSchemas returns collected schemas.
 func (c *SpecCollector) GetSchemas() []SchemaElement {
 	return c.schemas
 }
 
-// GetParams returns collected parameters.
-func (c *SpecCollector) GetParams() []ParamElement {
-	return c.params
+// AddParamGroupElement adds a parameter group to the collector.
+func (c *SpecCollector) AddParamGroupElement(group ParamGroupElement, language string) {
+	c.elements = append(c.elements, EnrichmentElement{
+		Type: prompt.TemplateTypeParam,
+		Path: group.Method + " " + group.Path + " [params]",
+		Context: prompt.TemplateContext{
+			Type:        prompt.TemplateTypeParam,
+			Language:    language,
+			Method:      group.Method,
+			Path:        group.Path,
+			ParamFields: convertParamFieldItems(group.Params),
+		},
+		ParamGroupFields: group.Params,
+	})
 }
