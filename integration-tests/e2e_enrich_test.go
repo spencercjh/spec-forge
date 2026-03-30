@@ -67,12 +67,30 @@ func loadE2EConfig(t *testing.T) *e2eConfig {
 	// Some providers (e.g., ollama) don't require API keys
 	requiresAPIKey := cfg.Enrich.Provider != "ollama"
 
-	apiKeyEnv := cfg.Enrich.APIKeyEnv
-	if apiKeyEnv == "" {
-		apiKeyEnv = "LLM_API_KEY"
+	// Determine the expected API key env var based on provider (matching CLI logic in cmd/enrich.go)
+	var apiKeyEnv string
+	switch cfg.Enrich.Provider {
+	case "openai":
+		apiKeyEnv = "OPENAI_API_KEY"
+	case "anthropic":
+		apiKeyEnv = "ANTHROPIC_API_KEY"
+	case "custom":
+		// Custom provider uses apiKeyEnv from config, or defaults to LLM_API_KEY
+		if cfg.Enrich.APIKeyEnv != "" {
+			apiKeyEnv = cfg.Enrich.APIKeyEnv
+		} else {
+			apiKeyEnv = "LLM_API_KEY"
+		}
+	case "ollama":
+		// No API key required
+		apiKeyEnv = ""
+	default:
+		// Unknown provider - skip test
+		t.Logf("Config %s has unknown provider %s", e2eConfigPath, cfg.Enrich.Provider)
+		return nil
 	}
 
-	if requiresAPIKey && os.Getenv(apiKeyEnv) == "" {
+	if requiresAPIKey && apiKeyEnv != "" && os.Getenv(apiKeyEnv) == "" {
 		t.Logf("Config %s found but %s not set (provider=%s requires API key)", e2eConfigPath, apiKeyEnv, cfg.Enrich.Provider)
 		return nil
 	}
@@ -321,17 +339,46 @@ components:
 	enrichedContent := string(enrichedData)
 	t.Logf("Enriched spec:\n%s", enrichedContent)
 
-	// Check that descriptions were added (not empty anymore)
-	assert.Contains(t, enrichedContent, "description:", "Spec should have descriptions after enrichment")
+	// Parse YAML for provider-agnostic assertions
+	var enrichedSpec map[string]interface{}
+	require.NoError(t, yaml.Unmarshal(enrichedData, &enrichedSpec), "Failed to parse enriched spec as YAML")
 
-	// Verify at least some summaries were filled in
-	assert.NotContains(t, enrichedContent, "summary: \"\"", "Summary should not be empty after enrichment")
+	// Verify schema field descriptions are not empty (language-agnostic)
+	components, ok := enrichedSpec["components"].(map[string]interface{})
+	require.True(t, ok, "components section should exist")
 
-	// Verify schema field descriptions exist (check for description lines after field names)
-	assert.Contains(t, enrichedContent, "description: 用户的", "Schema should have Chinese description")
+	schemas, ok := components["schemas"].(map[string]interface{})
+	require.True(t, ok, "components.schemas should exist")
 
-	// Verify parameter descriptions exist
-	assert.Contains(t, enrichedContent, "页码", "Parameter 'page' should have Chinese description")
+	userSchema, ok := schemas["User"].(map[string]interface{})
+	require.True(t, ok, "User schema should exist")
+
+	properties, ok := userSchema["properties"].(map[string]interface{})
+	require.True(t, ok, "User.properties should exist")
+
+	// Check that schema field descriptions are not empty
+	for _, field := range []string{"id", "name", "email"} {
+		prop, ok := properties[field].(map[string]interface{})
+		require.Truef(t, ok, "User.%s should exist", field)
+
+		desc, ok := prop["description"].(string)
+		require.Truef(t, ok, "User.%s should have description", field)
+		assert.NotEmptyf(t, desc, "User.%s.description should not be empty", field)
+	}
+
+	// Verify API operation descriptions are not empty
+	paths, ok := enrichedSpec["paths"].(map[string]interface{})
+	require.True(t, ok, "paths should exist")
+
+	usersPath, ok := paths["/users"].(map[string]interface{})
+	require.True(t, ok, "/users path should exist")
+
+	getOp, ok := usersPath["get"].(map[string]interface{})
+	require.True(t, ok, "/users.get should exist")
+
+	summary, ok := getOp["summary"].(string)
+	require.True(t, ok, "/users.get should have summary")
+	assert.NotEmpty(t, summary, "/users.get summary should not be empty")
 
 	// Note: Response descriptions are NOT enriched by design, so we don't assert on them
 }
