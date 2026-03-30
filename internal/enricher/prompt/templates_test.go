@@ -211,6 +211,73 @@ func TestTemplateContext_EnrichedFields(t *testing.T) {
 	}
 }
 
+func TestNewTemplateManager_RendersAllTypesWithEnrichedContext(t *testing.T) {
+	mgr := NewTemplateManager()
+
+	types := []TemplateType{TemplateTypeAPI, TemplateTypeSchema, TemplateTypeParam, TemplateTypeResponse}
+	for _, tt := range types {
+		t.Run(string(tt), func(t *testing.T) {
+			tmpl, err := mgr.Get(tt)
+			if err != nil {
+				t.Fatalf("Get(%s) error = %v", tt, err)
+			}
+
+			ctx := TemplateContext{
+				Type:     tt,
+				Language: "en",
+				Method:   "GET",
+				Path:     "/users/{id}",
+				Tags:     []string{"users"},
+				Fields: []FieldContext{
+					{Name: "email", Type: "string", Required: true, Format: "email", Constraints: "maxLength: 255"},
+				},
+				ParamFields: []ParamFieldContext{
+					{Name: "id", Type: "integer", ParamIn: "path", Required: true},
+				},
+				SchemaName:   "User",
+				ResponseCode: "200",
+			}
+
+			system, user, err := tmpl.Render(ctx)
+			if err != nil {
+				t.Fatalf("Render() error = %v", err)
+			}
+			if system == "" {
+				t.Errorf("%s: system prompt should not be empty", tt)
+			}
+			if user == "" {
+				t.Errorf("%s: user prompt should not be empty", tt)
+			}
+		})
+	}
+}
+
+func TestNewTemplateManager_APITemplateUsesTags(t *testing.T) {
+	mgr := NewTemplateManager()
+	tmpl, err := mgr.Get(TemplateTypeAPI)
+	if err != nil {
+		t.Fatalf("Get(API) error = %v", err)
+	}
+
+	ctx := TemplateContext{
+		Language:            "en",
+		Method:              "GET",
+		Path:                "/users/{id}",
+		Tags:                []string{"users", "admin"},
+		ExistingSummary:     "Get user",
+		ExistingDescription: "Returns a user by ID",
+	}
+
+	_, user, err := tmpl.Render(ctx)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	if !containsAll(user, "users, admin", "Get user", "Returns a user by ID") {
+		t.Errorf("API user prompt should contain tags and existing descriptions, got: %s", user)
+	}
+}
+
 func TestTemplate_RenderWithEnrichedFieldContext(t *testing.T) {
 	tmpl := &Template{
 		User: `Schema: {{.SchemaName}}
