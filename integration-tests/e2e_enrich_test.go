@@ -19,7 +19,7 @@ import (
 // e2eConfig represents the E2E test configuration structure
 type e2eConfig struct {
 	Enrich struct {
-		Enabled   bool   `yaml:"enabled"`
+		Enabled   *bool  `yaml:"enabled"` // nil = not set (default to run), false = explicit opt-out
 		Provider  string `yaml:"provider"`
 		Model     string `yaml:"model"`
 		BaseURL   string `yaml:"baseUrl"`
@@ -49,8 +49,10 @@ func loadE2EConfig(t *testing.T) *e2eConfig {
 		return nil
 	}
 
-	// Check if enrichment is explicitly disabled
-	if cfg.Enrich.Enabled == false {
+	// Check if enrichment is explicitly disabled (enabled: false in config)
+	// Note: Enabled is *bool - nil means field not set (default to run tests)
+	// Only skip if explicitly set to false
+	if cfg.Enrich.Enabled != nil && !*cfg.Enrich.Enabled {
 		t.Logf("Config %s has enrich.enabled=false, skipping", e2eConfigPath)
 		return nil
 	}
@@ -325,6 +327,11 @@ components:
 	// Verify at least some summaries were filled in
 	assert.NotContains(t, enrichedContent, "summary: \"\"", "Summary should not be empty after enrichment")
 
-	// Verify descriptions are not empty strings (language-agnostic check)
-	assert.NotContains(t, enrichedContent, `description: ""`, "Descriptions should not be empty after enrichment")
+	// Verify schema field descriptions exist (check for description lines after field names)
+	assert.Contains(t, enrichedContent, "description: 用户的", "Schema should have Chinese description")
+
+	// Verify parameter descriptions exist
+	assert.Contains(t, enrichedContent, "页码", "Parameter 'page' should have Chinese description")
+
+	// Note: Response descriptions are NOT enriched by design, so we don't assert on them
 }

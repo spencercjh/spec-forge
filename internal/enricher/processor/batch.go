@@ -71,6 +71,14 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) error {
 			return fmt.Errorf("LLM call failed: %w", err)
 		}
 
+		// Flush any buffered streamed output after each LLM call completes
+		// This ensures real-time output is visible even for short responses
+		if p.streamWriter != nil {
+			if flushErr := p.streamWriter.Flush(); flushErr != nil {
+				slog.Warn("failed to flush stream writer", "error", flushErr)
+			}
+		}
+
 		// Handle schema-specific response parsing
 		if batch.Type == prompt.TemplateTypeSchema && len(elem.SchemaFields) > 0 {
 			fieldDescriptions := parseSchemaResponse(response)

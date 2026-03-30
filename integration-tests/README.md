@@ -89,7 +89,7 @@ make test-e2e
 **Without config:** These tests will be **skipped** with a clear message:
 ```
 --- SKIP: TestE2E_Enrich_WithStreaming
-    Skipping: no valid E2E config found. Create integration-tests/.spec-forge.e2e.local.yaml
+    Skipping: no valid E2E config found. Create .spec-forge.e2e.local.yaml with LLM settings and set the API key env var.
 ```
 
 ### Unit Tests
