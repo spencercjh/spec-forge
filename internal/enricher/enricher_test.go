@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -493,6 +494,63 @@ func TestEnricher_CollectParameters_EnrichedContext(t *testing.T) {
 		}
 	}
 }
+
+func TestEnricher_CustomPrompts(t *testing.T) {
+	var capturedPrompt string
+	mp := &trackingMockProvider{
+		response: `{"summary": "Custom", "description": "Custom desc"}`,
+		capture:  &capturedPrompt,
+	}
+
+	cfg := Config{
+		Provider:    "openai",
+		Model:       "gpt-4o",
+		Concurrency: 1,
+		CustomPrompts: map[string]CustomPromptConfig{
+			"api": {
+				System: "Custom system prompt for {{.Language}}.",
+				User:   "Custom user prompt: {{.Method}} {{.Path}}",
+			},
+		},
+	}
+	cfg = cfg.MergeWithDefaults()
+
+	e, err := NewEnricher(cfg, mp)
+	if err != nil {
+		t.Fatalf("NewEnricher() error = %v", err)
+	}
+
+	paths := openapi3.NewPaths()
+	paths.Set("/test", &openapi3.PathItem{
+		Get: &openapi3.Operation{},
+	})
+	spec := &openapi3.T{Paths: paths}
+
+	_, err = e.Enrich(context.Background(), spec, nil)
+	if err != nil {
+		t.Fatalf("Enrich() error = %v", err)
+	}
+
+	if !strings.Contains(capturedPrompt, "Custom system prompt") {
+		t.Errorf("expected custom system prompt, got: %s", capturedPrompt)
+	}
+	if !strings.Contains(capturedPrompt, "Custom user prompt: GET /test") {
+		t.Errorf("expected custom user prompt, got: %s", capturedPrompt)
+	}
+}
+
+// trackingMockProvider captures the prompt sent to Generate.
+type trackingMockProvider struct {
+	response string
+	capture  *string
+}
+
+func (m *trackingMockProvider) Generate(_ context.Context, p string, _ ...provider.Option) (string, *provider.TokenUsage, error) {
+	*m.capture = p
+	return m.response, nil, nil
+}
+
+func (m *trackingMockProvider) Name() string { return "tracking-mock" }
 
 func TestEnricher_CollectElements_APITags(t *testing.T) {
 	paths := openapi3.NewPaths()

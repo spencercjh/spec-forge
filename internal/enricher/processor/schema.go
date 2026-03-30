@@ -132,7 +132,7 @@ func buildConstraintsString(schema *openapi3.Schema) string {
 		parts = append(parts, fmt.Sprintf("maxLength: %d", *schema.MaxLength))
 	}
 	if schema.Pattern != "" {
-		parts = append(parts, fmt.Sprintf("pattern: %s", schema.Pattern))
+		parts = append(parts, "pattern: "+schema.Pattern)
 	}
 	if schema.MinItems > 0 {
 		parts = append(parts, fmt.Sprintf("minItems: %d", schema.MinItems))

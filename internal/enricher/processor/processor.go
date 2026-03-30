@@ -156,7 +156,7 @@ func convertFieldElements(fields []FieldElement) []prompt.FieldContext {
 // convertParamFieldItems converts ParamFieldItem slice to ParamFieldContext slice.
 func convertParamFieldItems(items []ParamFieldItem) []prompt.ParamFieldContext {
 	result := make([]prompt.ParamFieldContext, len(items))
-	for i, p := range items {
+	for i, p := range items { //nolint:gocritic // copying is acceptable for small conversion
 		result[i] = prompt.ParamFieldContext{
 			Name:                p.ParamName,
 			Type:                p.FieldType,

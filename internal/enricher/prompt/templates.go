@@ -31,7 +31,7 @@ type FieldContext struct {
 type ParamFieldContext struct {
 	Name                string
 	Type                string
-	ParamIn             string   // path, query, header, cookie
+	ParamIn             string // path, query, header, cookie
 	Required            bool
 	Format              string   // e.g., "int32", "uuid"
 	Enum                []string // allowed values

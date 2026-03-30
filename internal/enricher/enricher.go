@@ -348,7 +348,7 @@ func buildParamConstraintsString(schema *openapi3.Schema) string {
 		parts = append(parts, fmt.Sprintf("maxLength: %d", *schema.MaxLength))
 	}
 	if schema.Pattern != "" {
-		parts = append(parts, fmt.Sprintf("pattern: %s", schema.Pattern))
+		parts = append(parts, "pattern: "+schema.Pattern)
 	}
 	return strings.Join(parts, ", ")
 }

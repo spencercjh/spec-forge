@@ -100,7 +100,7 @@ func (p *BatchProcessor) ProcessBatch(ctx context.Context, batch *Batch) (*provi
 			}
 		} else if batch.Type == prompt.TemplateTypeParam && len(elem.ParamGroupFields) > 0 {
 			paramDescriptions := parseSchemaResponse(response)
-			for _, param := range elem.ParamGroupFields {
+			for _, param := range elem.ParamGroupFields { //nolint:gocritic // copying is acceptable for callback access
 				if desc, ok := paramDescriptions[param.ParamName]; ok {
 					param.SetValue(desc)
 				}
