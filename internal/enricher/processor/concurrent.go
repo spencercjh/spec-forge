@@ -6,13 +6,17 @@ import (
 	"sync"
 )
 
-// ConcurrentProcessor processes batches concurrently
+// ConcurrentProcessor processes batches with configurable concurrency.
+// Note: When streaming is enabled (StreamWriter configured), processing is
+// sequential to ensure readable interleaved output. The concurrency setting
+// only applies when streaming is disabled via --no-stream.
 type ConcurrentProcessor struct {
 	batchProcessor *BatchProcessor
 	concurrency    int
 }
 
-// NewConcurrentProcessor creates a new concurrent processor
+// NewConcurrentProcessor creates a new concurrent processor.
+// The concurrency parameter is only used when streaming is disabled.
 func NewConcurrentProcessor(bp *BatchProcessor, concurrency int) *ConcurrentProcessor {
 	return &ConcurrentProcessor{
 		batchProcessor: bp,
@@ -20,9 +24,11 @@ func NewConcurrentProcessor(bp *BatchProcessor, concurrency int) *ConcurrentProc
 	}
 }
 
-// ProcessAll processes all batches with controlled concurrency.
-// When streaming is enabled, batches are processed sequentially to avoid
-// interleaved output. Otherwise, batches are processed concurrently.
+// ProcessAll processes all batches.
+// When streaming is enabled, batches are processed sequentially to prevent
+// interleaved LLM output chunks from mixing together (which would be unreadable).
+// When streaming is disabled (--no-stream), batches are processed concurrently
+// up to the configured concurrency limit for faster processing.
 func (p *ConcurrentProcessor) ProcessAll(ctx context.Context, batches []*Batch) error {
 	// Sequential processing when streaming to avoid interleaved output
 	if p.batchProcessor.HasStreamWriter() {
@@ -31,7 +37,8 @@ func (p *ConcurrentProcessor) ProcessAll(ctx context.Context, batches []*Batch) 
 	return p.processConcurrent(ctx, batches)
 }
 
-// processSequential processes batches one at a time
+// processSequential processes batches one at a time (streaming mode).
+// This ensures LLM output chunks are grouped by batch type for readability.
 func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*Batch) error {
 	var failedCount int
 	var failedErrors []error

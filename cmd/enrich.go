@@ -288,11 +288,11 @@ Examples:
 	c.Flags().String("model", "", "LLM model name")
 	c.Flags().String("language", "en", "Output language for descriptions")
 	c.Flags().StringP("output", "o", "", "Output file (default: overwrite input)")
-	c.Flags().Int("concurrency", 3, "Number of concurrent LLM calls")
+	c.Flags().Int("concurrency", 3, "Max concurrent LLM calls (only effective with --no-stream)")
 	c.Flags().Duration("timeout", 30*time.Second, "Timeout for single LLM call")
 	c.Flags().String("custom-base-url", "", "Custom provider API URL")
 	c.Flags().String("custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
-	c.Flags().Bool("no-stream", false, "Disable streaming output to enable concurrent LLM calls (faster)")
+	c.Flags().Bool("no-stream", false, "Disable streaming to enable concurrent processing (faster, but no real-time output)")
 
 	return c
 }
@@ -317,7 +317,7 @@ func init() {
 	enrichCmd.Flags().StringVar(&enrichModel, "model", "", "LLM model name")
 	enrichCmd.Flags().StringVar(&enrichLanguage, "language", "en", "Output language for descriptions")
 	enrichCmd.Flags().StringVarP(&enrichOutput, "output", "o", "", "Output file (default: overwrite input)")
-	enrichCmd.Flags().IntVar(&enrichConcurrency, "concurrency", 3, "Number of concurrent LLM calls")
+	enrichCmd.Flags().IntVar(&enrichConcurrency, "concurrency", 3, "Max concurrent LLM calls (only with --no-stream)")
 	enrichCmd.Flags().DurationVar(&enrichTimeout, "timeout", 30*time.Second, "Timeout for single LLM call")
 	enrichCmd.Flags().StringVar(&enrichCustomBaseURL, "custom-base-url", "", "Custom provider API URL")
 	enrichCmd.Flags().StringVar(&enrichCustomAPIKeyEnv, "custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
