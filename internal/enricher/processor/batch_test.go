@@ -414,3 +414,61 @@ func TestBatchProcessor_ProcessBatch_WithStreaming(t *testing.T) {
 		t.Errorf("Expected output to contain '[api]' prefix, got: %s", output)
 	}
 }
+
+func TestBatchProcessor_ProcessParamGroupBatch(t *testing.T) {
+	mockProvider := &MockProvider{
+		GenerateFunc: func(_ context.Context, prompt string, opts ...provider.Option) (string, *provider.TokenUsage, error) {
+			if strings.Contains(prompt, "/users") {
+				return `{"page": "Page number", "size": "Page size", "sort": "Sort field"}`, &provider.TokenUsage{InputTokens: 50, OutputTokens: 30}, nil
+			}
+			return "{}", nil, nil
+		},
+	}
+
+	tmplMgr := prompt.NewTemplateManager()
+	bp := NewBatchProcessor(mockProvider, tmplMgr)
+
+	params := []ParamFieldItem{
+		{ParamName: "page", ParamIn: "query", FieldType: "integer", Required: false},
+		{ParamName: "size", ParamIn: "query", FieldType: "integer", Required: false},
+		{ParamName: "sort", ParamIn: "query", FieldType: "string", Required: false},
+	}
+
+	var setValues []string
+	for i := range params {
+		p := &params[i]
+		p.SetValue = func(desc string) {
+			setValues = append(setValues, p.ParamName+":"+desc)
+		}
+	}
+
+	batch := &Batch{
+		Type: prompt.TemplateTypeParam,
+		Elements: []EnrichmentElement{
+			{
+				Type: prompt.TemplateTypeParam,
+				Path: "GET /users [params]",
+				Context: prompt.TemplateContext{
+					Type:        prompt.TemplateTypeParam,
+					Language:    "en",
+					Method:      "GET",
+					Path:        "/users",
+					ParamFields: convertParamFieldItems(params),
+				},
+				ParamGroupFields: params,
+			},
+		},
+	}
+
+	usage, err := bp.ProcessBatch(context.Background(), batch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(setValues) != 3 {
+		t.Errorf("expected 3 SetValue calls, got %d", len(setValues))
+	}
+	if usage == nil || usage.Total() == 0 {
+		t.Error("expected non-zero token usage")
+	}
+}

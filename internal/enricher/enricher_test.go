@@ -13,6 +13,8 @@ import (
 
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
+	"github.com/spencercjh/spec-forge/internal/enricher/prompt"
+	"github.com/spencercjh/spec-forge/internal/enricher/specctx"
 )
 
 // mockProvider for testing
@@ -357,6 +359,53 @@ func (m *mockStreamingDisabledProvider) Generate(ctx context.Context, prompt str
 
 func (m *mockStreamingDisabledProvider) Name() string {
 	return "mock-streaming-disabled"
+}
+
+func TestEnricher_ForceFlag_CollectsAllElements(t *testing.T) {
+	// Test that Force=true collects elements that would otherwise be skipped
+	paths := openapi3.NewPaths()
+	paths.Set("/users", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Summary:     "Existing summary",
+			Description: "Existing description",
+		},
+	})
+	spec := &openapi3.T{
+		Paths: paths,
+	}
+
+	// With force=false: collector should be empty (API already has descriptions)
+	cfg := Config{
+		Provider:    "openai",
+		Model:       "gpt-4o",
+		Concurrency: 1,
+	}
+	cfg = cfg.MergeWithDefaults()
+
+	e, _ := NewEnricher(cfg, &mockProvider{response: `{"summary": "test", "description": "test"}`})
+
+	// Force=false: should skip already-described API
+	collector1 := e.collectElements(spec, &specctx.EnrichmentContext{}, "en", false)
+	batches1 := collector1.GroupByType()
+	// API should NOT be in batches (already has description)
+	for _, b := range batches1 {
+		if b.Type == prompt.TemplateTypeAPI {
+			t.Error("expected no API batch when Force=false and descriptions exist")
+		}
+	}
+
+	// Force=true: should include the API
+	collector2 := e.collectElements(spec, &specctx.EnrichmentContext{}, "en", true)
+	batches2 := collector2.GroupByType()
+	found := false
+	for _, b := range batches2 {
+		if b.Type == prompt.TemplateTypeAPI {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected API batch when Force=true")
+	}
 }
 
 func TestEnricher_WithStreamingDisabled(t *testing.T) {
