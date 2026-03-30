@@ -197,10 +197,10 @@ func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContex
 					SetValue: func(desc string) {
 						// Parse response and set summary/description
 						summary, description := parseSummaryDescription(desc)
-						if op.Summary == "" {
+						if force || op.Summary == "" {
 							op.Summary = summary
 						}
-						if op.Description == "" {
+						if force || op.Description == "" {
 							op.Description = description
 						}
 					},

@@ -12,7 +12,7 @@ type TokenUsage struct {
 	OutputTokens int
 }
 
-// Add returns the sum of two TokenUsage values.
+// Add adds the other usage into u.
 func (u *TokenUsage) Add(other *TokenUsage) {
 	if other == nil {
 		return
