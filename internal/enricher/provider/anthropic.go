@@ -35,7 +35,7 @@ func newAnthropicProvider(apiKey, model string) (*AnthropicProvider, error) {
 }
 
 // Generate generates a response for the given prompt with optional streaming
-func (p *AnthropicProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
+func (p *AnthropicProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, *TokenUsage, error) {
 	cfg := applyOptions(opts...)
 
 	messages := []llms.MessageContent{
@@ -49,13 +49,13 @@ func (p *AnthropicProvider) Generate(ctx context.Context, prompt string, opts ..
 
 	response, err := p.llm.GenerateContent(ctx, messages, callOpts...)
 	if err != nil {
-		return "", fmt.Errorf("%s generation failed: %w", AnthropicProviderName, err)
+		return "", nil, fmt.Errorf("%s generation failed: %w", AnthropicProviderName, err)
 	}
 
 	if len(response.Choices) == 0 {
-		return "", errors.New("anthropic generation returned no choices")
+		return "", nil, errors.New("anthropic generation returned no choices")
 	}
-	return response.Choices[0].Content, nil
+	return response.Choices[0].Content, extractTokenUsage(response.Choices), nil
 }
 
 // Name returns the provider name

@@ -39,7 +39,7 @@ func newOllamaProvider(baseURL, model string) (*OllamaProvider, error) {
 }
 
 // Generate generates a response for the given prompt with optional streaming
-func (p *OllamaProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, error) {
+func (p *OllamaProvider) Generate(ctx context.Context, prompt string, opts ...Option) (string, *TokenUsage, error) {
 	cfg := applyOptions(opts...)
 
 	messages := []llms.MessageContent{
@@ -53,13 +53,13 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string, opts ...Op
 
 	response, err := p.llm.GenerateContent(ctx, messages, callOpts...)
 	if err != nil {
-		return "", fmt.Errorf("%s generation failed: %w", OllamaProviderName, err)
+		return "", nil, fmt.Errorf("%s generation failed: %w", OllamaProviderName, err)
 	}
 
 	if len(response.Choices) == 0 {
-		return "", fmt.Errorf("%s generation returned no choices", OllamaProviderName)
+		return "", nil, fmt.Errorf("%s generation returned no choices", OllamaProviderName)
 	}
-	return response.Choices[0].Content, nil
+	return response.Choices[0].Content, extractTokenUsage(response.Choices), nil
 }
 
 // Name returns the provider name

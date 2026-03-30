@@ -1,6 +1,10 @@
 package provider
 
-import "context"
+import (
+	"context"
+
+	"github.com/tmc/langchaingo/llms"
+)
 
 // TokenUsage represents token consumption for a single LLM call.
 type TokenUsage struct {
@@ -52,6 +56,31 @@ func applyOptions(opts ...Option) *GenerateOptions {
 		opt(cfg)
 	}
 	return cfg
+}
+
+// extractTokenUsage extracts TokenUsage from langchaingo GenerationInfo.
+// GenerationInfo is a map[string]any populated by langchaingo providers
+// with keys like "PromptTokens", "CompletionTokens", "TotalTokens".
+func extractTokenUsage(choices []*llms.ContentChoice) *TokenUsage {
+	if len(choices) == 0 {
+		return nil
+	}
+	info := choices[0].GenerationInfo
+	if info == nil {
+		return nil
+	}
+
+	var usage TokenUsage
+	if v, ok := info["PromptTokens"].(int); ok {
+		usage.InputTokens = v
+	}
+	if v, ok := info["CompletionTokens"].(int); ok {
+		usage.OutputTokens = v
+	}
+	if usage.InputTokens == 0 && usage.OutputTokens == 0 {
+		return nil
+	}
+	return &usage
 }
 
 // Config contains configuration for creating a provider
