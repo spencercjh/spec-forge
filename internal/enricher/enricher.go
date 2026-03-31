@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -290,8 +289,8 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 					schemaVal := param.Schema.Value
 					fieldType = getSchemaTypeString(schemaVal)
 					format = schemaVal.Format
-					enum = buildParamEnumStrings(schemaVal.Enum)
-					constraints = buildParamConstraintsString(schemaVal)
+					enum = processor.BuildEnumStrings(schemaVal.Enum)
+					constraints = processor.BuildConstraintsString(schemaVal)
 				}
 
 				// Capture for closure
@@ -330,39 +329,6 @@ func getSchemaTypeString(schema *openapi3.Schema) string {
 		return typeStr
 	}
 	return "object"
-}
-
-// buildParamConstraintsString builds a human-readable constraints string from a schema.
-func buildParamConstraintsString(schema *openapi3.Schema) string {
-	var parts []string
-	if schema.Min != nil {
-		parts = append(parts, fmt.Sprintf("min: %v", *schema.Min))
-	}
-	if schema.Max != nil {
-		parts = append(parts, fmt.Sprintf("max: %v", *schema.Max))
-	}
-	if schema.MinLength > 0 {
-		parts = append(parts, fmt.Sprintf("minLength: %d", schema.MinLength))
-	}
-	if schema.MaxLength != nil {
-		parts = append(parts, fmt.Sprintf("maxLength: %d", *schema.MaxLength))
-	}
-	if schema.Pattern != "" {
-		parts = append(parts, "pattern: "+schema.Pattern)
-	}
-	return strings.Join(parts, ", ")
-}
-
-// buildParamEnumStrings converts []any to []string for enum values.
-func buildParamEnumStrings(enum []any) []string {
-	if len(enum) == 0 {
-		return nil
-	}
-	result := make([]string, len(enum))
-	for i, v := range enum {
-		result[i] = fmt.Sprintf("%v", v)
-	}
-	return result
 }
 
 // parseSummaryDescription splits a description into summary and full description

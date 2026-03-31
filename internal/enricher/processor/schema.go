@@ -60,8 +60,8 @@ func CollectSchemaFields(
 			FieldType:           getSchemaTypeName(prop),
 			Required:            containsString(schema.Required, propName),
 			Format:              prop.Format,
-			Enum:                buildEnumStrings(prop.Enum),
-			Constraints:         buildConstraintsString(prop),
+			Enum:                BuildEnumStrings(prop.Enum),
+			Constraints:         BuildConstraintsString(prop),
 			ExistingDescription: prop.Description,
 		}
 
@@ -116,8 +116,8 @@ func containsString(slice []string, s string) bool {
 	return slices.Contains(slice, s)
 }
 
-// buildConstraintsString builds a human-readable constraints description from a schema.
-func buildConstraintsString(schema *openapi3.Schema) string {
+// BuildConstraintsString builds a human-readable constraints description from a schema.
+func BuildConstraintsString(schema *openapi3.Schema) string {
 	var parts []string
 	if schema.Min != nil {
 		parts = append(parts, fmt.Sprintf("min: %v", *schema.Min))
@@ -143,8 +143,8 @@ func buildConstraintsString(schema *openapi3.Schema) string {
 	return strings.Join(parts, ", ")
 }
 
-// buildEnumStrings converts []any to []string for enum values.
-func buildEnumStrings(enum []any) []string {
+// BuildEnumStrings converts []any to []string for enum values.
+func BuildEnumStrings(enum []any) []string {
 	if len(enum) == 0 {
 		return nil
 	}
