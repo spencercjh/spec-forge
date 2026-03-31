@@ -264,11 +264,10 @@ Use `--no-stream` for concurrent processing:
 spec-forge enrich ./openapi.json --no-stream
 ```
 
-Or increase concurrency:
+Or increase concurrency (CLI flag only):
 
-```yaml
-enrich:
-  concurrency: 10
+```bash
+spec-forge enrich ./openapi.json --no-stream --concurrency 10
 ```
 
 ### Poor quality descriptions
@@ -279,7 +278,7 @@ enrich:
 
 ### Rate limiting
 
-- Reduce concurrency: `enrich.concurrency: 3`
+- Reduce concurrency: use `--concurrency 3` flag
 - Add delays between batches (not directly supported, use smaller specs)
 - Consider upgrading your API plan
 

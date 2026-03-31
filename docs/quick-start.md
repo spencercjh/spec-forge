@@ -109,7 +109,7 @@ Requirements:
 
 ## Configuration
 
-Create `.spec-forge.yaml` in your project root:
+Create `.spec-forge.yaml` in your **current working directory**:
 
 ```yaml
 # AI Enrichment
@@ -126,6 +126,8 @@ output:
   dir: ./openapi
   format: yaml              # yaml or json
 ```
+
+**Important:** Spec Forge reads `.spec-forge.yaml` from the current working directory, not the project directory. If you run `spec-forge generate ./path/to/project`, ensure the config file is in your current directory, not `./path/to/project`.
 
 **Priority:** CLI flags > Environment variables > Config file > Defaults
 
@@ -145,8 +147,12 @@ spec-forge generate ./project --language zh
 # Disable enrichment
 spec-forge generate ./project --language zh --skip-enrich
 
-# Custom output
+# Custom output path (format auto-detected from extension)
 spec-forge generate ./project --output ./specs/api.yaml
+spec-forge generate ./project --output ./specs/api.json
+
+# Custom output directory (uses default filename)
+spec-forge generate ./project --output-dir ./specs
 
 # Verbose logging
 spec-forge generate ./project -v

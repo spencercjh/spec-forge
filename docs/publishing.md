@@ -18,14 +18,15 @@ Guide to publishing OpenAPI specs to documentation platforms.
 The default output is a local file.
 
 ```bash
-# Default output: ./openapi.yaml
+# Default output
 spec-forge generate ./project
 
-# Custom output path
+# Custom output path (format auto-detected from extension)
 spec-forge generate ./project --output ./docs/api.yaml
-
-# JSON format
 spec-forge generate ./project --output ./api.json
+
+# Custom output directory (uses default filename)
+spec-forge generate ./project --output-dir ./docs
 ```
 
 ---
@@ -181,9 +182,11 @@ enrich:
 ✅ Good:
 
 ```yaml
-# .spec-forge.yaml
+# .spec-forge.yaml - No API keys here!
 enrich:
-  apiKeyEnv: OPENAI_API_KEY
+  enabled: true
+  provider: openai
+  model: gpt-4o
 ```
 
 ```bash
@@ -193,15 +196,25 @@ spec-forge generate ./
 
 ### Use Environment Variables
 
-All sensitive values support `*Env` variants:
+Keep API keys in environment variables, never in config files:
 
 ```yaml
+# .spec-forge.yaml - Safe: no API keys
 enrich:
-  apiKeyEnv: OPENAI_API_KEY      # Instead of apiKey
-
-readme:
-  # No slug here, pass via CLI or keep in CI secrets
+  enabled: true
+  provider: openai
+  model: gpt-4o
 ```
+
+```bash
+# Set environment variable
+export OPENAI_API_KEY="sk-xxx"
+
+# Run spec-forge
+spec-forge generate ./
+```
+
+**Note:** For OpenAI and Anthropic, API keys are always read from `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` respectively. For custom providers, use `LLM_API_KEY` or set `apiKeyEnv` in config.
 
 ### CI/CD Secrets
 

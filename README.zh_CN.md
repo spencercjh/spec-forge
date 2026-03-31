@@ -159,7 +159,7 @@ LLM **从不** 虚构类型或改变结构 —— 它只为我们已经验证存
 
 ## 配置
 
-在项目根目录创建 `.spec-forge.yaml`：
+在当前工作目录创建 `.spec-forge.yaml`：
 
 ```yaml
 enrich:
@@ -173,10 +173,12 @@ output:
   format: yaml
 ```
 
-**注意：** AI 增强需要通过环境变量提供 API 密钥：
-- OpenAI: `OPENAI_API_KEY`
-- Anthropic: `ANTHROPIC_API_KEY`
-- 自定义提供商: `LLM_API_KEY`（或在 `apiKeyEnv` 中配置的变量）
+**注意：**
+- AI 增强需要通过环境变量提供 API 密钥：
+  - OpenAI: `OPENAI_API_KEY`
+  - Anthropic: `ANTHROPIC_API_KEY`
+  - 自定义提供商: `LLM_API_KEY`
+- 配置文件只在当前工作目录读取，不会自动读取项目目录。如果在其他目录运行 `spec-forge generate ./path/to/project`，请确保配置文件在当前目录。
 
 查看 [.spec-forge.example.yaml](.spec-forge.example.yaml) 了解所有选项。
 

@@ -4,10 +4,9 @@ Complete reference for `.spec-forge.yaml` configuration.
 
 ## Configuration File Location
 
-Spec Forge looks for `.spec-forge.yaml` in:
+Spec Forge looks for `.spec-forge.yaml` in the current working directory only.
 
-1. Current working directory
-2. Project directory (when using `spec-forge generate ./project`)
+**Note:** If you run `spec-forge generate ./path/to/project`, the config file must be in your current directory, not in `./path/to/project`. Use `--config /path/to/.spec-forge.yaml` to specify a custom location.
 
 ## Configuration Priority
 
@@ -126,14 +125,15 @@ CLI equivalent: `--custom-base-url`
 
 ### `enrich.apiKeyEnv`
 
-Environment variable containing the API key.
+Environment variable containing the API key. **Only used for `custom` provider.**
 
 ```yaml
 enrich:
-  apiKeyEnv: LLM_API_KEY
+  provider: custom
+  apiKeyEnv: MY_API_KEY
 ```
 
-Default: `LLM_API_KEY` for custom, `OPENAI_API_KEY` for OpenAI, etc.
+**Note:** For OpenAI and Anthropic providers, API keys are always read from `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` respectively. The `apiKeyEnv` setting only applies to custom providers.
 
 ### `enrich.language`
 
@@ -174,7 +174,7 @@ output:
 
 Default: Current directory
 
-CLI equivalent: `--output` (accepts file or directory)
+CLI equivalent: `--output-dir` for directory, `--output` for full file path
 
 ### `output.format`
 
@@ -309,9 +309,10 @@ enrich:
   enabled: true
   provider: openai
   model: gpt-4o
-  apiKeyEnv: OPENAI_API_KEY
   language: en
 ```
+
+**Note:** Requires `OPENAI_API_KEY` environment variable.
 
 ### Anthropic
 
@@ -320,9 +321,10 @@ enrich:
   enabled: true
   provider: anthropic
   model: claude-3-sonnet-20240229
-  apiKeyEnv: ANTHROPIC_API_KEY
   language: en
 ```
+
+**Note:** Requires `ANTHROPIC_API_KEY` environment variable.
 
 ### Ollama (Local)
 
