@@ -54,7 +54,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		path = args[0]
 	}
 
-	slog.InfoContext(ctx, "Generating OpenAPI spec", "path", path)
+	slog.DebugContext(ctx, "Generating OpenAPI spec", "path", path)
 
 	// Get all flag values from command (isolated per command instance)
 	//nolint:errcheck // flags are bound at command creation, errors not possible
@@ -103,11 +103,11 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 3: If we patched the file and should restore later, defer the restore
 	if !keepPatched && patchResult.OriginalContent != "" {
 		defer func() {
-			slog.InfoContext(ctx, "Restoring original build file...")
+			slog.DebugContext(ctx, "Restoring original build file")
 			if restoreErr := extractorImpl.Restore(patchResult.BuildFilePath, patchResult.OriginalContent); restoreErr != nil {
 				slog.WarnContext(ctx, "failed to restore original file", "error", restoreErr)
 			} else {
-				slog.InfoContext(ctx, "Original build file restored", "status", "✅")
+				slog.DebugContext(ctx, "Original build file restored")
 			}
 		}()
 	}
