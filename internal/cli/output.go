@@ -10,11 +10,9 @@ import (
 )
 
 var (
-	green  = color.New(color.FgGreen).FprintfFunc()
-	red    = color.New(color.FgRed, color.Bold).FprintfFunc()
-	cyan   = color.New(color.FgCyan).FprintfFunc()
-	yellow = color.New(color.FgYellow).FprintfFunc()
-	dim    = color.New(color.Faint).FprintfFunc()
+	green = color.New(color.FgGreen).FprintfFunc()
+	red   = color.New(color.FgRed, color.Bold).FprintfFunc()
+	dim   = color.New(color.Faint).FprintfFunc()
 )
 
 func init() {
@@ -53,11 +51,11 @@ func Errorf(w io.Writer, format string, args ...any) {
 	red(w, "❌ %s\n", msg)
 }
 
-// Hintf prints a cyan hint prefix with yellow hint content.
+// Hintf prints a cyan hint prefix with yellow hint content as a single atomic write.
 func Hintf(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	cyan(w, "💡 Hint: ")
-	yellow(w, "%s\n", msg)
+	line := color.CyanString("💡 Hint: ") + color.YellowString("%s\n", msg)
+	fmt.Fprint(w, line)
 }
 
 // Statusf prints a neutral status message.
