@@ -263,9 +263,32 @@ CLI equivalent: `--readme-branch`
 
 Override built-in prompts for each enrichment type.
 
+### Structure
+
+```yaml
+enrich:
+  customPrompts:
+    api:
+      system: "System prompt for API descriptions"
+      user: "User prompt template for API"
+    schema:
+      system: "System prompt for schema fields"
+      user: "User prompt template for fields"
+    param:
+      system: "System prompt for parameters"
+      user: "User prompt template for params"
+    response:
+      system: "System prompt for responses"
+      user: "User prompt template for responses"
+```
+
+Each type supports:
+- `system` — System prompt that sets the AI's role and behavior
+- `user` — User prompt template with variables (see below)
+
 ### Available Types
 
-- `api` — API operation descriptions
+- `api` — API operation descriptions (summary + description)
 - `schema` — Schema field descriptions
 - `param` — Parameter descriptions
 - `response` — Response schema descriptions

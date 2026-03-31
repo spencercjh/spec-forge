@@ -279,15 +279,23 @@ enrich:
 
 ## Cost Estimation
 
-Approximate costs (varies by model and spec complexity):
+Approximate costs for AI enrichment (varies by model, spec complexity, and description length):
+
+Pricing basis (per 1M tokens):
+- OpenAI GPT-4o: $2.50 input / $10.00 output
+- DeepSeek: $0.14 input / $0.28 output
 
 | Spec Size        | ~Tokens | OpenAI GPT-4o | DeepSeek |
 |------------------|---------|---------------|----------|
-| Small (10 APIs)  | 5K      | $0.15         | $0.01    |
-| Medium (50 APIs) | 25K     | $0.75         | $0.05    |
-| Large (200 APIs) | 100K    | $3.00         | $0.20    |
+| Small (10 APIs)  | 5K      | ~$0.03        | ~$0.001  |
+| Medium (50 APIs) | 25K     | ~$0.15        | ~$0.005  |
+| Large (200 APIs) | 100K    | ~$0.60        | ~$0.02   |
 
-Costs are typically negligible for development workflows.
+**Notes:**
+- Costs are typically negligible for development workflows
+- Actual costs depend on prompt complexity and generated description length
+- Use `--no-stream` with `concurrency` setting to process faster (same cost)
+- Consider using local Ollama for zero-cost enrichment during development
 
 ---
 

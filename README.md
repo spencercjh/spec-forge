@@ -50,7 +50,7 @@ write code.
 
 ### Go Web Frameworks: The Annotation Trap
 
-**Gin, Echo, and friends** — the dominant solution is [`swaggo/swag`](https://github.com/swaggo/swag), and it's an
+**Gin and friends** — the dominant solution is [`swaggo/swag`](https://github.com/swaggo/swag), and it's an
 annotation nightmare:
 
 ```go
