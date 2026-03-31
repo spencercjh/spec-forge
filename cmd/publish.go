@@ -3,12 +3,12 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
 
+	"github.com/spencercjh/spec-forge/internal/cli"
 	"github.com/spencercjh/spec-forge/internal/publisher"
 )
 
@@ -51,7 +51,7 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	//nolint:errcheck
 	readMeUseSpecVersion, _ := cmd.Flags().GetBool("readme-use-spec-version")
 
-	slog.InfoContext(ctx, "Publishing spec", "file", specFile, "target", target)
+	cli.Statusf(os.Stderr, "Publishing spec to %s", target)
 
 	// Create publisher using factory
 	pub, err := publisher.NewPublisher(target)
@@ -59,7 +59,7 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
-	slog.InfoContext(ctx, "Using publisher", "name", pub.Name())
+	cli.Statusf(os.Stderr, "Using publisher: %s", pub.Name())
 
 	// Load spec file
 	specData, err := os.ReadFile(specFile)
@@ -100,13 +100,9 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to publish: %w", err)
 	}
 
-	slog.InfoContext(ctx, "Published successfully",
-		"path", result.Path,
-		"format", result.Format,
-		"bytes", result.BytesWritten,
-	)
+	cli.Successf(os.Stderr, "Published successfully (%d bytes, %s)", result.BytesWritten, result.Format)
 	if result.Message != "" {
-		slog.InfoContext(ctx, "Publisher output", "message", result.Message)
+		cli.Statusf(os.Stderr, "%s", result.Message)
 	}
 
 	return nil
@@ -143,6 +139,13 @@ Note: Local file output is handled by the generate command.`,
 		panic(fmt.Sprintf("failed to mark flag 'to' as required: %v", err))
 	}
 
+	c.RegisterFlagCompletionFunc("format", cobra.FixedCompletions(
+		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	c.RegisterFlagCompletionFunc("to", cobra.FixedCompletions(
+		[]string{"readme"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+
 	return c
 }
 
@@ -178,4 +181,11 @@ func init() {
 	if err := publishCmd.MarkFlagRequired("to"); err != nil {
 		panic(fmt.Sprintf("failed to mark flag 'to' as required: %v", err))
 	}
+
+	publishCmd.RegisterFlagCompletionFunc("format", cobra.FixedCompletions(
+		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	publishCmd.RegisterFlagCompletionFunc("to", cobra.FixedCompletions(
+		[]string{"readme"}, cobra.ShellCompDirectiveNoFileComp,
+	))
 }

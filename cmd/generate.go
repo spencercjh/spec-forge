@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/spencercjh/spec-forge/internal/cli"
 	"github.com/spencercjh/spec-forge/internal/config"
 	"github.com/spencercjh/spec-forge/internal/enricher"
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
@@ -87,11 +88,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		return errWrap("no supported framework detected", err)
 	}
 
-	slog.InfoContext(ctx, "Detected project",
-		"framework", extractorImpl.Name(),
-		"tool", info.BuildTool,
-		"build_file", info.BuildFilePath,
-	)
+	cli.Statusf(os.Stderr, "Detected %s project (tool: %s, build: %s)", extractorImpl.Name(), info.BuildTool, info.BuildFilePath)
 
 	// Step 2: Patch project if needed
 	patchOpts := &extractor.PatchOptions{
@@ -116,13 +113,13 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	}
 
 	if patchResult.DependencyAdded {
-		slog.InfoContext(ctx, "dependencies added temporarily", "status", "✅")
+		cli.Successf(os.Stderr, "Dependencies added temporarily")
 	}
 	if patchResult.PluginAdded {
-		slog.InfoContext(ctx, "plugin added temporarily", "status", "✅")
+		cli.Successf(os.Stderr, "Plugin added temporarily")
 	}
 	if patchResult.SpringBootConfigured {
-		slog.InfoContext(ctx, "spring-boot-maven-plugin configured with start/stop goals", "status", "✅")
+		cli.Successf(os.Stderr, "spring-boot-maven-plugin configured with start/stop goals")
 	}
 
 	// Step 4: Generate OpenAPI spec
@@ -164,10 +161,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		return errWrap("generation failed", err)
 	}
 
-	slog.InfoContext(ctx, "OpenAPI spec generated",
-		"path", genResult.SpecFilePath,
-		"format", genResult.Format,
-	)
+	cli.Statusf(os.Stderr, "OpenAPI spec generated: %s (%s)", genResult.SpecFilePath, genResult.Format)
 
 	// Step 5: Validate the generated spec
 	if !skipValidate {
@@ -178,16 +172,16 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		}
 
 		if !valResult.Valid {
-			slog.ErrorContext(ctx, "OpenAPI spec validation failed")
+			cli.Errorf(os.Stderr, "OpenAPI spec validation failed")
 			for _, validationErr := range valResult.Errors {
-				slog.ErrorContext(ctx, "  - "+validationErr)
+				cli.Errorf(os.Stderr, "  - %s", validationErr)
 			}
 			return errors.New("generated OpenAPI spec is invalid")
 		}
 
-		slog.InfoContext(ctx, "OpenAPI spec validated", "status", "✅")
+		cli.Successf(os.Stderr, "OpenAPI spec validated")
 	} else {
-		slog.InfoContext(ctx, "Validation skipped", "status", "⏭️")
+		cli.Skipf(os.Stderr, "Validation skipped")
 	}
 
 	// Step 6: Enrich with AI (optional)
@@ -198,7 +192,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 			slog.WarnContext(ctx, "Enrichment failed (non-fatal)", "error", enrichErr)
 		}
 	} else {
-		slog.InfoContext(ctx, "Enrichment skipped", "status", "⏭️")
+		cli.Skipf(os.Stderr, "Enrichment skipped")
 	}
 
 	// Step 7: Ensure spec is in the output directory
@@ -221,11 +215,11 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		if err := copySpecToOutput(genResult.SpecFilePath, outputDir, overwriteOutput); err != nil {
 			return errWrap("failed to copy spec to output directory", err)
 		}
-		slog.InfoContext(ctx, "Spec saved", "path", targetPath)
+		cli.Successf(os.Stderr, "Spec saved: %s", targetPath)
 		// Update genResult.SpecFilePath to point to the copied file for publishing
 		genResult.SpecFilePath = targetPath
 	} else {
-		slog.InfoContext(ctx, "Spec saved", "path", genResult.SpecFilePath)
+		cli.Successf(os.Stderr, "Spec saved: %s", genResult.SpecFilePath)
 	}
 
 	// Step 8: Publish the spec to remote platforms (optional)
@@ -267,19 +261,14 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 			return errWrap("failed to publish spec", err)
 		}
 
-		slog.InfoContext(ctx, "Spec published",
-			"target", pub.Name(),
-			"path", pubResult.Path,
-			"format", pubResult.Format,
-			"bytes", pubResult.BytesWritten,
-		)
+		cli.Successf(os.Stderr, "Spec published to %s", pub.Name())
 		if pubResult.Message != "" {
-			slog.InfoContext(ctx, "Publisher output", "message", pubResult.Message)
+			cli.Statusf(os.Stderr, "%s", pubResult.Message)
 		}
 	}
 
 	// Step 8: Output final result
-	slog.InfoContext(ctx, "Generation complete")
+	cli.Successf(os.Stderr, "Generation complete")
 
 	return nil
 }
@@ -324,6 +313,16 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 		"overwrite existing local spec file if it already exists")
 	c.Flags().StringSlice("proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
+
+	c.RegisterFlagCompletionFunc("output", cobra.FixedCompletions(
+		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	c.RegisterFlagCompletionFunc("language", cobra.FixedCompletions(
+		[]string{"en", "zh"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	c.RegisterFlagCompletionFunc("publish-target", cobra.FixedCompletions(
+		[]string{"readme"}, cobra.ShellCompDirectiveNoFileComp,
+	))
 
 	return c
 }
@@ -371,11 +370,21 @@ func init() {
 		"overwrite existing local spec file if it already exists")
 	generateCmd.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
+
+	generateCmd.RegisterFlagCompletionFunc("output", cobra.FixedCompletions(
+		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	generateCmd.RegisterFlagCompletionFunc("language", cobra.FixedCompletions(
+		[]string{"en", "zh"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	generateCmd.RegisterFlagCompletionFunc("publish-target", cobra.FixedCompletions(
+		[]string{"readme"}, cobra.ShellCompDirectiveNoFileComp,
+	))
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
 func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.Config, language string) error {
-	slog.InfoContext(ctx, "Enriching OpenAPI spec with AI descriptions...")
+	cli.Statusf(os.Stderr, "Enriching OpenAPI spec with AI descriptions...")
 
 	// Determine language
 	lang := language
@@ -458,7 +467,7 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 		return fmt.Errorf("failed to write enriched spec: %w", writeErr)
 	}
 
-	slog.InfoContext(ctx, "OpenAPI spec enriched", "output", specFilePath)
+	cli.Successf(os.Stderr, "OpenAPI spec enriched: %s", specFilePath)
 	return nil
 }
 

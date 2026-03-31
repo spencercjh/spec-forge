@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/spencercjh/spec-forge/internal/cli"
 	"github.com/spencercjh/spec-forge/internal/config"
 	"github.com/spencercjh/spec-forge/internal/enricher"
 	"github.com/spencercjh/spec-forge/internal/enricher/processor"
@@ -105,12 +106,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	slog.InfoContext(ctx, "Enriching OpenAPI spec",
-		"file", specFile,
-		"provider", prov,
-		"model", model,
-		"language", lang,
-	)
+	cli.Statusf(os.Stderr, "Enriching OpenAPI spec (provider: %s, model: %s, language: %s)", prov, model, lang)
 
 	// Load spec
 	loader := openapi3.NewLoader()
@@ -170,6 +166,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 				"failed_batches", partialErr.FailedBatches,
 				"total_batches", partialErr.TotalBatches,
 			)
+			cli.Statusf(os.Stderr, "Partial enrichment: %d/%d batches succeeded", partialErr.TotalBatches-partialErr.FailedBatches, partialErr.TotalBatches)
 		} else {
 			return fmt.Errorf("enrichment failed: %w", err)
 		}
@@ -201,7 +198,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write enriched spec: %w", writeErr)
 	}
 
-	slog.InfoContext(ctx, "Enrichment complete", "output", outputFile)
+	cli.Successf(os.Stderr, "Enrichment complete: %s", outputFile)
 	return nil
 }
 
@@ -298,6 +295,16 @@ Examples:
 	c.Flags().Bool("no-stream", false, "Disable streaming to enable concurrent processing (faster, but no real-time output)")
 	c.Flags().Bool("force", false, "Force regeneration of all descriptions, ignoring existing ones")
 
+	c.RegisterFlagCompletionFunc("provider", cobra.FixedCompletions(
+		[]string{"openai", "anthropic", "ollama", "custom"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	c.RegisterFlagCompletionFunc("language", cobra.FixedCompletions(
+		[]string{"en", "zh"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	c.RegisterFlagCompletionFunc("output", cobra.FixedCompletions(
+		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+
 	return c
 }
 
@@ -328,4 +335,14 @@ func init() {
 	enrichCmd.Flags().StringVar(&enrichCustomAPIKeyEnv, "custom-api-key-env", "LLM_API_KEY", "Environment variable for custom API key")
 	enrichCmd.Flags().BoolVar(&enrichNoStream, "no-stream", false, "Disable streaming output to enable concurrent LLM calls (faster)")
 	enrichCmd.Flags().BoolVar(&enrichForce, "force", false, "Force regeneration of all descriptions, ignoring existing ones")
+
+	enrichCmd.RegisterFlagCompletionFunc("provider", cobra.FixedCompletions(
+		[]string{"openai", "anthropic", "ollama", "custom"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	enrichCmd.RegisterFlagCompletionFunc("language", cobra.FixedCompletions(
+		[]string{"en", "zh"}, cobra.ShellCompDirectiveNoFileComp,
+	))
+	enrichCmd.RegisterFlagCompletionFunc("output", cobra.FixedCompletions(
+		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
+	))
 }
