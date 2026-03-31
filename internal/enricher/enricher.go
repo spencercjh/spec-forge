@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -117,7 +118,9 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	slog.Info("Enriching spec", "batches", len(batches), "language", language)
 
 	// Process batches
+	// Create template manager and apply custom prompts if configured
 	tmplMgr := prompt.NewTemplateManager()
+	e.applyCustomPrompts(tmplMgr)
 	batchProcessor := processor.NewBatchProcessor(e.provider, tmplMgr,
 		processor.WithStreamWriter(streamWriter))
 	concurrentProcessor := processor.NewConcurrentProcessor(batchProcessor, e.config.Concurrency)
@@ -199,10 +202,13 @@ func (e *Enricher) collectElements(spec *openapi3.T, _ *specctx.EnrichmentContex
 					Type: prompt.TemplateTypeAPI,
 					Path: item.method + " " + pathStr,
 					Context: prompt.TemplateContext{
-						Type:     prompt.TemplateTypeAPI,
-						Language: language,
-						Method:   item.method,
-						Path:     pathStr,
+						Type:                prompt.TemplateTypeAPI,
+						Language:            language,
+						Method:              item.method,
+						Path:                pathStr,
+						Tags:                op.Tags,
+						ExistingSummary:     op.Summary,
+						ExistingDescription: op.Description,
 					},
 					SetValue: func(desc string) {
 						// Parse response and set summary/description
@@ -270,17 +276,28 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 				}
 				param := paramRef.Value
 				fieldType := ""
+				format := ""
+				var enum []string
+				var constraints string
 				if param.Schema != nil && param.Schema.Value != nil {
-					fieldType = getSchemaTypeString(param.Schema.Value)
+					schemaVal := param.Schema.Value
+					fieldType = getSchemaTypeString(schemaVal)
+					format = schemaVal.Format
+					enum = processor.BuildEnumStrings(schemaVal.Enum)
+					constraints = processor.BuildConstraintsString(schemaVal)
 				}
 
 				// Capture for closure
 				p := param
 				params = append(params, processor.ParamFieldItem{
-					ParamName: param.Name,
-					ParamIn:   param.In,
-					FieldType: fieldType,
-					Required:  param.Required,
+					ParamName:           param.Name,
+					ParamIn:             param.In,
+					FieldType:           fieldType,
+					Required:            param.Required,
+					Format:              format,
+					Enum:                enum,
+					Constraints:         constraints,
+					ExistingDescription: param.Description,
 					SetValue: func(desc string) {
 						p.Description = desc
 					},
@@ -297,14 +314,46 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 	}
 }
 
+// applyCustomPrompts merges user-configured custom prompts into the template manager.
+// Only non-empty fields override built-in templates; empty fields keep the built-in value.
+func (e *Enricher) applyCustomPrompts(tmplMgr *prompt.TemplateManager) {
+	validTypes := map[string]bool{
+		string(prompt.TemplateTypeAPI):      true,
+		string(prompt.TemplateTypeSchema):   true,
+		string(prompt.TemplateTypeParam):    true,
+		string(prompt.TemplateTypeResponse): true,
+	}
+	for typeKey, customPrompt := range e.config.CustomPrompts {
+		if !validTypes[typeKey] {
+			slog.Warn("ignoring custom prompt with invalid type key", "type", typeKey, "valid_keys", []string{string(prompt.TemplateTypeAPI), string(prompt.TemplateTypeSchema), string(prompt.TemplateTypeParam), string(prompt.TemplateTypeResponse)})
+			continue
+		}
+		ttype := prompt.TemplateType(typeKey)
+		// Merge with built-in: only override non-empty fields
+		builtIn, _ := tmplMgr.Get(ttype) //nolint:errcheck // merge handles nil case
+		system := customPrompt.System
+		if strings.TrimSpace(system) == "" && builtIn != nil {
+			system = builtIn.System
+		}
+		user := customPrompt.User
+		if strings.TrimSpace(user) == "" && builtIn != nil {
+			user = builtIn.User
+		}
+		if setErr := tmplMgr.Set(ttype, &prompt.Template{
+			System: system,
+			User:   user,
+		}); setErr != nil {
+			slog.Warn("ignoring invalid custom prompt template", "type", typeKey, "error", setErr)
+			continue
+		}
+		slog.Debug("applied custom prompt", "type", typeKey)
+	}
+}
+
 // getSchemaTypeString returns a string representation of a schema type.
 func getSchemaTypeString(schema *openapi3.Schema) string {
 	if schema.Type != nil && len(*schema.Type) > 0 {
-		typeStr := (*schema.Type)[0]
-		if schema.Format != "" {
-			return typeStr + "(" + schema.Format + ")"
-		}
-		return typeStr
+		return (*schema.Type)[0]
 	}
 	return "object"
 }

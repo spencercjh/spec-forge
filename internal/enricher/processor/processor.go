@@ -85,10 +85,14 @@ type SchemaElement struct {
 
 // FieldElement represents a field to be enriched.
 type FieldElement struct {
-	FieldName string
-	FieldType string
-	Required  bool
-	SetValue  func(description string)
+	FieldName           string
+	FieldType           string
+	Required            bool
+	Format              string
+	Enum                []string
+	Constraints         string
+	ExistingDescription string
+	SetValue            func(description string)
 }
 
 // ParamGroupElement represents a group of parameters from the same API endpoint.
@@ -100,11 +104,15 @@ type ParamGroupElement struct {
 
 // ParamFieldItem represents a single parameter within a group.
 type ParamFieldItem struct {
-	ParamName string
-	ParamIn   string
-	FieldType string
-	Required  bool
-	SetValue  func(description string)
+	ParamName           string
+	ParamIn             string
+	FieldType           string
+	Required            bool
+	Format              string
+	Enum                []string
+	Constraints         string
+	ExistingDescription string
+	SetValue            func(description string)
 }
 
 // AddSchemaElement adds a schema element to the collector.
@@ -133,9 +141,13 @@ func convertFieldElements(fields []FieldElement) []prompt.FieldContext {
 	result := make([]prompt.FieldContext, len(fields))
 	for i, f := range fields {
 		result[i] = prompt.FieldContext{
-			Name:     f.FieldName,
-			Type:     f.FieldType,
-			Required: f.Required,
+			Name:                f.FieldName,
+			Type:                f.FieldType,
+			Required:            f.Required,
+			Format:              f.Format,
+			Enum:                f.Enum,
+			Constraints:         f.Constraints,
+			ExistingDescription: f.ExistingDescription,
 		}
 	}
 	return result
@@ -144,12 +156,16 @@ func convertFieldElements(fields []FieldElement) []prompt.FieldContext {
 // convertParamFieldItems converts ParamFieldItem slice to ParamFieldContext slice.
 func convertParamFieldItems(items []ParamFieldItem) []prompt.ParamFieldContext {
 	result := make([]prompt.ParamFieldContext, len(items))
-	for i, p := range items {
+	for i, p := range items { //nolint:gocritic // copying is acceptable for small conversion
 		result[i] = prompt.ParamFieldContext{
-			Name:     p.ParamName,
-			Type:     p.FieldType,
-			ParamIn:  p.ParamIn,
-			Required: p.Required,
+			Name:                p.ParamName,
+			Type:                p.FieldType,
+			ParamIn:             p.ParamIn,
+			Required:            p.Required,
+			Format:              p.Format,
+			Enum:                p.Enum,
+			Constraints:         p.Constraints,
+			ExistingDescription: p.ExistingDescription,
 		}
 	}
 	return result

@@ -139,6 +139,9 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		customAPIKeyEnv = cfg.Enrich.APIKeyEnv
 	}
 
+	// Map custom prompts from config
+	customPrompts := enricher.CustomPromptsFromMap(cfg.Enrich.CustomPrompts)
+
 	enricherCfg := enricher.Config{
 		Provider:        prov,
 		Model:           model,
@@ -147,6 +150,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 		Timeout:         timeoutFlag,
 		CustomBaseURL:   customBaseURL,
 		CustomAPIKeyEnv: customAPIKeyEnv,
+		CustomPrompts:   customPrompts,
 	}
 	enricherCfg = enricherCfg.MergeWithDefaults()
 

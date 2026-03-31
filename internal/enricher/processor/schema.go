@@ -1,8 +1,10 @@
 package processor
 
 import (
+	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -54,9 +56,13 @@ func CollectSchemaFields(
 		}
 
 		field := FieldElement{
-			FieldName: propName,
-			FieldType: getSchemaTypeName(prop),
-			Required:  containsString(schema.Required, propName),
+			FieldName:           propName,
+			FieldType:           getSchemaTypeName(prop),
+			Required:            containsString(schema.Required, propName),
+			Format:              prop.Format,
+			Enum:                BuildEnumStrings(prop.Enum),
+			Constraints:         BuildConstraintsString(prop),
+			ExistingDescription: prop.Description,
 		}
 
 		// Capture prop for closure
@@ -108,4 +114,43 @@ func getSchemaTypeName(schema *openapi3.Schema) string {
 // containsString checks if a string is in a slice.
 func containsString(slice []string, s string) bool {
 	return slices.Contains(slice, s)
+}
+
+// BuildConstraintsString builds a human-readable constraints description from a schema.
+func BuildConstraintsString(schema *openapi3.Schema) string {
+	var parts []string
+	if schema.Min != nil {
+		parts = append(parts, fmt.Sprintf("min: %v", *schema.Min))
+	}
+	if schema.Max != nil {
+		parts = append(parts, fmt.Sprintf("max: %v", *schema.Max))
+	}
+	if schema.MinLength > 0 {
+		parts = append(parts, fmt.Sprintf("minLength: %d", schema.MinLength))
+	}
+	if schema.MaxLength != nil {
+		parts = append(parts, fmt.Sprintf("maxLength: %d", *schema.MaxLength))
+	}
+	if schema.Pattern != "" {
+		parts = append(parts, "pattern: "+schema.Pattern)
+	}
+	if schema.MinItems > 0 {
+		parts = append(parts, fmt.Sprintf("minItems: %d", schema.MinItems))
+	}
+	if schema.MaxItems != nil {
+		parts = append(parts, fmt.Sprintf("maxItems: %d", *schema.MaxItems))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// BuildEnumStrings converts []any to []string for enum values.
+func BuildEnumStrings(enum []any) []string {
+	if len(enum) == 0 {
+		return nil
+	}
+	result := make([]string, len(enum))
+	for i, v := range enum {
+		result[i] = fmt.Sprintf("%v", v)
+	}
+	return result
 }
