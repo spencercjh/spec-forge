@@ -309,13 +309,14 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 				// Capture for closure
 				p := param
 				params = append(params, processor.ParamFieldItem{
-					ParamName:   param.Name,
-					ParamIn:     param.In,
-					FieldType:   fieldType,
-					Required:    param.Required,
-					Format:      format,
-					Enum:        enum,
-					Constraints: constraints,
+					ParamName:           param.Name,
+					ParamIn:             param.In,
+					FieldType:           fieldType,
+					Required:            param.Required,
+					Format:              format,
+					Enum:                enum,
+					Constraints:         constraints,
+					ExistingDescription: param.Description,
 					SetValue: func(desc string) {
 						p.Description = desc
 					},
