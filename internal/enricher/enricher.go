@@ -131,10 +131,13 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 			continue
 		}
 		ttype := prompt.TemplateType(typeKey)
-		tmplMgr.Set(ttype, &prompt.Template{
+		if setErr := tmplMgr.Set(ttype, &prompt.Template{
 			System: customPrompt.System,
 			User:   customPrompt.User,
-		})
+		}); setErr != nil {
+			slog.Warn("ignoring invalid custom prompt template", "type", typeKey, "error", setErr)
+			continue
+		}
 		slog.Debug("applied custom prompt", "type", typeKey)
 	}
 	batchProcessor := processor.NewBatchProcessor(e.provider, tmplMgr,

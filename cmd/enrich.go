@@ -140,16 +140,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Map custom prompts from config
-	var customPrompts map[string]enricher.CustomPromptConfig
-	if cfg.Enrich.CustomPrompts != nil {
-		customPrompts = make(map[string]enricher.CustomPromptConfig)
-		for k, v := range cfg.Enrich.CustomPrompts {
-			customPrompts[k] = enricher.CustomPromptConfig{
-				System: v.System,
-				User:   v.User,
-			}
-		}
-	}
+	customPrompts := enricher.CustomPromptsFromMap(cfg.Enrich.CustomPrompts)
 
 	enricherCfg := enricher.Config{
 		Provider:        prov,

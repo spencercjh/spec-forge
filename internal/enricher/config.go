@@ -3,12 +3,30 @@ package enricher
 import (
 	"errors"
 	"time"
+
+	"github.com/spencercjh/spec-forge/internal/config"
 )
 
 // CustomPromptConfig holds custom prompt overrides for a template type.
 type CustomPromptConfig struct {
 	System string
 	User   string
+}
+
+// CustomPromptsFromMap converts config-layer prompt overrides into enricher-layer
+// values. Accepts config.CustomPromptCfg from Viper-loaded configuration.
+func CustomPromptsFromMap(m map[string]config.CustomPromptCfg) map[string]CustomPromptConfig {
+	if m == nil {
+		return nil
+	}
+	result := make(map[string]CustomPromptConfig, len(m))
+	for k, v := range m {
+		result[k] = CustomPromptConfig{
+			System: v.System,
+			User:   v.User,
+		}
+	}
+	return result
 }
 
 // Config Enricher configuration
