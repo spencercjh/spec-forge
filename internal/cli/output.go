@@ -21,9 +21,13 @@ func init() {
 	initColorState()
 }
 
-// initColorState reads environment and configures color output.
+// initColorState configures color output based on the NO_COLOR environment variable.
+// Per the NO_COLOR convention (https://no-color.org/), mere presence of the variable
+// disables color output regardless of its value (including empty string).
 func initColorState() {
-	color.NoColor = os.Getenv("NO_COLOR") != ""
+	if _, ok := os.LookupEnv("NO_COLOR"); ok {
+		color.NoColor = true
+	}
 }
 
 // ColorEnabled reports whether colored output is active.
