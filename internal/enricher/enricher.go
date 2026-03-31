@@ -120,37 +120,7 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	// Process batches
 	// Create template manager and apply custom prompts if configured
 	tmplMgr := prompt.NewTemplateManager()
-	validTypes := map[string]bool{
-		string(prompt.TemplateTypeAPI):      true,
-		string(prompt.TemplateTypeSchema):   true,
-		string(prompt.TemplateTypeParam):    true,
-		string(prompt.TemplateTypeResponse): true,
-	}
-	for typeKey, customPrompt := range e.config.CustomPrompts {
-		if !validTypes[typeKey] {
-			slog.Warn("ignoring custom prompt with invalid type key", "type", typeKey, "valid_keys", []string{string(prompt.TemplateTypeAPI), string(prompt.TemplateTypeSchema), string(prompt.TemplateTypeParam), string(prompt.TemplateTypeResponse)})
-			continue
-		}
-		ttype := prompt.TemplateType(typeKey)
-		// Merge with built-in: only override non-empty fields
-		builtIn, _ := tmplMgr.Get(ttype) //nolint:errcheck // merge handles nil case
-		system := customPrompt.System
-		if strings.TrimSpace(system) == "" && builtIn != nil {
-			system = builtIn.System
-		}
-		user := customPrompt.User
-		if strings.TrimSpace(user) == "" && builtIn != nil {
-			user = builtIn.User
-		}
-		if setErr := tmplMgr.Set(ttype, &prompt.Template{
-			System: system,
-			User:   user,
-		}); setErr != nil {
-			slog.Warn("ignoring invalid custom prompt template", "type", typeKey, "error", setErr)
-			continue
-		}
-		slog.Debug("applied custom prompt", "type", typeKey)
-	}
+	e.applyCustomPrompts(tmplMgr)
 	batchProcessor := processor.NewBatchProcessor(e.provider, tmplMgr,
 		processor.WithStreamWriter(streamWriter))
 	concurrentProcessor := processor.NewConcurrentProcessor(batchProcessor, e.config.Concurrency)
@@ -341,6 +311,42 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 				}, language)
 			}
 		}
+	}
+}
+
+// applyCustomPrompts merges user-configured custom prompts into the template manager.
+// Only non-empty fields override built-in templates; empty fields keep the built-in value.
+func (e *Enricher) applyCustomPrompts(tmplMgr *prompt.TemplateManager) {
+	validTypes := map[string]bool{
+		string(prompt.TemplateTypeAPI):      true,
+		string(prompt.TemplateTypeSchema):   true,
+		string(prompt.TemplateTypeParam):    true,
+		string(prompt.TemplateTypeResponse): true,
+	}
+	for typeKey, customPrompt := range e.config.CustomPrompts {
+		if !validTypes[typeKey] {
+			slog.Warn("ignoring custom prompt with invalid type key", "type", typeKey, "valid_keys", []string{string(prompt.TemplateTypeAPI), string(prompt.TemplateTypeSchema), string(prompt.TemplateTypeParam), string(prompt.TemplateTypeResponse)})
+			continue
+		}
+		ttype := prompt.TemplateType(typeKey)
+		// Merge with built-in: only override non-empty fields
+		builtIn, _ := tmplMgr.Get(ttype) //nolint:errcheck // merge handles nil case
+		system := customPrompt.System
+		if strings.TrimSpace(system) == "" && builtIn != nil {
+			system = builtIn.System
+		}
+		user := customPrompt.User
+		if strings.TrimSpace(user) == "" && builtIn != nil {
+			user = builtIn.User
+		}
+		if setErr := tmplMgr.Set(ttype, &prompt.Template{
+			System: system,
+			User:   user,
+		}); setErr != nil {
+			slog.Warn("ignoring invalid custom prompt template", "type", typeKey, "error", setErr)
+			continue
+		}
+		slog.Debug("applied custom prompt", "type", typeKey)
 	}
 }
 
