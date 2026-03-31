@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/schollz/progressbar/v3"
+
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 )
 
@@ -73,9 +74,11 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 				"batch_type", batch.Type,
 				"error", err)
 		}
+		//nolint:errcheck // progress bar errors are non-critical
 		_ = bar.Add(1)
 	}
 
+	//nolint:errcheck
 	_ = bar.Finish()
 
 	if failedCount > 0 {
@@ -131,11 +134,13 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 					"error", err)
 			}
 			mu.Unlock()
+			//nolint:errcheck // progress bar errors are non-critical
 			_ = bar.Add(1)
 		}(i, batch)
 	}
 
 	wg.Wait()
+	//nolint:errcheck
 	_ = bar.Finish()
 
 	if failedCount > 0 {

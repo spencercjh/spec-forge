@@ -295,12 +295,15 @@ Examples:
 	c.Flags().Bool("no-stream", false, "Disable streaming to enable concurrent processing (faster, but no real-time output)")
 	c.Flags().Bool("force", false, "Force regeneration of all descriptions, ignoring existing ones")
 
+	//nolint:errcheck // completion registration cannot fail with valid flag names
 	c.RegisterFlagCompletionFunc("provider", cobra.FixedCompletions(
 		[]string{"openai", "anthropic", "ollama", "custom"}, cobra.ShellCompDirectiveNoFileComp,
 	))
+	//nolint:errcheck
 	c.RegisterFlagCompletionFunc("language", cobra.FixedCompletions(
 		[]string{"en", "zh"}, cobra.ShellCompDirectiveNoFileComp,
 	))
+	//nolint:errcheck
 	c.RegisterFlagCompletionFunc("output", cobra.FixedCompletions(
 		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
 	))
@@ -336,12 +339,15 @@ func init() {
 	enrichCmd.Flags().BoolVar(&enrichNoStream, "no-stream", false, "Disable streaming output to enable concurrent LLM calls (faster)")
 	enrichCmd.Flags().BoolVar(&enrichForce, "force", false, "Force regeneration of all descriptions, ignoring existing ones")
 
+	//nolint:errcheck // completion registration cannot fail with valid flag names
 	enrichCmd.RegisterFlagCompletionFunc("provider", cobra.FixedCompletions(
 		[]string{"openai", "anthropic", "ollama", "custom"}, cobra.ShellCompDirectiveNoFileComp,
 	))
+	//nolint:errcheck
 	enrichCmd.RegisterFlagCompletionFunc("language", cobra.FixedCompletions(
 		[]string{"en", "zh"}, cobra.ShellCompDirectiveNoFileComp,
 	))
+	//nolint:errcheck
 	enrichCmd.RegisterFlagCompletionFunc("output", cobra.FixedCompletions(
 		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
 	))
