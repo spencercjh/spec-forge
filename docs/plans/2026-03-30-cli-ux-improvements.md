@@ -38,7 +38,7 @@
 
 Run:
 ```bash
-cd /home/caijh/codes/open-source/spec-forge/.claude/worktrees/cli-ux
+cd <spec-forge-repo-root>
 go get github.com/fatih/color@latest
 ```
 

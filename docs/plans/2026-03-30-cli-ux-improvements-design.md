@@ -103,8 +103,8 @@ Enriching OpenAPI spec...  ████████████████░�
 
 ### Implementation
 
-- Use `schollz/progressbar` v3
-- Create in `internal/enricher/processor/batch.go`:
+- Use `schollz/progressbar/v3`
+- Create in `internal/enricher/processor/concurrent.go`:
   - `progressbar.NewOptions(total, ...option)` with total = `len(batches)`
   - Options: `progressbar.OptionSetWriter(os.Stderr)`, `progressbar.OptionShowCount()`, custom description with failed count
   - `bar.Add(1)` after each batch completes
@@ -116,7 +116,7 @@ Enriching OpenAPI spec...  ████████████████░�
 |------|----------|
 | Streaming (default) | Progress bar on stderr; streaming text prints above it via `bar.Describe()` or interleaved |
 | Concurrent (`--no-stream`) | Thread-safe `bar.Add(1)` from multiple goroutines |
-| Non-TTY / piped | Auto-degrades to text: `12/15 batches completed` |
+| Non-TTY / piped | Progress bar writes to stderr (schollz/progressbar handles non-TTY rendering); colors disabled via fatih/color TTY detection or `NO_COLOR` |
 
 ### Progress Bar Options
 
@@ -131,15 +131,15 @@ progressbar.NewOptions(len(batches),
 
 ### Files Changed
 
-- **Modified:** `internal/enricher/processor/batch.go`
+- **Modified:** `internal/enricher/processor/concurrent.go`
 
 ---
 
 ## Dependencies
 
 ```
-github.com/fatih/color v1.18.0    # Terminal color output
-github.com/schollz/progressbar/v3  # Progress bar
+github.com/fatih/color v1.19.0    # Terminal color output
+github.com/schollz/progressbar/v3 v3.19.0  # Progress bar
 ```
 
 Both are well-maintained, widely-used, zero-TUI-framework dependencies.
