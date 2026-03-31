@@ -33,30 +33,36 @@ func TestStatusFunctions(t *testing.T) {
 	defer os.Setenv("NO_COLOR", origNoColor)
 	initColorState()
 
-	t.Run("Successf contains checkmark", func(t *testing.T) {
+	t.Run("Successf contains checkmark prefix", func(t *testing.T) {
 		var buf bytes.Buffer
 		Successf(&buf, "test message")
-		assert.Contains(t, buf.String(), "test message")
-		assert.Contains(t, buf.String(), "✅")
+		output := buf.String()
+		assert.Contains(t, output, "✅")
+		assert.Contains(t, output, "test message")
 	})
 
-	t.Run("Skipf contains skip mark", func(t *testing.T) {
+	t.Run("Skipf contains skip prefix", func(t *testing.T) {
 		var buf bytes.Buffer
 		Skipf(&buf, "skipped")
-		assert.Contains(t, buf.String(), "skipped")
-		assert.Contains(t, buf.String(), "⏭️")
+		output := buf.String()
+		assert.Contains(t, output, "⏭️")
+		assert.Contains(t, output, "skipped")
 	})
 
-	t.Run("Errorf contains error marker", func(t *testing.T) {
+	t.Run("Errorf contains error prefix", func(t *testing.T) {
 		var buf bytes.Buffer
 		Errorf(&buf, "something failed")
-		assert.Contains(t, buf.String(), "something failed")
+		output := buf.String()
+		assert.Contains(t, output, "❌")
+		assert.Contains(t, output, "something failed")
 	})
 
-	t.Run("Hintf contains hint", func(t *testing.T) {
+	t.Run("Hintf contains hint prefix", func(t *testing.T) {
 		var buf bytes.Buffer
 		Hintf(&buf, "check your config")
-		assert.Contains(t, buf.String(), "check your config")
+		output := buf.String()
+		assert.Contains(t, output, "💡 Hint:")
+		assert.Contains(t, output, "check your config")
 	})
 
 	t.Run("Statusf formats with args", func(t *testing.T) {
@@ -82,5 +88,13 @@ func TestNoColorMode(t *testing.T) {
 		var buf bytes.Buffer
 		Errorf(&buf, "test")
 		assert.NotContains(t, buf.String(), "\x1b[")
+		assert.Contains(t, buf.String(), "❌")
+	})
+
+	t.Run("Hintf no ANSI codes", func(t *testing.T) {
+		var buf bytes.Buffer
+		Hintf(&buf, "test")
+		assert.NotContains(t, buf.String(), "\x1b[")
+		assert.Contains(t, buf.String(), "💡 Hint:")
 	})
 }

@@ -10,8 +10,6 @@ import (
 )
 
 var (
-	colorEnabled bool
-
 	green  = color.New(color.FgGreen).FprintfFunc()
 	red    = color.New(color.FgRed, color.Bold).FprintfFunc()
 	cyan   = color.New(color.FgCyan).FprintfFunc()
@@ -25,13 +23,12 @@ func init() {
 
 // initColorState reads environment and configures color output.
 func initColorState() {
-	colorEnabled = os.Getenv("NO_COLOR") == ""
-	color.NoColor = !colorEnabled
+	color.NoColor = os.Getenv("NO_COLOR") != ""
 }
 
 // ColorEnabled reports whether colored output is active.
 func ColorEnabled() bool {
-	return colorEnabled
+	return !color.NoColor
 }
 
 // Successf prints a green success message with checkmark prefix.
