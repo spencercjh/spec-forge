@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -80,5 +81,15 @@ func newCompletionCmd() *cobra.Command {
 		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE:                  completionCmd.RunE,
+	}
+}
+
+// registerCompletion registers shell completion for a flag. Errors are logged
+// as warnings since completion is best-effort and should not block startup.
+func registerCompletion(cmd *cobra.Command, flag string, completions []string) {
+	if err := cmd.RegisterFlagCompletionFunc(flag,
+		cobra.FixedCompletions(completions, cobra.ShellCompDirectiveNoFileComp),
+	); err != nil {
+		slog.Warn("failed to register flag completion", "flag", flag, "error", err)
 	}
 }

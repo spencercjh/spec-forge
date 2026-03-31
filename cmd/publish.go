@@ -139,14 +139,8 @@ Note: Local file output is handled by the generate command.`,
 		panic(fmt.Sprintf("failed to mark flag 'to' as required: %v", err))
 	}
 
-	//nolint:errcheck // completion registration cannot fail with valid flag names
-	c.RegisterFlagCompletionFunc("format", cobra.FixedCompletions(
-		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
-	))
-	//nolint:errcheck
-	c.RegisterFlagCompletionFunc("to", cobra.FixedCompletions(
-		[]string{"readme"}, cobra.ShellCompDirectiveNoFileComp,
-	))
+	registerCompletion(c, "format", []string{"yaml", "json"})
+	registerCompletion(c, "to", []string{"readme"})
 
 	return c
 }
@@ -184,12 +178,6 @@ func init() {
 		panic(fmt.Sprintf("failed to mark flag 'to' as required: %v", err))
 	}
 
-	//nolint:errcheck // completion registration cannot fail with valid flag names
-	publishCmd.RegisterFlagCompletionFunc("format", cobra.FixedCompletions(
-		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
-	))
-	//nolint:errcheck
-	publishCmd.RegisterFlagCompletionFunc("to", cobra.FixedCompletions(
-		[]string{"readme"}, cobra.ShellCompDirectiveNoFileComp,
-	))
+	registerCompletion(publishCmd, "format", []string{"yaml", "json"})
+	registerCompletion(publishCmd, "to", []string{"readme"})
 }

@@ -314,18 +314,9 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 	c.Flags().StringSlice("proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
 
-	//nolint:errcheck // completion registration cannot fail with valid flag names
-	c.RegisterFlagCompletionFunc("output", cobra.FixedCompletions(
-		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
-	))
-	//nolint:errcheck
-	c.RegisterFlagCompletionFunc("language", cobra.FixedCompletions(
-		[]string{"en", "zh"}, cobra.ShellCompDirectiveNoFileComp,
-	))
-	//nolint:errcheck
-	c.RegisterFlagCompletionFunc("publish-target", cobra.FixedCompletions(
-		[]string{"readme"}, cobra.ShellCompDirectiveNoFileComp,
-	))
+	registerCompletion(c, "output", []string{"yaml", "json"})
+	registerCompletion(c, "language", []string{"en", "zh"})
+	registerCompletion(c, "publish-target", []string{"readme"})
 
 	return c
 }
@@ -374,18 +365,9 @@ func init() {
 	generateCmd.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
 
-	//nolint:errcheck // completion registration cannot fail with valid flag names
-	generateCmd.RegisterFlagCompletionFunc("output", cobra.FixedCompletions(
-		[]string{"yaml", "json"}, cobra.ShellCompDirectiveNoFileComp,
-	))
-	//nolint:errcheck
-	generateCmd.RegisterFlagCompletionFunc("language", cobra.FixedCompletions(
-		[]string{"en", "zh"}, cobra.ShellCompDirectiveNoFileComp,
-	))
-	//nolint:errcheck
-	generateCmd.RegisterFlagCompletionFunc("publish-target", cobra.FixedCompletions(
-		[]string{"readme"}, cobra.ShellCompDirectiveNoFileComp,
-	))
+	registerCompletion(generateCmd, "output", []string{"yaml", "json"})
+	registerCompletion(generateCmd, "language", []string{"en", "zh"})
+	registerCompletion(generateCmd, "publish-target", []string{"readme"})
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions

@@ -74,12 +74,14 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 				"batch_type", batch.Type,
 				"error", err)
 		}
-		//nolint:errcheck // progress bar errors are non-critical
-		_ = bar.Add(1)
+		if err := bar.Add(1); err != nil {
+			slog.Debug("progress bar add failed", "error", err)
+		}
 	}
 
-	//nolint:errcheck
-	_ = bar.Finish()
+	if err := bar.Finish(); err != nil {
+		slog.Debug("progress bar finish failed", "error", err)
+	}
 
 	if failedCount > 0 {
 		return &totalUsage, &PartialEnrichmentError{
@@ -134,14 +136,16 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 					"error", err)
 			}
 			mu.Unlock()
-			//nolint:errcheck // progress bar errors are non-critical
-			_ = bar.Add(1)
+			if err := bar.Add(1); err != nil {
+				slog.Debug("progress bar add failed", "error", err)
+			}
 		}(i, batch)
 	}
 
 	wg.Wait()
-	//nolint:errcheck
-	_ = bar.Finish()
+	if err := bar.Finish(); err != nil {
+		slog.Debug("progress bar finish failed", "error", err)
+	}
 
 	if failedCount > 0 {
 		return &totalUsage, &PartialEnrichmentError{
