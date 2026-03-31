@@ -56,7 +56,7 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 	bar := progressbar.NewOptions(len(batches),
 		progressbar.OptionSetWriter(os.Stderr),
 		progressbar.OptionShowCount(),
-		progressbar.OptionSetDescription("Enriching OpenAPI spec..."),
+		progressbar.OptionSetDescription("Enriching OpenAPI spec... | 0 failed"),
 		progressbar.OptionOnCompletion(func() { fmt.Fprint(os.Stderr, "\n") }),
 	)
 
@@ -68,7 +68,7 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 		if err != nil {
 			failedCount++
 			failedErrors = append(failedErrors, err)
-			bar.Describe(fmt.Sprintf("Enriching... | %d failed", failedCount))
+			bar.Describe(fmt.Sprintf("Enriching OpenAPI spec... | %d failed", failedCount))
 			slog.Warn("batch processing failed",
 				"batch_index", i,
 				"batch_type", batch.Type,
@@ -106,7 +106,7 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 	bar := progressbar.NewOptions(len(batches),
 		progressbar.OptionSetWriter(os.Stderr),
 		progressbar.OptionShowCount(),
-		progressbar.OptionSetDescription("Enriching OpenAPI spec..."),
+		progressbar.OptionSetDescription("Enriching OpenAPI spec... | 0 failed"),
 		progressbar.OptionOnCompletion(func() { fmt.Fprint(os.Stderr, "\n") }),
 	)
 
@@ -129,7 +129,7 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 			if err != nil {
 				failedCount++
 				failedErrors = append(failedErrors, err)
-				bar.Describe(fmt.Sprintf("Enriching... | %d failed", failedCount))
+				bar.Describe(fmt.Sprintf("Enriching OpenAPI spec... | %d failed", failedCount))
 				slog.Warn("batch processing failed",
 					"batch_index", idx,
 					"batch_type", b.Type,
