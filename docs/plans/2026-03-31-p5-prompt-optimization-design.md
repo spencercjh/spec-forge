@@ -148,7 +148,7 @@ enrich:
 
 1. **Backward compatible** — Output format stays the same (`{"summary": "...", "description": "..."}` for API, `{"field": "desc"}` for schema/param). No response parsing changes.
 
-2. **Constraint helper duplication** — `buildConstraintsString` exists in both `processor/schema.go` and `enricher.go` (different packages). Accepted tradeoff: smaller than creating a shared utility package.
+2. **Constraint helper reuse** — `enricher.go` reuses `processor.BuildConstraintsString` and `processor.BuildEnumStrings` to keep constraint/enum formatting logic centralized in the `processor` package, avoiding duplicated helpers.
 
 3. **ExistingDescription in templates** — Only visible in `--force` mode (fields with existing descriptions are skipped otherwise). When force is on, the LLM can improve or translate existing descriptions.
 

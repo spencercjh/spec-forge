@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -157,15 +158,11 @@ func TestTemplateManager_GetAllTypes(t *testing.T) {
 // Helper function
 func containsAll(s string, substrs ...string) bool {
 	for _, substr := range substrs {
-		if !contains(s, substr) {
+		if !strings.Contains(s, substr) {
 			return false
 		}
 	}
 	return true
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[0:len(substr)] == substr || len(s) > len(substr) && contains(s[1:], substr)
 }
 
 func TestTemplateContext_EnrichedFields(t *testing.T) {

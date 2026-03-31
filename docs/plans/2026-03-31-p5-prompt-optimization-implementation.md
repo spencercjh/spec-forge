@@ -64,7 +64,7 @@
 - Modify: `internal/enricher/enricher.go`
 - Modify: `internal/enricher/enricher_test.go`
 
-- [x] Add `buildParamConstraintsString` and `buildParamEnumStrings` helpers
+- [x] Reuse shared `processor.BuildConstraintsString` and `processor.BuildEnumStrings` helpers for parameter constraint/enum extraction
 - [x] Update `collectParameterGroups` to extract format, enum, constraints from param schemas
 - [x] Update `collectElements` to pass Tags, ExistingSummary, ExistingDescription for API operations
 - [x] Add `TestEnricher_CollectParameters_EnrichedContext` and `TestEnricher_CollectElements_APITags`
