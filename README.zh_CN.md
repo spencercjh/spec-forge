@@ -173,6 +173,11 @@ output:
   format: yaml
 ```
 
+**注意：** AI 增强需要通过环境变量提供 API 密钥：
+- OpenAI: `OPENAI_API_KEY`
+- Anthropic: `ANTHROPIC_API_KEY`
+- 自定义提供商: `LLM_API_KEY`（或在 `apiKeyEnv` 中配置的变量）
+
 查看 [.spec-forge.example.yaml](.spec-forge.example.yaml) 了解所有选项。
 
 ---

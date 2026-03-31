@@ -33,8 +33,6 @@ enrich:
   apiKey: ""                    # Direct API key (not recommended)
   language: zh                  # Output language
   timeout: 60s                  # Request timeout
-  force: false                  # Enrich even if description exists
-  concurrency: 5                # Concurrent requests (non-streaming)
   customPrompts:                # Override built-in prompts
     api:
       system: "You are an API documentation expert..."
@@ -50,16 +48,11 @@ enrich:
 output:
   dir: ./openapi                # Output directory
   format: yaml                  # yaml or json
-  filename: openapi             # Base filename (without extension)
 
 # Publishing settings
 readme:
   slug: my-api                  # API identifier in ReadMe
   branch: stable                # Version/branch name
-
-# General settings
-verbose: false                  # Verbose logging
-skipValidation: false           # Skip OpenAPI validation
 ```
 
 ---
@@ -75,7 +68,7 @@ enrich:
   enabled: true
 ```
 
-CLI equivalent: `--enrich`
+Enabled by default when `enrich.provider` and `enrich.model` are set; disable via CLI with `--skip-enrich`.
 
 ### `enrich.provider`
 
@@ -166,28 +159,6 @@ enrich:
 
 Default: `60s`
 
-### `enrich.force`
-
-Enrich fields even if they already have descriptions.
-
-```yaml
-enrich:
-  force: true
-```
-
-CLI equivalent: `--force`
-
-### `enrich.concurrency`
-
-Number of concurrent LLM requests (only when streaming is disabled).
-
-```yaml
-enrich:
-  concurrency: 10
-```
-
-Default: `5`
-
 ---
 
 ## Output Settings
@@ -217,17 +188,6 @@ output:
 Values: `yaml`, `json`
 
 Default: `yaml`
-
-### `output.filename`
-
-Base filename (without extension).
-
-```yaml
-output:
-  filename: my-api
-```
-
-Default: `openapi`
 
 ---
 

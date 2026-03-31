@@ -57,7 +57,7 @@ spec-forge publish ./openapi.json \
 Options:
 - `--readme-slug` — API identifier in ReadMe (required)
 - `--readme-branch` — Version/branch name (default: `stable`)
-- `--publish-overwrite` — Overwrite existing spec (default: false)
+- `--overwrite` — Overwrite existing spec (default: false)
 
 ### Full Pipeline
 
@@ -68,7 +68,6 @@ export LLM_API_KEY="sk-xxx"
 export README_API_KEY="rdme_xxx"
 
 spec-forge generate ./project \
-    --enrich \
     --language zh \
     --publish-target readme \
     --readme-slug my-api \
@@ -82,16 +81,16 @@ This runs: Detect → Patch → Generate → Validate → Enrich → Publish
 By default, Spec Forge refuses to overwrite existing specs in ReadMe:
 
 ```
-Error: Spec already exists. Use --publish-overwrite to replace.
+Error: Spec already exists. Use --overwrite to replace.
 ```
 
-Use `--publish-overwrite` in CI/CD pipelines:
+Use `--overwrite` in CI/CD pipelines:
 
 ```bash
 spec-forge publish ./openapi.json \
     --to readme \
     --readme-slug my-api \
-    --publish-overwrite
+    --overwrite
 ```
 
 ### Configuration
@@ -143,7 +142,6 @@ jobs:
           README_API_KEY: ${{ secrets.README_API_KEY }}
         run: |
           spec-forge generate ./ \
-            --enrich \
             --language en \
             --publish-target readme \
             --readme-slug ${{ secrets.README_SLUG }} \
@@ -158,10 +156,9 @@ publish-api:
   stage: deploy
   script:
     - go install github.com/spencercjh/spec-forge@latest
-    - spec-forge generate ./
-        --enrich
-        --publish-target readme
-        --readme-slug $README_SLUG
+    - spec-forge generate ./ \
+        --publish-target readme \
+        --readme-slug $README_SLUG \
         --publish-overwrite
   only:
     - main

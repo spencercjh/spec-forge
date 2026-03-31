@@ -77,9 +77,17 @@ Works with any OpenAI-compatible API: DeepSeek, Mistral, Groq, etc.
 
 ### During Generation
 
+AI enrichment runs automatically during `spec-forge generate` when `enrich.provider` and `enrich.model` are configured in `.spec-forge.yaml`:
+
 ```bash
 export OPENAI_API_KEY="sk-xxx"
-spec-forge generate ./project --enrich --language zh
+spec-forge generate ./project --language zh
+```
+
+To disable enrichment during generation:
+
+```bash
+spec-forge generate ./project --language zh --skip-enrich
 ```
 
 ### Standalone Enrichment
@@ -145,7 +153,7 @@ Use `--language` or `enrich.language` config:
 Example:
 
 ```bash
-spec-forge generate ./project --enrich --language ja
+spec-forge generate ./project --language ja
 ```
 
 ---
@@ -315,7 +323,7 @@ enrich:
 
 ```bash
 export DEEPSEEK_API_KEY="sk-xxx"
-spec-forge generate ./project --enrich
+spec-forge generate ./project
 ```
 
 ### Ollama (Local, Free)
@@ -329,7 +337,6 @@ ollama pull llama3
 
 # Generate
 spec-forge generate ./project \
-    --enrich \
     --provider ollama \
     --model llama3 \
     --custom-base-url http://localhost:11434

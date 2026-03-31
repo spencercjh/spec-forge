@@ -198,6 +198,11 @@ output:
   format: yaml
 ```
 
+**Note:** AI enrichment requires API keys via environment variables:
+- OpenAI: `OPENAI_API_KEY`
+- Anthropic: `ANTHROPIC_API_KEY`
+- Custom providers: `LLM_API_KEY` (or as configured in `apiKeyEnv`)
+
 See [.spec-forge.example.yaml](.spec-forge.example.yaml) for all options.
 
 ---

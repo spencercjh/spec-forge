@@ -33,13 +33,21 @@ spec-forge --help
 spec-forge generate ./path/to/project
 ```
 
-Output is written to `./openapi.yaml` by default.
+Output is written to the project's output directory (default: project root). For gRPC/protoc, the filename follows `<service>.openapi.yaml`.
 
 ### With AI Enrichment
 
+AI enrichment runs automatically when `enrich.provider` and `enrich.model` are configured:
+
 ```bash
 export OPENAI_API_KEY="sk-xxx"
-spec-forge generate ./path/to/project --enrich --language zh
+spec-forge generate ./path/to/project --language zh
+```
+
+To disable enrichment during generation:
+
+```bash
+spec-forge generate ./path/to/project --language zh --skip-enrich
 ```
 
 ---
@@ -131,8 +139,11 @@ output:
 # Basic
 spec-forge generate ./project
 
-# With enrichment
-spec-forge generate ./project --enrich --language zh
+# With enrichment (requires enrich.provider and enrich.model configured)
+spec-forge generate ./project --language zh
+
+# Disable enrichment
+spec-forge generate ./project --language zh --skip-enrich
 
 # Custom output
 spec-forge generate ./project --output ./specs/api.yaml
