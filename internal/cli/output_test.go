@@ -49,9 +49,15 @@ func TestColorEnabled(t *testing.T) {
 }
 
 func TestStatusFunctions(t *testing.T) {
-	origNoColor := os.Getenv("NO_COLOR")
+	origNoColor, noColorWasSet := os.LookupEnv("NO_COLOR")
 	os.Unsetenv("NO_COLOR")
-	defer os.Setenv("NO_COLOR", origNoColor)
+	defer func() {
+		if noColorWasSet {
+			os.Setenv("NO_COLOR", origNoColor)
+		} else {
+			os.Unsetenv("NO_COLOR")
+		}
+	}()
 	origColorNoColor := color.NoColor
 	defer func() { color.NoColor = origColorNoColor }()
 	initColorState()
