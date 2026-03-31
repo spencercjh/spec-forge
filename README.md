@@ -81,7 +81,7 @@ func GetUser(c *gin.Context) { ... }
 4. **Stale by default** — Since there's no compile-time verification, specs drift from reality. Developers forget to
    regenerate, or worse, stop trusting the spec because it's often wrong.
 
-**Spec Forge requires zero annotations.** We parse Go AST to extract routes from `gin.Engine` or `echo.Echo`, analyze
+**Spec Forge requires zero annotations.** We parse Go AST to extract routes from `gin.Engine`, analyze
 handler signatures, and map request/response structs directly. Rename a type, and the spec updates automatically. No
 comments to maintain, no stale references, no visual noise.
 

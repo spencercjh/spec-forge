@@ -132,7 +132,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.26'
 
       - name: Install Spec Forge
         run: go install github.com/spencercjh/spec-forge@latest
@@ -154,7 +154,7 @@ jobs:
 
 ```yaml
 publish-api:
-  image: golang:1.22
+  image: golang:1.26
   stage: deploy
   script:
     - go install github.com/spencercjh/spec-forge@latest
