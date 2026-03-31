@@ -142,6 +142,11 @@ OpenAPI docs. Spec Forge wraps `protoc-gen-connect-openapi` — a maintained, Op
 **Hertz / Kitex (CloudWeGo)** — Official OpenAPI docs are outdated. Spec Forge will wrap the working tools from
 `hertz-contrib/swagger-generate` into a single command (coming soon).
 
+**Why use Spec Forge when frameworks have their own tools?** Each framework's ecosystem requires different setup,
+dependencies, and CI configurations. Spec Forge reduces integration cost by providing a unified generation interface — one
+command, one config file, consistent output across all your services. This enables centralized CI/CD pipelines that
+generate, validate, enrich, and publish API documentation automatically, regardless of which framework each team chose.
+
 ---
 
 ## How It Works
