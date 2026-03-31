@@ -30,7 +30,6 @@ Core workflow: Source Code -> Extract -> Enrich -> Publish`,
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
-		slog.Error("command failed", "error", err)
 		printHintAndExit(err)
 	}
 }
