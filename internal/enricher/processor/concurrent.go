@@ -2,9 +2,12 @@ package processor
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 
+	"github.com/schollz/progressbar/v3"
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 )
 
@@ -49,6 +52,13 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 		failedErrors []error
 	)
 
+	bar := progressbar.NewOptions(len(batches),
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionShowCount(),
+		progressbar.OptionSetDescription("Enriching OpenAPI spec..."),
+		progressbar.OptionOnCompletion(func() { fmt.Fprint(os.Stderr, "\n") }),
+	)
+
 	for i, batch := range batches {
 		usage, err := p.batchProcessor.ProcessBatch(ctx, batch)
 		if usage != nil {
@@ -57,12 +67,16 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 		if err != nil {
 			failedCount++
 			failedErrors = append(failedErrors, err)
+			bar.Describe(fmt.Sprintf("Enriching... | %d failed", failedCount))
 			slog.Warn("batch processing failed",
 				"batch_index", i,
 				"batch_type", batch.Type,
 				"error", err)
 		}
+		_ = bar.Add(1)
 	}
+
+	_ = bar.Finish()
 
 	if failedCount > 0 {
 		return &totalUsage, &PartialEnrichmentError{
@@ -84,6 +98,13 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 		failedErrors []error
 	)
 
+	bar := progressbar.NewOptions(len(batches),
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionShowCount(),
+		progressbar.OptionSetDescription("Enriching OpenAPI spec..."),
+		progressbar.OptionOnCompletion(func() { fmt.Fprint(os.Stderr, "\n") }),
+	)
+
 	semaphore := make(chan struct{}, p.concurrency)
 
 	for i, batch := range batches {
@@ -92,7 +113,6 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 		go func(idx int, b *Batch) {
 			defer wg.Done()
 
-			// Acquire semaphore
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
@@ -104,18 +124,20 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 			if err != nil {
 				failedCount++
 				failedErrors = append(failedErrors, err)
+				bar.Describe(fmt.Sprintf("Enriching... | %d failed", failedCount))
 				slog.Warn("batch processing failed",
 					"batch_index", idx,
 					"batch_type", b.Type,
 					"error", err)
 			}
 			mu.Unlock()
+			_ = bar.Add(1)
 		}(i, batch)
 	}
 
 	wg.Wait()
+	_ = bar.Finish()
 
-	// Return partial error if some batches failed
 	if failedCount > 0 {
 		return &totalUsage, &PartialEnrichmentError{
 			TotalBatches:  len(batches),
