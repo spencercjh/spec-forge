@@ -3,13 +3,13 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/spencercjh/spec-forge/internal/cli"
 	forgeerrors "github.com/spencercjh/spec-forge/internal/errors"
 )
 
@@ -39,12 +39,14 @@ func Execute() {
 // with an appropriate exit code.
 func printHintAndExit(err error) {
 	if fe, ok := errors.AsType[*forgeerrors.Error](err); ok {
+		cli.Errorf(os.Stderr, "%s", fe.Error())
 		hint := fe.Hint()
 		if hint != "" {
-			fmt.Fprintf(os.Stderr, "Hint: %s\n", hint)
+			cli.Hintf(os.Stderr, "%s", hint)
 		}
 		os.Exit(exitCodeForCode(fe.Code))
 	}
+	cli.Errorf(os.Stderr, "%s", err.Error())
 	os.Exit(1)
 }
 
