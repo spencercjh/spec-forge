@@ -74,9 +74,9 @@ Register `ValidArgsFunction` on enum-type flags for shell completion:
   - `Hintf(format, args...)` — prints cyan hint prefix + yellow content
   - `Skipf(format, args...)` — prints dim skip message
 - Auto-detection:
-  - Respect `NO_COLOR` environment variable (https://no-color.org/)
-  - Check `os.Stdout.IsTerminal()` / `os.Stderr.IsTerminal()` — disable color when piped
-  - Use `color.NoColor` from fatih/color which handles both
+  - Respect `NO_COLOR` environment variable (https://no-color.org/) — mere presence disables color
+  - Otherwise rely on `fatih/color` defaults for terminal detection and color enable/disable behavior
+  - Initialize `color.NoColor` in `internal/cli/initColorState()` instead of performing explicit `IsTerminal` checks
 
 ### Output Architecture
 
