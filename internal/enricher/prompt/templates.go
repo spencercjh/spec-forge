@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"text/template"
 )
@@ -238,6 +239,14 @@ func (m *TemplateManager) Get(ttype TemplateType) (*Template, error) {
 }
 
 // Set sets a custom template
-func (m *TemplateManager) Set(ttype TemplateType, tmpl *Template) {
+func (m *TemplateManager) Set(ttype TemplateType, tmpl *Template) error {
+	// Validate templates can be parsed
+	if _, err := template.New("system").Funcs(template.FuncMap{"join": strings.Join}).Parse(tmpl.System); err != nil {
+		return fmt.Errorf("invalid system prompt template for %q: %w", ttype, err)
+	}
+	if _, err := template.New("user").Funcs(template.FuncMap{"join": strings.Join}).Parse(tmpl.User); err != nil {
+		return fmt.Errorf("invalid user prompt template for %q: %w", ttype, err)
+	}
 	m.templates[ttype] = tmpl
+	return nil
 }
