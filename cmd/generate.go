@@ -54,7 +54,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 		path = args[0]
 	}
 
-	slog.DebugContext(ctx, "Generating OpenAPI spec", "path", path)
+	cli.Statusf(os.Stderr, "Generating OpenAPI spec in %s...", path)
 
 	// Get all flag values from command (isolated per command instance)
 	//nolint:errcheck // flags are bound at command creation, errors not possible
