@@ -297,7 +297,6 @@ Examples:
 
 	registerCompletion(c, "provider", []string{"openai", "anthropic", "ollama", "custom"})
 	registerCompletion(c, "language", []string{"en", "zh"})
-	registerCompletion(c, "output", []string{"yaml", "json"})
 
 	return c
 }
@@ -332,5 +331,4 @@ func init() {
 
 	registerCompletion(enrichCmd, "provider", []string{"openai", "anthropic", "ollama", "custom"})
 	registerCompletion(enrichCmd, "language", []string{"en", "zh"})
-	registerCompletion(enrichCmd, "output", []string{"yaml", "json"})
 }
