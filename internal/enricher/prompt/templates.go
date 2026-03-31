@@ -171,7 +171,7 @@ Example output:
   {"email": "The user's primary email address used for authentication and notifications", "role": "The user's permission level determining access to system features"}`,
 				User: `Schema: {{.SchemaName}}
 Fields:
-{{range .Fields}}- {{.Name}} ({{.Type}}, {{if .Required}}required{{else}}optional{{end}}{{if .Format}}, format: {{.Format}}{{end}}{{if .Constraints}}, {{.Constraints}}{{end}}{{if .Enum}}, enum: [{{join .Enum ", "}}]{{end}}{{if .ExistingDescription}}, existing: "{{.ExistingDescription}}"{{end}})
+{{range .Fields}}- {{.Name}} ({{.Type}}, {{if .Required}}required{{else}}optional{{end}}{{if .Format}}, format: {{.Format}}{{end}}{{if .Constraints}}, {{.Constraints}}{{end}}{{if .Enum}}, enum: [{{join .Enum ", "}}]{{end}}{{if .ExistingDescription}}, existing: {{.ExistingDescription}}{{end}})
 {{end}}
 Generate a description for each field.`,
 			},
@@ -198,7 +198,7 @@ Example output:
   {"page": "Page number for pagination, starting from 1. Defaults to 1 if not specified.", "status": "Filter users by account status. Use 'active' for current users or 'inactive' for deactivated accounts."}`,
 				User: `API: {{.Method}} {{.Path}}
 Parameters:
-{{range .ParamFields}}- {{.Name}} ({{.Type}}, in: {{.ParamIn}}, {{if .Required}}required{{else}}optional{{end}}{{if .Format}}, format: {{.Format}}{{end}}{{if .Constraints}}, {{.Constraints}}{{end}}{{if .Enum}}, enum: [{{join .Enum ", "}}]{{end}}{{if .ExistingDescription}}, existing: "{{.ExistingDescription}}"{{end}})
+{{range .ParamFields}}- {{.Name}} ({{.Type}}, in: {{.ParamIn}}, {{if .Required}}required{{else}}optional{{end}}{{if .Format}}, format: {{.Format}}{{end}}{{if .Constraints}}, {{.Constraints}}{{end}}{{if .Enum}}, enum: [{{join .Enum ", "}}]{{end}}{{if .ExistingDescription}}, existing: {{.ExistingDescription}}{{end}})
 {{end}}
 Generate a description for each parameter.`,
 			},
@@ -240,6 +240,9 @@ func (m *TemplateManager) Get(ttype TemplateType) (*Template, error) {
 
 // Set sets a custom template
 func (m *TemplateManager) Set(ttype TemplateType, tmpl *Template) error {
+	if tmpl == nil {
+		return fmt.Errorf("template for %q cannot be nil", ttype)
+	}
 	// Validate templates can be parsed
 	if _, err := template.New("system").Funcs(template.FuncMap{"join": strings.Join}).Parse(tmpl.System); err != nil {
 		return fmt.Errorf("invalid system prompt template for %q: %w", ttype, err)
