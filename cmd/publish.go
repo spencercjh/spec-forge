@@ -51,7 +51,7 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	//nolint:errcheck
 	readMeUseSpecVersion, _ := cmd.Flags().GetBool("readme-use-spec-version")
 
-	cli.Statusf(os.Stderr, "Publishing spec to %s", target)
+	cli.Statusf(os.Stderr, "Publishing %s to %s", specFile, target)
 
 	// Create publisher using factory
 	pub, err := publisher.NewPublisher(target)
