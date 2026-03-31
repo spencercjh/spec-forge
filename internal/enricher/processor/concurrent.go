@@ -2,8 +2,12 @@ package processor
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"os"
 	"sync"
+
+	"github.com/schollz/progressbar/v3"
 
 	"github.com/spencercjh/spec-forge/internal/enricher/provider"
 )
@@ -49,6 +53,13 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 		failedErrors []error
 	)
 
+	bar := progressbar.NewOptions(len(batches),
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionShowCount(),
+		progressbar.OptionSetDescription("Enriching OpenAPI spec... | 0 failed"),
+		progressbar.OptionOnCompletion(func() { fmt.Fprint(os.Stderr, "\n") }),
+	)
+
 	for i, batch := range batches {
 		usage, err := p.batchProcessor.ProcessBatch(ctx, batch)
 		if usage != nil {
@@ -57,11 +68,19 @@ func (p *ConcurrentProcessor) processSequential(ctx context.Context, batches []*
 		if err != nil {
 			failedCount++
 			failedErrors = append(failedErrors, err)
+			bar.Describe(fmt.Sprintf("Enriching OpenAPI spec... | %d failed", failedCount))
 			slog.Warn("batch processing failed",
 				"batch_index", i,
 				"batch_type", batch.Type,
 				"error", err)
 		}
+		if err := bar.Add(1); err != nil {
+			slog.Debug("progress bar add failed", "error", err)
+		}
+	}
+
+	if err := bar.Finish(); err != nil {
+		slog.Debug("progress bar finish failed", "error", err)
 	}
 
 	if failedCount > 0 {
@@ -84,6 +103,13 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 		failedErrors []error
 	)
 
+	bar := progressbar.NewOptions(len(batches),
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionShowCount(),
+		progressbar.OptionSetDescription("Enriching OpenAPI spec... | 0 failed"),
+		progressbar.OptionOnCompletion(func() { fmt.Fprint(os.Stderr, "\n") }),
+	)
+
 	semaphore := make(chan struct{}, p.concurrency)
 
 	for i, batch := range batches {
@@ -92,7 +118,6 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 		go func(idx int, b *Batch) {
 			defer wg.Done()
 
-			// Acquire semaphore
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
@@ -104,18 +129,24 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 			if err != nil {
 				failedCount++
 				failedErrors = append(failedErrors, err)
+				bar.Describe(fmt.Sprintf("Enriching OpenAPI spec... | %d failed", failedCount))
 				slog.Warn("batch processing failed",
 					"batch_index", idx,
 					"batch_type", b.Type,
 					"error", err)
+			}
+			if err := bar.Add(1); err != nil {
+				slog.Debug("progress bar add failed", "error", err)
 			}
 			mu.Unlock()
 		}(i, batch)
 	}
 
 	wg.Wait()
+	if err := bar.Finish(); err != nil {
+		slog.Debug("progress bar finish failed", "error", err)
+	}
 
-	// Return partial error if some batches failed
 	if failedCount > 0 {
 		return &totalUsage, &PartialEnrichmentError{
 			TotalBatches:  len(batches),

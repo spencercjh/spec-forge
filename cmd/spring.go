@@ -2,12 +2,12 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
+	"os"
 
 	"github.com/spf13/cobra"
 
+	"github.com/spencercjh/spec-forge/internal/cli"
 	"github.com/spencercjh/spec-forge/internal/extractor"
 	"github.com/spencercjh/spec-forge/internal/extractor/spring"
 )
@@ -42,8 +42,7 @@ This command will identify:
 	RunE: runSpringDetect,
 }
 
-func runSpringDetect(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
+func runSpringDetect(_ *cobra.Command, args []string) error {
 	path := "."
 	if len(args) > 0 {
 		path = args[0]
@@ -56,43 +55,43 @@ func runSpringDetect(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print human-readable output
-	printProjectInfo(ctx, info)
+	printProjectInfo(info)
 	return nil
 }
 
-func printProjectInfo(ctx context.Context, info *extractor.ProjectInfo) {
-	slog.InfoContext(ctx, "Spring Project Detection Results")
-	slog.InfoContext(ctx, "Build Tool", "tool", info.BuildTool)
-	slog.InfoContext(ctx, "Build File", "path", info.BuildFilePath)
+func printProjectInfo(info *extractor.ProjectInfo) {
+	cli.Statusf(os.Stderr, "Spring Project Detection Results")
+	cli.Statusf(os.Stderr, "Build Tool: %s", info.BuildTool)
+	cli.Statusf(os.Stderr, "Build File: %s", info.BuildFilePath)
 
 	springInfo, ok := info.FrameworkData.(*spring.Info)
 	if !ok || springInfo == nil {
 		springInfo = &spring.Info{}
 	}
 
-	slog.InfoContext(ctx, "Spring Boot", "version", springInfo.SpringBootVersion)
+	cli.Statusf(os.Stderr, "Spring Boot: %s", springInfo.SpringBootVersion)
 
 	if springInfo.IsMultiModule {
-		slog.InfoContext(ctx, "Multi-Module", "enabled", "✅ Yes")
-		slog.InfoContext(ctx, "Modules", "list", springInfo.Modules)
+		cli.Successf(os.Stderr, "Multi-Module: Yes")
+		cli.Statusf(os.Stderr, "Modules: %v", springInfo.Modules)
 		if springInfo.MainModule != "" {
-			slog.InfoContext(ctx, "Main Module", "name", springInfo.MainModule)
-			slog.InfoContext(ctx, "Main Module Path", "path", springInfo.MainModulePath)
+			cli.Statusf(os.Stderr, "Main Module: %s", springInfo.MainModule)
+			cli.Statusf(os.Stderr, "Main Module Path: %s", springInfo.MainModulePath)
 		}
 	} else {
-		slog.InfoContext(ctx, "Multi-Module", "enabled", "❌ No")
+		cli.Skipf(os.Stderr, "Multi-Module: No")
 	}
 
 	if springInfo.HasSpringdocDeps {
-		slog.InfoContext(ctx, "springdoc Dependency", "status", "✅ Present", "version", springInfo.SpringdocVersion)
+		cli.Successf(os.Stderr, "springdoc Dependency: Present (version: %s)", springInfo.SpringdocVersion)
 	} else {
-		slog.InfoContext(ctx, "springdoc Dependency", "status", "❌ Not found")
+		cli.Skipf(os.Stderr, "springdoc Dependency: Not found")
 	}
 
 	if springInfo.HasSpringdocPlugin {
-		slog.InfoContext(ctx, "springdoc Plugin", "status", "✅ Configured")
+		cli.Successf(os.Stderr, "springdoc Plugin: Configured")
 	} else {
-		slog.InfoContext(ctx, "springdoc Plugin", "status", "❌ Not configured")
+		cli.Skipf(os.Stderr, "springdoc Plugin: Not configured")
 	}
 }
 
@@ -116,8 +115,7 @@ This command will:
 	RunE: runSpringPatch,
 }
 
-func runSpringPatch(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
+func runSpringPatch(_ *cobra.Command, args []string) error {
 	path := "."
 	if len(args) > 0 {
 		path = args[0]
@@ -139,29 +137,29 @@ func runSpringPatch(cmd *cobra.Command, args []string) error {
 
 	// Print results
 	if opts.DryRun {
-		slog.InfoContext(ctx, "Dry run mode - showing changes without modifying files")
+		cli.Statusf(os.Stderr, "Dry run mode - showing changes without modifying files")
 	}
 
-	slog.InfoContext(ctx, "Build file", "path", result.BuildFilePath)
+	cli.Statusf(os.Stderr, "Build file: %s", result.BuildFilePath)
 
 	if result.DependencyAdded {
-		slog.InfoContext(ctx, "springdoc dependency will be added", "status", "✅")
+		cli.Successf(os.Stderr, "springdoc dependency will be added")
 	} else {
-		slog.InfoContext(ctx, "springdoc dependency already present", "status", "⏭️")
+		cli.Skipf(os.Stderr, "springdoc dependency already present")
 	}
 
 	if result.PluginAdded {
-		slog.InfoContext(ctx, "springdoc plugin will be added", "status", "✅")
+		cli.Successf(os.Stderr, "springdoc plugin will be added")
 	} else {
-		slog.InfoContext(ctx, "springdoc plugin already configured", "status", "⏭️")
+		cli.Skipf(os.Stderr, "springdoc plugin already configured")
 	}
 
 	if !opts.DryRun && (result.DependencyAdded || result.PluginAdded) {
-		slog.InfoContext(ctx, "Patch applied successfully!")
-		slog.InfoContext(ctx, "Note: Build file format may differ from original due to XML serialization.")
-		slog.InfoContext(ctx, "Use 'spec-forge generate' to extract specs while preserving original file format.")
+		cli.Successf(os.Stderr, "Patch applied successfully!")
+		cli.Statusf(os.Stderr, "Note: Build file format may differ from original due to XML serialization.")
+		cli.Statusf(os.Stderr, "Use 'spec-forge generate' to extract specs while preserving original file format.")
 	} else if !result.DependencyAdded && !result.PluginAdded {
-		slog.InfoContext(ctx, "No changes needed.")
+		cli.Skipf(os.Stderr, "No changes needed.")
 	}
 
 	return nil
