@@ -335,11 +335,7 @@ func collectParameterGroups(spec *openapi3.T, collector *processor.SpecCollector
 // getSchemaTypeString returns a string representation of a schema type.
 func getSchemaTypeString(schema *openapi3.Schema) string {
 	if schema.Type != nil && len(*schema.Type) > 0 {
-		typeStr := (*schema.Type)[0]
-		if schema.Format != "" {
-			return typeStr + "(" + schema.Format + ")"
-		}
-		return typeStr
+		return (*schema.Type)[0]
 	}
 	return "object"
 }
