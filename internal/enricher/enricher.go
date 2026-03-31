@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -131,9 +132,19 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 			continue
 		}
 		ttype := prompt.TemplateType(typeKey)
+		// Merge with built-in: only override non-empty fields
+		builtIn, _ := tmplMgr.Get(ttype) //nolint:errcheck // merge handles nil case
+		system := customPrompt.System
+		if strings.TrimSpace(system) == "" && builtIn != nil {
+			system = builtIn.System
+		}
+		user := customPrompt.User
+		if strings.TrimSpace(user) == "" && builtIn != nil {
+			user = builtIn.User
+		}
 		if setErr := tmplMgr.Set(ttype, &prompt.Template{
-			System: customPrompt.System,
-			User:   customPrompt.User,
+			System: system,
+			User:   user,
 		}); setErr != nil {
 			slog.Warn("ignoring invalid custom prompt template", "type", typeKey, "error", setErr)
 			continue

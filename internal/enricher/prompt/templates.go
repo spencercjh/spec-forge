@@ -244,6 +244,9 @@ func (m *TemplateManager) Set(ttype TemplateType, tmpl *Template) error {
 	if _, err := template.New("system").Funcs(template.FuncMap{"join": strings.Join}).Parse(tmpl.System); err != nil {
 		return fmt.Errorf("invalid system prompt template for %q: %w", ttype, err)
 	}
+	if strings.TrimSpace(tmpl.User) == "" {
+		return fmt.Errorf("user prompt template for %q cannot be empty", ttype)
+	}
 	if _, err := template.New("user").Funcs(template.FuncMap{"join": strings.Join}).Parse(tmpl.User); err != nil {
 		return fmt.Errorf("invalid user prompt template for %q: %w", ttype, err)
 	}

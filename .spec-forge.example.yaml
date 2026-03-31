@@ -25,6 +25,7 @@ enrich:
   #     user: "API: {{.Method}} {{.Path}}\nDescribe this endpoint."
   #   schema:
   #     system: "You are a data model documenter..."
+  #     user: "Schema: {{.SchemaName}}\nDescribe this data model and its fields."
 
 # Output Settings
 output:
