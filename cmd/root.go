@@ -86,6 +86,7 @@ Core workflow: Source Code -> Extract -> Enrich -> Publish`,
 	c.AddCommand(newGenerateCmd())
 	c.AddCommand(newEnrichCmd())
 	c.AddCommand(newPublishCmd())
+	c.AddCommand(newCompletionCmd())
 
 	return c
 }
