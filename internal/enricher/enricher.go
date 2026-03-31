@@ -119,7 +119,17 @@ func (e *Enricher) Enrich(ctx context.Context, spec *openapi3.T, opts *EnrichOpt
 	// Process batches
 	// Create template manager and apply custom prompts if configured
 	tmplMgr := prompt.NewTemplateManager()
+	validTypes := map[string]bool{
+		string(prompt.TemplateTypeAPI):      true,
+		string(prompt.TemplateTypeSchema):   true,
+		string(prompt.TemplateTypeParam):    true,
+		string(prompt.TemplateTypeResponse): true,
+	}
 	for typeKey, customPrompt := range e.config.CustomPrompts {
+		if !validTypes[typeKey] {
+			slog.Warn("ignoring custom prompt with invalid type key", "type", typeKey, "valid_keys", []string{string(prompt.TemplateTypeAPI), string(prompt.TemplateTypeSchema), string(prompt.TemplateTypeParam), string(prompt.TemplateTypeResponse)})
+			continue
+		}
 		ttype := prompt.TemplateType(typeKey)
 		tmplMgr.Set(ttype, &prompt.Template{
 			System: customPrompt.System,
