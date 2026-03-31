@@ -135,10 +135,10 @@ func (p *ConcurrentProcessor) processConcurrent(ctx context.Context, batches []*
 					"batch_type", b.Type,
 					"error", err)
 			}
-			mu.Unlock()
 			if err := bar.Add(1); err != nil {
 				slog.Debug("progress bar add failed", "error", err)
 			}
+			mu.Unlock()
 		}(i, batch)
 	}
 
