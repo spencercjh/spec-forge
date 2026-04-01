@@ -310,8 +310,9 @@ func TestEnricher_WithStreaming(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify streaming output was written (raw, no prefix)
+	expected := strings.Join(chunks, "")
 	output := buf.String()
-	assert.NotEmpty(t, output, "Expected non-empty streaming output")
+	assert.Contains(t, output, expected, "Expected streaming output to contain concatenated chunks")
 	assert.NotContains(t, output, "[api]", "Streaming output should not contain prefix markers")
 }
 

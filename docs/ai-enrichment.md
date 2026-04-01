@@ -110,12 +110,10 @@ LLM_API_KEY="sk-xxx" spec-forge enrich ./openapi.json \
 
 ### Streaming (Default)
 
-Shows real-time progress with batch type prefixes:
+Shows real-time LLM output as it is generated:
 
 ```
-[api] Processing batch 1/3...
-[schema] Processing batch 2/3...
-[param] Processing batch 3/3...
+{"summary": "获取用户列表", "description": "检索系统中所有可用的用户信息..."}
 ```
 
 Best for: Interactive use, seeing progress

@@ -410,8 +410,11 @@ func TestBatchProcessor_ProcessBatch_WithStreaming(t *testing.T) {
 
 	// Verify output was streamed (raw, no prefix)
 	output := buf.String()
-	if output == "" {
-		t.Error("Expected non-empty streaming output, got empty string")
+	if !strings.Contains(output, "chunk1") || !strings.Contains(output, "chunk2") {
+		t.Errorf("Streaming output should contain 'chunk1' and 'chunk2', got: %s", output)
+	}
+	if idx1, idx2 := strings.Index(output, "chunk1"), strings.Index(output, "chunk2"); idx1 > idx2 {
+		t.Errorf("Streaming chunks out of order: expected 'chunk1' before 'chunk2', got: %s", output)
 	}
 	if strings.Contains(output, "[api]") {
 		t.Errorf("Streaming output should not contain prefix, got: %s", output)
