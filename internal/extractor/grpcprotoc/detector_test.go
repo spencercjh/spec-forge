@@ -412,11 +412,20 @@ func TestDetector_findProtoFiles_RelativeDotPath(t *testing.T) {
 	dir := t.TempDir()
 
 	// Create a .proto file in the project root
-	os.WriteFile(filepath.Join(dir, "main.proto"), []byte(`syntax = "proto3"; package main;`), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "main.proto"), []byte(`syntax = "proto3"; package main;`), 0o644); err != nil {
+		t.Fatalf("failed to create main.proto: %v", err)
+	}
 
 	// Change to temp dir so "." resolves to it
-	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Errorf("failed to restore working directory: %v", err)
+		}
+	}()
 	if err := os.Chdir(dir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
 	}

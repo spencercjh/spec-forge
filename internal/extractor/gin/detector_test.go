@@ -112,12 +112,23 @@ func TestDetector_findMainFiles(t *testing.T) {
 func TestDetector_findMainFiles_RelativeDotPath(t *testing.T) {
 	dir := t.TempDir()
 
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}"), 0o644)
-	os.WriteFile(filepath.Join(dir, "router.go"), []byte("package main\n\nfunc setupRouter() {}"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}"), 0o644); err != nil {
+		t.Fatalf("failed to create main.go: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "router.go"), []byte("package main\n\nfunc setupRouter() {}"), 0o644); err != nil {
+		t.Fatalf("failed to create router.go: %v", err)
+	}
 
 	// Change to temp dir so "." resolves to it
-	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Errorf("failed to restore working directory: %v", err)
+		}
+	}()
 	if err := os.Chdir(dir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
 	}

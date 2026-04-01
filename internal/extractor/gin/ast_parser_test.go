@@ -171,7 +171,9 @@ func main() {
 	r.GET("/ping", func(c *gin.Context) {})
 }
 `
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o644); err != nil {
+		t.Fatalf("failed to create main.go: %v", err)
+	}
 
 	// Use "." relative path — this is how users invoke: spec-forge generate .
 	// Regression test: info.Name() returns "." for the root, which must not be
@@ -179,8 +181,15 @@ func main() {
 	parser := NewASTParser(".")
 
 	// Change working directory to temp dir so "." resolves correctly
-	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Errorf("failed to restore working directory: %v", err)
+		}
+	}()
 	if err := os.Chdir(dir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
 	}
