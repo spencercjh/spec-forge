@@ -109,6 +109,29 @@ func TestDetector_findMainFiles(t *testing.T) {
 	}
 }
 
+func TestDetector_findMainFiles_RelativeDotPath(t *testing.T) {
+	dir := t.TempDir()
+
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}"), 0o644)
+	os.WriteFile(filepath.Join(dir, "router.go"), []byte("package main\n\nfunc setupRouter() {}"), 0o644)
+
+	// Change to temp dir so "." resolves to it
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	d := NewDetector()
+	files, err := d.findMainFiles(".")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected at least 1 file with relative \".\" path, got 0")
+	}
+}
+
 func TestDetector_Detect(t *testing.T) {
 	tests := []struct {
 		name        string

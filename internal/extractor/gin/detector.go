@@ -122,9 +122,10 @@ func (d *Detector) findMainFiles(projectPath string) ([]string, error) {
 			return err
 		}
 
-		// Skip vendor and hidden directories
+		// Skip vendor and hidden directories (but not the root itself when path is ".")
 		if info.IsDir() {
-			if info.Name() == "vendor" || strings.HasPrefix(info.Name(), ".") {
+			if path != projectPath &&
+				(info.Name() == "vendor" || strings.HasPrefix(info.Name(), ".")) {
 				return filepath.SkipDir
 			}
 			return nil
