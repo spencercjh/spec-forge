@@ -408,10 +408,13 @@ func TestBatchProcessor_ProcessBatch_WithStreaming(t *testing.T) {
 		t.Fatalf("Flush() error = %v", err)
 	}
 
-	// Verify output contains the prefix
+	// Verify output was streamed (raw, no prefix)
 	output := buf.String()
-	if !strings.Contains(output, "[api]") {
-		t.Errorf("Expected output to contain '[api]' prefix, got: %s", output)
+	if output == "" {
+		t.Error("Expected non-empty streaming output, got empty string")
+	}
+	if strings.Contains(output, "[api]") {
+		t.Errorf("Streaming output should not contain prefix, got: %s", output)
 	}
 }
 

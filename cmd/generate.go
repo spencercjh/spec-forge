@@ -81,6 +81,10 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	overwriteOutput, _ := cmd.Flags().GetBool("overwrite-output")
 	//nolint:errcheck
 	protoImportPaths, _ := cmd.Flags().GetStringSlice("proto-import-path")
+	//nolint:errcheck
+	noStream, _ := cmd.Flags().GetBool("no-stream")
+	//nolint:errcheck
+	concurrency, _ := cmd.Flags().GetInt("concurrency")
 
 	// Step 1: Detect framework - try all registered extractors
 	extractorImpl, info, err := builtin.DetectFramework(path)
@@ -187,7 +191,7 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	// Step 6: Enrich with AI (optional)
 	cfg := config.Get()
 	if !skipEnrich && cfg.Enrich.Enabled && cfg.Enrich.Provider != "" && cfg.Enrich.Model != "" {
-		if enrichErr := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg, language); enrichErr != nil {
+		if enrichErr := enrichGeneratedSpec(ctx, genResult.SpecFilePath, cfg, language, noStream, concurrency); enrichErr != nil {
 			// Log warning but don't fail - enrichment is optional
 			slog.WarnContext(ctx, "Enrichment failed (non-fatal)", "error", enrichErr)
 		}
@@ -313,6 +317,10 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 		"overwrite existing local spec file if it already exists")
 	c.Flags().StringSlice("proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
+	c.Flags().Bool("no-stream", false,
+		"disable streaming to enable concurrent LLM calls (faster, but no real-time output)")
+	c.Flags().Int("concurrency", 3,
+		"max concurrent LLM calls (only effective with --no-stream)")
 
 	registerCompletion(c, "output", []string{"yaml", "json"})
 	registerCompletion(c, "language", []string{"en", "zh"})
@@ -335,6 +343,8 @@ var (
 	generatePublishOverwrite bool
 	generateOverwriteOutput  bool
 	generateProtoImportPaths []string
+	generateNoStream         bool
+	generateConcurrency      int
 )
 
 func init() {
@@ -364,6 +374,10 @@ func init() {
 		"overwrite existing local spec file if it already exists")
 	generateCmd.Flags().StringSliceVar(&generateProtoImportPaths, "proto-import-path", nil,
 		"additional import paths for protoc (-I flags), can be specified multiple times")
+	generateCmd.Flags().BoolVar(&generateNoStream, "no-stream", false,
+		"disable streaming to enable concurrent LLM calls (faster, but no real-time output)")
+	generateCmd.Flags().IntVar(&generateConcurrency, "concurrency", 3,
+		"max concurrent LLM calls (only effective with --no-stream)")
 
 	registerCompletion(generateCmd, "output", []string{"yaml", "json"})
 	registerCompletion(generateCmd, "language", []string{"en", "zh"})
@@ -371,7 +385,7 @@ func init() {
 }
 
 // enrichGeneratedSpec enriches the generated spec with AI-generated descriptions
-func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.Config, language string) error {
+func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.Config, language string, noStream bool, concurrency int) error {
 	cli.Statusf(os.Stderr, "Enriching OpenAPI spec with AI descriptions...")
 
 	// Determine language
@@ -417,6 +431,7 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 		Timeout:       timeout,
 		CustomBaseURL: cfg.Enrich.BaseURL,
 		CustomPrompts: customPrompts,
+		Concurrency:   concurrency,
 	}
 	enricherCfg = enricherCfg.MergeWithDefaults()
 
@@ -427,7 +442,12 @@ func enrichGeneratedSpec(ctx context.Context, specFilePath string, cfg *config.C
 	}
 
 	// Enrich
-	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{Language: lang})
+	streamEnabled := !noStream
+	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{
+		Language: lang,
+		Stream:   &streamEnabled,
+		Writer:   os.Stderr,
+	})
 	if err != nil {
 		// Check if partial enrichment
 		if partialErr, ok := errors.AsType[*processor.PartialEnrichmentError](err); ok {

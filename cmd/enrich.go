@@ -161,6 +161,7 @@ func runEnrich(cmd *cobra.Command, args []string) error {
 	result, err := e.Enrich(ctx, spec, &enricher.EnrichOptions{
 		Language: lang,
 		Stream:   &streamEnabled,
+		Writer:   os.Stderr,
 		Force:    forceFlag,
 	})
 	if err != nil {
