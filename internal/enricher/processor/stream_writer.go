@@ -171,6 +171,38 @@ func (sw *StreamWriter) flushLocked() error {
 	return nil
 }
 
+// WriteRaw writes a chunk directly to the underlying writer without any prefix.
+// It is thread-safe and can be used for streaming LLM output where per-chunk
+// prefixes would create visual noise.
+func (sw *StreamWriter) WriteRaw(chunk []byte) error {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+
+	sw.metrics.TotalChunks++
+	sw.metrics.TotalBytes += int64(len(chunk))
+
+	if sw.debug {
+		slog.Debug("stream raw chunk received",
+			"chunk_size", len(chunk),
+			"total_chunks", sw.metrics.TotalChunks,
+			"total_bytes", sw.metrics.TotalBytes,
+		)
+	}
+
+	// Write directly, handling potential short writes
+	for len(chunk) > 0 {
+		n, err := sw.writer.Write(chunk)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+		chunk = chunk[n:]
+	}
+	return nil
+}
+
 // GetMetrics returns current streaming metrics
 func (sw *StreamWriter) GetMetrics() StreamWriterMetrics {
 	sw.mu.Lock()

@@ -309,10 +309,11 @@ func TestEnricher_WithStreaming(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Verify streaming output was written
-	// Note: TemplateType is lowercase, so prefix is "[api]" not "[API]"
+	// Verify streaming output was written (raw, no prefix)
+	expected := strings.Join(chunks, "")
 	output := buf.String()
-	assert.Contains(t, output, "[api]", "Expected [api] prefix in streaming output")
+	assert.Contains(t, output, expected, "Expected streaming output to contain concatenated chunks")
+	assert.NotContains(t, output, "[api]", "Streaming output should not contain prefix markers")
 }
 
 // mockStreamingProvider simulates streaming behavior

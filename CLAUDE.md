@@ -263,8 +263,8 @@ LLM_API_KEY="your-deepseek-api-key" ./build/spec-forge enrich \
     --no-stream
 ```
 
-> **Note:** Streaming is enabled by default, showing real-time LLM output with batch-type prefixes
-> (`[api]`, `[schema]`, `[param]`). With streaming on, batches are processed sequentially for readable output.
+> **Note:** Streaming is enabled by default, showing real-time LLM output to stderr.
+> With streaming on, batches are processed sequentially for readable output.
 > Use `--no-stream` to enable concurrent processing across batches for faster enrichment.
 
 Expected output:
