@@ -1,17 +1,15 @@
-// Package gozero_test tests the go-zero extractor implementation.
-package gozero_test
+// Package gozero tests the go-zero extractor implementation.
+package gozero
 
 import (
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/spencercjh/spec-forge/internal/extractor/gozero"
 )
 
 func TestNewDetector(t *testing.T) {
-	d := gozero.NewDetector()
+	d := NewDetector()
 	if d == nil {
 		t.Error("NewDetector() should not return nil")
 	}
@@ -21,7 +19,7 @@ func TestDetector_Detect_NoGoMod(t *testing.T) {
 	// Create temp dir without go.mod
 	tmpDir := t.TempDir()
 
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	_, err := detector.Detect(tmpDir)
 
 	if err == nil {
@@ -56,14 +54,14 @@ require (
 		t.Fatalf("Failed to create .api file: %v", err)
 	}
 
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.BuildTool != gozero.BuildToolGoModules {
-		t.Errorf("BuildTool = %s, want %s", info.BuildTool, gozero.BuildToolGoModules)
+	if info.BuildTool != BuildToolGoModules {
+		t.Errorf("BuildTool = %s, want %s", info.BuildTool, BuildToolGoModules)
 	}
 
 	if info.BuildFilePath != goModPath {
@@ -74,9 +72,9 @@ require (
 		t.Fatal("FrameworkData should not be nil")
 	}
 
-	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	goZeroInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *gozero.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	if goZeroInfo.ModuleName != "example.com/testproject" {
@@ -117,7 +115,7 @@ require github.com/zeromicro/go-zero v1.5.0
 		t.Fatalf("Failed to create .api file: %v", err)
 	}
 
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
@@ -127,9 +125,9 @@ require github.com/zeromicro/go-zero v1.5.0
 		t.Fatal("FrameworkData should not be nil")
 	}
 
-	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	goZeroInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *gozero.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	if !goZeroInfo.HasGoZeroDeps {
@@ -158,14 +156,14 @@ require (
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	_, err := detector.Detect(tmpDir)
 	if err == nil {
 		t.Fatal("expected Detect to fail when no go-zero dependencies are present")
 	}
 
-	if _, ok := errors.AsType[*gozero.ErrNotGoZeroProject](err); !ok {
-		t.Errorf("expected error to be *gozero.ErrNotGoZeroProject, got: %T", err)
+	if _, ok := errors.AsType[*ErrNotGoZeroProject](err); !ok {
+		t.Errorf("expected error to be *ErrNotGoZeroProject, got: %T", err)
 	}
 }
 
@@ -200,7 +198,7 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Failed to create .api file: %v", err)
 	}
 
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
@@ -210,9 +208,9 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatal("FrameworkData should not be nil")
 	}
 
-	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	goZeroInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *gozero.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	if len(goZeroInfo.APIFiles) != 2 {
@@ -252,7 +250,7 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Failed to create vendor .api file: %v", err)
 	}
 
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
@@ -262,9 +260,9 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatal("FrameworkData should not be nil")
 	}
 
-	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	goZeroInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *gozero.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	// Should only find the main.api file, not the vendor one
@@ -309,7 +307,7 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatalf("Failed to create hidden .api file: %v", err)
 	}
 
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
@@ -319,9 +317,9 @@ require github.com/zeromicro/go-zero v1.6.0
 		t.Fatal("FrameworkData should not be nil")
 	}
 
-	goZeroInfo, ok := info.FrameworkData.(*gozero.Info)
+	goZeroInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *gozero.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	// Should only find the main.api file, not the hidden one
@@ -331,7 +329,7 @@ require github.com/zeromicro/go-zero v1.6.0
 }
 
 func TestDetector_Detect_InvalidPath(t *testing.T) {
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	_, err := detector.Detect("/nonexistent/path/that/does/not/exist")
 
 	if err == nil {
@@ -350,13 +348,36 @@ func TestDetector_Detect_EmptyProject(t *testing.T) {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
-	detector := gozero.NewDetector()
+	detector := NewDetector()
 	_, err := detector.Detect(tmpDir)
 	if err == nil {
 		t.Fatal("expected Detect to fail when no go-zero dependency is present")
 	}
 
-	if _, ok := errors.AsType[*gozero.ErrNotGoZeroProject](err); !ok {
-		t.Errorf("expected error to be *gozero.ErrNotGoZeroProject, got: %T", err)
+	if _, ok := errors.AsType[*ErrNotGoZeroProject](err); !ok {
+		t.Errorf("expected error to be *ErrNotGoZeroProject, got: %T", err)
+	}
+}
+
+func TestDetector_findAPIFiles_RelativeDotPath(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create an .api file in the project root
+	os.WriteFile(filepath.Join(dir, "main.api"), []byte(`syntax = "v1"`), 0o644)
+
+	// Change to temp dir so "." resolves to it
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	d := NewDetector()
+	files, err := d.findAPIFiles(".")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected at least 1 .api file with relative \".\" path, got 0")
 	}
 }

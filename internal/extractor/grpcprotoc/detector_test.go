@@ -1,5 +1,4 @@
-// Package grpcprotoc_test tests the gRPC-protoc extractor implementation.
-package grpcprotoc_test
+package grpcprotoc
 
 import (
 	"errors"
@@ -7,12 +6,10 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-
-	"github.com/spencercjh/spec-forge/internal/extractor/grpcprotoc"
 )
 
 func TestNewDetector(t *testing.T) {
-	d := grpcprotoc.NewDetector()
+	d := NewDetector()
 	if d == nil {
 		t.Error("NewDetector() should not return nil")
 	}
@@ -37,14 +34,14 @@ package test;
 		t.Fatalf("Failed to create .proto file: %v", err)
 	}
 
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	_, err := detector.Detect(tmpDir)
 
 	if err == nil {
 		t.Fatal("Expected error when buf.yaml is present")
 	}
 
-	if !errors.Is(err, grpcprotoc.ErrBufProjectDetected) {
+	if !errors.Is(err, ErrBufProjectDetected) {
 		t.Errorf("Expected ErrBufProjectDetected, got: %v", err)
 	}
 }
@@ -59,15 +56,15 @@ func TestDetector_Detect_NoProtoFiles(t *testing.T) {
 		t.Fatalf("Failed to create README.md: %v", err)
 	}
 
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	_, err := detector.Detect(tmpDir)
 
 	if err == nil {
 		t.Fatal("Expected error when no .proto files are found")
 	}
 
-	if _, ok := errors.AsType[*grpcprotoc.ErrNotProtocProject](err); !ok {
-		t.Errorf("Expected error to be *grpcprotoc.ErrNotProtocProject, got: %T", err)
+	if _, ok := errors.AsType[*ErrNotProtocProject](err); !ok {
+		t.Errorf("Expected error to be *ErrNotProtocProject, got: %T", err)
 	}
 }
 
@@ -102,18 +99,18 @@ service HelloService {
 		t.Fatalf("Failed to create .proto file: %v", err)
 	}
 
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	if info.Framework != grpcprotoc.ExtractorName {
-		t.Errorf("Framework = %s, want %s", info.Framework, grpcprotoc.ExtractorName)
+	if info.Framework != ExtractorName {
+		t.Errorf("Framework = %s, want %s", info.Framework, ExtractorName)
 	}
 
-	if info.BuildTool != grpcprotoc.BuildToolProtoc {
-		t.Errorf("BuildTool = %s, want %s", info.BuildTool, grpcprotoc.BuildToolProtoc)
+	if info.BuildTool != BuildToolProtoc {
+		t.Errorf("BuildTool = %s, want %s", info.BuildTool, BuildToolProtoc)
 	}
 
 	if info.BuildFilePath != tmpDir {
@@ -124,9 +121,9 @@ service HelloService {
 		t.Fatal("FrameworkData should not be nil")
 	}
 
-	grpcInfo, ok := info.FrameworkData.(*grpcprotoc.Info)
+	grpcInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *grpcprotoc.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	if len(grpcInfo.ProtoFiles) != 1 {
@@ -185,15 +182,15 @@ service HelloService {
 		t.Fatalf("Failed to create .proto file: %v", err)
 	}
 
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	grpcInfo, ok := info.FrameworkData.(*grpcprotoc.Info)
+	grpcInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *grpcprotoc.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	if !grpcInfo.HasGoogleAPI {
@@ -243,15 +240,15 @@ message GetResponse {}
 		t.Fatalf("Failed to create proto3: %v", err)
 	}
 
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	grpcInfo, ok := info.FrameworkData.(*grpcprotoc.Info)
+	grpcInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *grpcprotoc.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	if len(grpcInfo.ProtoFiles) != 3 {
@@ -294,15 +291,15 @@ service TestService {}
 		t.Fatalf("Failed to create c.proto: %v", err)
 	}
 
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	grpcInfo, ok := info.FrameworkData.(*grpcprotoc.Info)
+	grpcInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *grpcprotoc.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	// Check that import paths include proto, third_party, and protos directories
@@ -339,15 +336,15 @@ message GetResponse {}`), 0o644); err != nil {
 		t.Fatalf("Failed to create vendor.proto: %v", err)
 	}
 
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	grpcInfo, ok := info.FrameworkData.(*grpcprotoc.Info)
+	grpcInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *grpcprotoc.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	// Should only find the main.proto file, not the vendor one
@@ -385,15 +382,15 @@ message GetResponse {}`), 0o644); err != nil {
 		t.Fatalf("Failed to create hidden.proto: %v", err)
 	}
 
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	info, err := detector.Detect(tmpDir)
 	if err != nil {
 		t.Fatalf("Detect failed: %v", err)
 	}
 
-	grpcInfo, ok := info.FrameworkData.(*grpcprotoc.Info)
+	grpcInfo, ok := info.FrameworkData.(*Info)
 	if !ok {
-		t.Fatal("FrameworkData should be *grpcprotoc.Info")
+		t.Fatal("FrameworkData should be *Info")
 	}
 
 	// Should only find the main.proto file, not the hidden one
@@ -403,10 +400,33 @@ message GetResponse {}`), 0o644); err != nil {
 }
 
 func TestDetector_Detect_InvalidPath(t *testing.T) {
-	detector := grpcprotoc.NewDetector()
+	detector := NewDetector()
 	_, err := detector.Detect("/nonexistent/path/that/does/not/exist")
 
 	if err == nil {
 		t.Error("Expected error for invalid path")
+	}
+}
+
+func TestDetector_findProtoFiles_RelativeDotPath(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create a .proto file in the project root
+	os.WriteFile(filepath.Join(dir, "main.proto"), []byte(`syntax = "proto3"; package main;`), 0o644)
+
+	// Change to temp dir so "." resolves to it
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	d := NewDetector()
+	files, err := d.findProtoFiles(".")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) == 0 {
+		t.Fatal("expected at least 1 .proto file with relative \".\" path, got 0")
 	}
 }
