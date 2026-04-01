@@ -140,8 +140,8 @@ func (d *Detector) findProtoFiles(projectPath string) ([]string, error) {
 			return filepath.SkipDir
 		}
 
-		// Skip hidden directories
-		if info.IsDir() && strings.HasPrefix(info.Name(), ".") {
+		// Skip hidden directories (but not the root itself when path is ".")
+		if info.IsDir() && path != projectPath && strings.HasPrefix(info.Name(), ".") {
 			return filepath.SkipDir
 		}
 

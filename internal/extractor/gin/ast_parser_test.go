@@ -159,6 +159,82 @@ func TestIsHTTPMethod(t *testing.T) {
 	}
 }
 
+func TestASTParser_ParseFiles_RelativeDotPath(t *testing.T) {
+	dir := t.TempDir()
+
+	code := `package main
+
+import "github.com/gin-gonic/gin"
+
+func main() {
+	r := gin.Default()
+	r.GET("/ping", func(c *gin.Context) {})
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(code), 0o644); err != nil {
+		t.Fatalf("failed to create main.go: %v", err)
+	}
+
+	// Use "." relative path — this is how users invoke: spec-forge generate .
+	// Regression test: info.Name() returns "." for the root, which must not be
+	// treated as a hidden directory and skip the entire tree.
+	parser := NewASTParser(".")
+
+	// Change working directory to temp dir so "." resolves correctly
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Errorf("failed to restore working directory: %v", err)
+		}
+	}()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+
+	if err := parser.ParseFiles(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(parser.files) == 0 {
+		t.Fatal("expected at least 1 parsed file with relative \".\" path, got 0")
+	}
+
+	routes, err := parser.ExtractRoutes()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(routes) == 0 {
+		t.Fatal("expected at least 1 route with relative \".\" path, got 0")
+	}
+}
+
+func TestASTParser_ParseFiles_HiddenDirsSkipped(t *testing.T) {
+	dir := t.TempDir()
+
+	// Normal Go file should be parsed
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte(`package main; func main(){}`), 0o644)
+
+	// Go file inside hidden directory should be skipped
+	os.MkdirAll(filepath.Join(dir, ".hidden"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".hidden", "secret.go"), []byte(`package main; func secret(){}`), 0o644)
+
+	parser := NewASTParser(dir)
+	if err := parser.ParseFiles(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(parser.files) != 1 {
+		t.Errorf("expected 1 file (hidden dir skipped), got %d", len(parser.files))
+	}
+	for path := range parser.files {
+		if filepath.Base(filepath.Dir(path)) == ".hidden" {
+			t.Errorf("file from hidden directory should not be parsed: %s", path)
+		}
+	}
+}
+
 func TestExtractStringLiteral(t *testing.T) {
 	// This function is tested indirectly through ExtractRoutes tests
 	// as it requires AST nodes which are complex to create manually

@@ -46,9 +46,10 @@ func (p *ASTParser) ParseFiles() error {
 			return err
 		}
 
-		// Skip vendor and hidden directories
+		// Skip vendor and hidden directories (but not the root itself when path is ".")
 		if info.IsDir() {
-			if info.Name() == "vendor" || strings.HasPrefix(info.Name(), ".") {
+			if path != p.projectPath &&
+				(info.Name() == "vendor" || strings.HasPrefix(info.Name(), ".")) {
 				return filepath.SkipDir
 			}
 			return nil
