@@ -34,5 +34,8 @@
       "description": ""
     }
   },
-  "summary": "createUser"
+  "summary": "createUser",
+  "tags": [
+    "Users"
+  ]
 }
