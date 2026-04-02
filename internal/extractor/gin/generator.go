@@ -360,7 +360,20 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 	// Path parameters: extract from the route path (source of truth)
 	// rather than relying solely on c.Param() calls in the handler,
 	// since handlers may not explicitly call c.Param() for every path segment.
-	operation.Parameters = append(operation.Parameters, g.extractPathParamsFromRoute(route.FullPath)...)
+	pathParams := g.extractPathParamsFromRoute(route.FullPath)
+
+	inferredTypes := make(map[string]string)
+	for _, pp := range handlerInfo.PathParams {
+		if pp.GoType != "" && pp.GoType != goTypeString {
+			inferredTypes[pp.Name] = pp.GoType
+		}
+	}
+	for _, p := range pathParams {
+		if inferred, ok := inferredTypes[p.Value.Name]; ok {
+			p.Value.Schema = &openapi3.SchemaRef{Value: GoTypeToSchema(inferred)}
+		}
+	}
+	operation.Parameters = append(operation.Parameters, pathParams...)
 
 	// Query parameters
 	for _, param := range handlerInfo.QueryParams {
@@ -395,6 +408,9 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 	operation.Responses = openapi3.NewResponses()
 	for _, resp := range handlerInfo.Responses {
 		desc := fmt.Sprintf("HTTP %d response", resp.StatusCode)
+		if resp.StatusCode == 0 {
+			desc = "Default error response"
+		}
 		response := &openapi3.Response{
 			Description: &desc,
 			Content:     openapi3.Content{},
@@ -426,8 +442,11 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 			}
 		}
 
-		statusCode := strconv.Itoa(resp.StatusCode)
-		operation.Responses.Set(statusCode, &openapi3.ResponseRef{Value: response})
+		statusCodeKey := "default"
+		if resp.StatusCode != 0 {
+			statusCodeKey = strconv.Itoa(resp.StatusCode)
+		}
+		operation.Responses.Set(statusCodeKey, &openapi3.ResponseRef{Value: response})
 	}
 
 	// Default response if none specified

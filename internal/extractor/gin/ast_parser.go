@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -342,18 +343,36 @@ func filterRoutes(routes []Route, extraExcludes, extraPrefixes []string) []Route
 
 // shouldExcludeRoute checks if a route path should be excluded from the API spec.
 func shouldExcludeRoute(path string, extraExcludes, extraPrefixes []string) bool {
-	// Default prefix excludes
+	normalized := normalizeRoutePath(path)
+
 	for _, prefix := range defaultExcludePrefixes {
-		if strings.HasPrefix(path, prefix) {
+		if hasPathSegmentPrefix(normalized, prefix) {
 			return true
 		}
 	}
-	// Custom prefix excludes
 	for _, prefix := range extraPrefixes {
-		if strings.HasPrefix(path, prefix) {
+		normalizedPrefix := normalizeRoutePath(prefix)
+		if hasPathSegmentPrefix(normalized, normalizedPrefix) {
 			return true
 		}
 	}
-	// Exact path excludes
-	return slices.Contains(extraExcludes, path)
+
+	normalizedExcludes := make([]string, len(extraExcludes))
+	for i, exc := range extraExcludes {
+		normalizedExcludes[i] = normalizeRoutePath(exc)
+	}
+	return slices.Contains(normalizedExcludes, normalized)
+}
+
+var routeParamReplacer = regexp.MustCompile(`:([^/]+)`)
+
+func normalizeRoutePath(path string) string {
+	return routeParamReplacer.ReplaceAllString(path, `{$1}`)
+}
+
+func hasPathSegmentPrefix(path, prefix string) bool {
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	return len(path) == len(prefix) || path[len(prefix)] == '/'
 }

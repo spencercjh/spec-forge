@@ -510,7 +510,7 @@ type Employee struct {
 	}
 
 	if len(schemas) != len(expectedTypes) {
-		t.Errorf("expected %d schemas, got %d: %v", len(expectedTypes), len(schemas), getSchemaKeys(schemas))
+		t.Errorf("expected %d schemas, got %d: %v", len(expectedTypes), len(schemas), getSchemaPropKeys(schemas))
 	}
 }
 
@@ -830,15 +830,6 @@ type Resource struct {
 			t.Errorf("expected property %q not found in Resource schema (got: %v)", name, getSchemaPropKeys(props))
 		}
 	}
-}
-
-// Helper function to get schema keys for error messages
-func getSchemaKeys(schemas openapi3.Schemas) []string {
-	keys := make([]string, 0, len(schemas))
-	for k := range schemas {
-		keys = append(keys, k)
-	}
-	return keys
 }
 
 // Helper function to get property keys for error messages

@@ -86,21 +86,17 @@ func isKnownResponseHelper(name string) bool {
 
 // isErrorType checks if an expression represents an error value.
 func isErrorType(expr ast.Expr, varTypeMap map[string]string) bool {
-	// Check for variable named "err" or with "error" type
 	if ident, ok := expr.(*ast.Ident); ok {
-		if ident.Name == "err" || ident.Name == "e" {
+		if ident.Name == "nil" {
+			return false
+		}
+		if ident.Name == "err" {
 			return true
 		}
 		if vtype, ok := varTypeMap[ident.Name]; ok {
 			return vtype == "error" || vtype == "*errors.errorString"
 		}
 	}
-
-	// Check for nil (common in done(c, data, nil) pattern)
-	if ident, ok := expr.(*ast.Ident); ok && ident.Name == "nil" {
-		return true
-	}
-
 	return false
 }
 

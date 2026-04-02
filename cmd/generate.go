@@ -90,6 +90,13 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	//nolint:errcheck
 	excludeRoutePrefixes, _ := cmd.Flags().GetStringSlice("exclude-route-prefix")
 
+	if len(excludeRoutes) == 0 {
+		excludeRoutes = config.Get().Extract.ExcludeRoutes
+	}
+	if len(excludeRoutePrefixes) == 0 {
+		excludeRoutePrefixes = config.Get().Extract.ExcludeRoutePrefixes
+	}
+
 	// Step 1: Detect framework - try all registered extractors
 	extractorImpl, info, err := builtin.DetectFramework(path)
 	if err != nil {

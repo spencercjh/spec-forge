@@ -6,7 +6,7 @@ Spec-forge 的 Gin extractor 基于 Go AST 静态分析生成 OpenAPI spec，与
 
 ## 当前差距总结
 
-基于 `/home/caijh/codes/open/openapi` 项目，对比 spec-forge 生成的 `openapi.yaml`（OpenAPI 3.0.3）和 swaggo 生成的 `docs/swagger.yaml`（Swagger 2.0）：
+基于 `<project-path>` 项目，对比 spec-forge 生成的 `openapi.yaml`（OpenAPI 3.0.3）和 swaggo 生成的 `docs/swagger.yaml`（Swagger 2.0）：
 
 | # | 差距                                      | 严重度 | 分类       | 根因                                              |
 |---|-----------------------------------------|-----|----------|-------------------------------------------------|
@@ -313,10 +313,10 @@ spec-forge generate ./project --exclude-route-prefix /swagger
 
 ```bash
 # 生成 spec
-go run . generate /home/caijh/codes/open/openapi --output-dir /tmp/spec-test --output yaml --skip-enrich --skip-publish
+go run . generate <project-path> --output-dir /tmp/spec-test --output yaml --skip-enrich --skip-publish
 
 # 对比与 swaggo 的差异
-diff /tmp/spec-test/openapi.yaml /home/caijh/codes/open/openapi/docs/swagger.yaml
+diff /tmp/spec-test/openapi.yaml <project-path>/docs/swagger.yaml
 ```
 
 关键指标：

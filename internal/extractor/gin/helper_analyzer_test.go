@@ -195,68 +195,6 @@ func getItems(c *gin.Context) {
 	}
 }
 
-func TestParameterTypeInference_GetInt(t *testing.T) {
-	src := `package main
-
-import "github.com/gin-gonic/gin"
-
-func getItems(c *gin.Context) {
-	page := c.GetInt("page")
-	active := c.GetBool("active")
-	_ = page
-	_ = active
-	c.JSON(200, nil)
-}
-`
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "test.go", src, parser.ParseComments)
-	if err != nil {
-		t.Fatalf("failed to parse: %v", err)
-	}
-	files := map[string]*ast.File{"test.go": file}
-
-	analyzer := NewHandlerAnalyzer(fset, files)
-
-	var fn *ast.FuncDecl
-	for _, decl := range file.Decls {
-		if f, ok := decl.(*ast.FuncDecl); ok && f.Name.Name == "getItems" {
-			fn = f
-			break
-		}
-	}
-	if fn == nil {
-		t.Fatal("getItems handler not found")
-	}
-
-	info, err := analyzer.AnalyzeHandler(fn)
-	if err != nil {
-		t.Fatalf("failed to analyze: %v", err)
-	}
-
-	foundPage := false
-	foundActive := false
-	for _, p := range info.QueryParams {
-		if p.Name == "page" {
-			foundPage = true
-			if p.GoType != "integer" {
-				t.Errorf("expected page GoType 'integer', got %q", p.GoType)
-			}
-		}
-		if p.Name == "active" {
-			foundActive = true
-			if p.GoType != "boolean" {
-				t.Errorf("expected active GoType 'boolean', got %q", p.GoType)
-			}
-		}
-	}
-	if !foundPage {
-		t.Error("expected 'page' query param")
-	}
-	if !foundActive {
-		t.Error("expected 'active' query param")
-	}
-}
-
 func TestIsKnownResponseHelper(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -448,28 +386,22 @@ func Handler(c *gin.Context) {
 }
 
 func TestIsErrorType(t *testing.T) {
-	// Test nil literal
-	if !isErrorType(&ast.Ident{Name: "nil"}, nil) {
-		t.Error("expected nil ident to be error type")
+	if isErrorType(&ast.Ident{Name: "nil"}, nil) {
+		t.Error("expected nil ident to NOT be error type")
 	}
-	// Test err variable
+	if isErrorType(&ast.Ident{Name: "e"}, nil) {
+		t.Error("expected single-letter 'e' to NOT be error type")
+	}
 	if !isErrorType(&ast.Ident{Name: "err"}, nil) {
 		t.Error("expected 'err' ident to be error type")
 	}
-	// Test e variable
-	if !isErrorType(&ast.Ident{Name: "e"}, nil) {
-		t.Error("expected 'e' ident to be error type")
-	}
-	// Test regular variable
 	if isErrorType(&ast.Ident{Name: "data"}, nil) {
 		t.Error("expected 'data' ident to NOT be error type")
 	}
-	// Test variable with error type in varTypeMap
 	varTypeMap := map[string]string{"myErr": "error"}
 	if !isErrorType(&ast.Ident{Name: "myErr"}, varTypeMap) {
 		t.Error("expected variable with error type to be error type")
 	}
-	// Test variable with non-error type in varTypeMap
 	varTypeMap2 := map[string]string{"data": "string"}
 	if isErrorType(&ast.Ident{Name: "data"}, varTypeMap2) {
 		t.Error("expected variable with string type to NOT be error type")

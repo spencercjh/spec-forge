@@ -20,7 +20,7 @@ type HandlerAnalyzer struct {
 	fset        *token.FileSet
 	files       map[string]*ast.File
 	typeCache   map[string]*ast.TypeSpec
-	helperFuncs map[string]*ast.FuncDecl // package-level funcs taking *gin.Context as first param
+	helperFuncs map[string][]*ast.FuncDecl // package-level funcs taking *gin.Context as first param
 }
 
 // NewHandlerAnalyzer creates a new HandlerAnalyzer instance.
@@ -29,7 +29,7 @@ func NewHandlerAnalyzer(fset *token.FileSet, files map[string]*ast.File) *Handle
 		fset:        fset,
 		files:       files,
 		typeCache:   make(map[string]*ast.TypeSpec),
-		helperFuncs: make(map[string]*ast.FuncDecl),
+		helperFuncs: make(map[string][]*ast.FuncDecl),
 	}
 	a.discoverHelperFuncs()
 	return a
@@ -48,7 +48,9 @@ func (a *HandlerAnalyzer) discoverHelperFuncs() {
 			// Check if first parameter is *gin.Context
 			firstParam := fn.Type.Params.List[0]
 			if isGinContextType(firstParam.Type) {
-				a.helperFuncs[fn.Name.Name] = fn
+				key := file.Name.Name + "." + fn.Name.Name
+				a.helperFuncs[key] = append(a.helperFuncs[key], fn)
+				a.helperFuncs[fn.Name.Name] = append(a.helperFuncs[fn.Name.Name], fn)
 			}
 		}
 	}
@@ -284,10 +286,6 @@ func (a *HandlerAnalyzer) dispatchParamMethods(method string, call *ast.CallExpr
 		a.extractQueryParam(call, info)
 	case "GetHeader":
 		a.extractHeaderParam(call, info)
-	case "GetInt", "GetInt64":
-		a.extractTypedParam(call, info, goTypeInteger, "query")
-	case "GetBool":
-		a.extractTypedParam(call, info, goTypeBoolean, "query")
 	default:
 		return false
 	}
@@ -378,23 +376,6 @@ func (a *HandlerAnalyzer) extractHeaderParam(call *ast.CallExpr, info *HandlerIn
 			GoType:   goTypeString,
 			Required: false,
 		})
-	}
-}
-
-// extractTypedParam extracts a typed parameter from c.GetInt()/c.GetBool()/c.GetInt64() calls.
-func (a *HandlerAnalyzer) extractTypedParam(call *ast.CallExpr, info *HandlerInfo, goType, location string) {
-	if len(call.Args) < 1 {
-		return
-	}
-	if name := extractStringLiteral(call.Args[0]); name != "" {
-		param := ParamInfo{
-			Name:     name,
-			GoType:   goType,
-			Required: false,
-		}
-		if location == "query" {
-			info.QueryParams = append(info.QueryParams, param)
-		}
 	}
 }
 
@@ -616,6 +597,10 @@ func (a *HandlerAnalyzer) extractHelperResponse(args []ast.Expr, info *HandlerIn
 	dataArgs := args[1:]
 
 	for _, arg := range dataArgs {
+		if ident, ok := arg.(*ast.Ident); ok && ident.Name == "nil" {
+			continue
+		}
+
 		goType := extractTypeFromResponseInternal(arg, varTypeMap, 200, true)
 		if goType == "" {
 			continue
@@ -666,8 +651,8 @@ func (a *HandlerAnalyzer) parseHelperCall(call *ast.CallExpr, info *HandlerInfo,
 	}
 
 	// Cross-function call tracking: trace into discovered helper functions
-	if helperDecl, exists := a.helperFuncs[ident.Name]; exists {
-		a.traceHelperResponse(helperDecl, call.Args, info, varTypeMap)
+	if helpers, exists := a.helperFuncs[ident.Name]; exists && len(helpers) > 0 {
+		a.traceHelperResponse(helpers[0], call.Args, info, varTypeMap)
 	}
 }
 
@@ -703,7 +688,7 @@ func (a *HandlerAnalyzer) traceHelperResponse(helperDecl *ast.FuncDecl, callArgs
 		case "JSON", "XML", "YAML":
 			if len(call.Args) >= 2 {
 				// Resolve the response argument through param mapping
-				resolvedArg := a.resolveThroughParamMap(call.Args[1], paramArgMap)
+				resolvedArg := a.resolveThroughParamMap(call.Args[1], paramArgMap, nil)
 				statusCode := extractStatusCode(call.Args[0])
 				goType := extractTypeFromResponseWithStatus(resolvedArg, varTypeMap, statusCode)
 				if goType != "" {
@@ -748,11 +733,18 @@ func (a *HandlerAnalyzer) buildParamArgMap(helperDecl *ast.FuncDecl, callArgs []
 // resolveThroughParamMap resolves an expression by substituting helper parameters
 // with their call-site arguments. If the expression is an Ident matching a helper
 // parameter name, the corresponding call-site argument is returned instead.
-func (a *HandlerAnalyzer) resolveThroughParamMap(expr ast.Expr, paramArgMap map[string]ast.Expr) ast.Expr {
-	if ident, ok := expr.(*ast.Ident); ok {
-		if arg, exists := paramArgMap[ident.Name]; exists {
+func (a *HandlerAnalyzer) resolveThroughParamMap(expr ast.Expr, paramToArg map[string]ast.Expr, paramNames []string) ast.Expr {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		if arg, exists := paramToArg[e.Name]; exists {
 			return arg
 		}
+	case *ast.CompositeLit:
+		for i, elt := range e.Elts {
+			e.Elts[i] = a.resolveThroughParamMap(elt, paramToArg, paramNames)
+		}
+	case *ast.KeyValueExpr:
+		e.Value = a.resolveThroughParamMap(e.Value, paramToArg, paramNames)
 	}
 	return expr
 }
