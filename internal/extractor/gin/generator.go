@@ -262,18 +262,10 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 	// Add parameters
 	operation.Parameters = make(openapi3.Parameters, 0)
 
-	// Path parameters
-	for _, param := range handlerInfo.PathParams {
-		operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{
-			Value: &openapi3.Parameter{
-				Name:        param.Name,
-				In:          "path",
-				Required:    param.Required,
-				Description: "Path parameter",
-				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
-			},
-		})
-	}
+	// Path parameters: extract from the route path (source of truth)
+	// rather than relying solely on c.Param() calls in the handler,
+	// since handlers may not explicitly call c.Param() for every path segment.
+	operation.Parameters = append(operation.Parameters, g.extractPathParamsFromRoute(route.FullPath)...)
 
 	// Query parameters
 	for _, param := range handlerInfo.QueryParams {
