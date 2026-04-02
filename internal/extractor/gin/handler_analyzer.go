@@ -8,24 +8,67 @@ import (
 )
 
 const (
-	goTypeString = "string"
-	goTypeArray  = "array"
+	goTypeString  = "string"
+	goTypeArray   = "array"
+	goTypeInteger = "integer"
+	goTypeBoolean = "boolean"
+	goTypeNumber  = "number"
 )
 
 // HandlerAnalyzer analyzes Gin handler functions.
 type HandlerAnalyzer struct {
-	fset      *token.FileSet
-	files     map[string]*ast.File
-	typeCache map[string]*ast.TypeSpec
+	fset        *token.FileSet
+	files       map[string]*ast.File
+	typeCache   map[string]*ast.TypeSpec
+	helperFuncs map[string]*ast.FuncDecl // package-level funcs taking *gin.Context as first param
 }
 
 // NewHandlerAnalyzer creates a new HandlerAnalyzer instance.
 func NewHandlerAnalyzer(fset *token.FileSet, files map[string]*ast.File) *HandlerAnalyzer {
-	return &HandlerAnalyzer{
-		fset:      fset,
-		files:     files,
-		typeCache: make(map[string]*ast.TypeSpec),
+	a := &HandlerAnalyzer{
+		fset:        fset,
+		files:       files,
+		typeCache:   make(map[string]*ast.TypeSpec),
+		helperFuncs: make(map[string]*ast.FuncDecl),
 	}
+	a.discoverHelperFuncs()
+	return a
+}
+
+// discoverHelperFuncs scans all parsed files for package-level functions
+// that accept *gin.Context as their first parameter. These are potential
+// response helpers that can be traced for cross-function response extraction.
+func (a *HandlerAnalyzer) discoverHelperFuncs() {
+	for _, file := range a.files {
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv != nil || fn.Type.Params == nil || len(fn.Type.Params.List) == 0 {
+				continue
+			}
+			// Check if first parameter is *gin.Context
+			firstParam := fn.Type.Params.List[0]
+			if isGinContextType(firstParam.Type) {
+				a.helperFuncs[fn.Name.Name] = fn
+			}
+		}
+	}
+	if len(a.helperFuncs) > 0 {
+		slog.Debug("Discovered potential helper functions", "count", len(a.helperFuncs))
+	}
+}
+
+// isGinContextType checks if an AST expression represents *gin.Context.
+func isGinContextType(expr ast.Expr) bool {
+	star, ok := expr.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := star.X.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	x, ok := sel.X.(*ast.Ident)
+	return ok && x.Name == "gin" && sel.Sel.Name == "Context"
 }
 
 // AnalyzeHandler analyzes a handler function and extracts information.
@@ -61,6 +104,9 @@ func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error)
 		}
 		return true
 	})
+
+	// Infer parameter types from strconv conversions and conditional checks
+	a.inferParamTypes(fn.Body, info)
 
 	// For form binding, expand struct fields into form params
 	if info.BindingSrc == BindingSourceForm && info.BodyType != "" {
@@ -217,19 +263,43 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 
 	method := sel.Sel.Name
 
-	// Categorize methods and dispatch to specialized handlers
+	// Dispatch parameter extraction methods
+	if a.dispatchParamMethods(method, call, info, varTypeMap) {
+		return
+	}
+	// Dispatch binding methods
+	if a.dispatchBindingMethods(method, call, info, varTypeMap, hasFormContext) {
+		return
+	}
+	// Dispatch response methods
+	a.dispatchResponseMethods(method, call, info, varTypeMap)
+}
+
+// dispatchParamMethods handles parameter extraction methods (Param, Query, GetHeader, etc.).
+func (a *HandlerAnalyzer) dispatchParamMethods(method string, call *ast.CallExpr, info *HandlerInfo, _ map[string]string) bool {
 	switch method {
 	case "Param":
 		a.extractParam(call, info)
-	case "Query", "DefaultQuery":
+	case "Query", "DefaultQuery": //nolint:goconst // AST method name literals
 		a.extractQueryParam(call, info)
 	case "GetHeader":
 		a.extractHeaderParam(call, info)
+	case "GetInt", "GetInt64":
+		a.extractTypedParam(call, info, goTypeInteger, "query")
+	case "GetBool":
+		a.extractTypedParam(call, info, goTypeBoolean, "query")
+	default:
+		return false
+	}
+	return true
+}
+
+// dispatchBindingMethods handles body/form binding methods.
+func (a *HandlerAnalyzer) dispatchBindingMethods(method string, call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string, hasFormContext bool) bool {
+	switch method {
 	case "ShouldBindJSON", "BindJSON":
 		a.extractBodyType(call, info, varTypeMap, BindingSourceJSON)
 	case "ShouldBind", "Bind":
-		// ShouldBind auto-detects based on Content-Type
-		// Use form binding if we detect form context in the handler
 		if hasFormContext {
 			a.extractBodyType(call, info, varTypeMap, BindingSourceForm)
 		} else {
@@ -240,7 +310,6 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 	case "ShouldBindYAML", "BindYAML":
 		a.extractBodyType(call, info, varTypeMap, BindingSourceYAML)
 	case "ShouldBindQuery", "BindQuery":
-		// Query binding extracts query parameters, not body
 		a.extractQueryBinding(call, info, varTypeMap)
 	case "PostForm":
 		a.extractFormParam(call, info, true)
@@ -248,6 +317,15 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 		a.extractFormParam(call, info, false)
 	case "FormFile":
 		a.extractFileParam(call, info)
+	default:
+		return false
+	}
+	return true
+}
+
+// dispatchResponseMethods handles response methods (JSON, XML, etc.).
+func (a *HandlerAnalyzer) dispatchResponseMethods(method string, call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
+	switch method {
 	case "JSON", "XML", "YAML":
 		a.extractResponse(call, info, varTypeMap, "")
 	case "String":
@@ -300,6 +378,23 @@ func (a *HandlerAnalyzer) extractHeaderParam(call *ast.CallExpr, info *HandlerIn
 			GoType:   goTypeString,
 			Required: false,
 		})
+	}
+}
+
+// extractTypedParam extracts a typed parameter from c.GetInt()/c.GetBool()/c.GetInt64() calls.
+func (a *HandlerAnalyzer) extractTypedParam(call *ast.CallExpr, info *HandlerInfo, goType, location string) {
+	if len(call.Args) < 1 {
+		return
+	}
+	if name := extractStringLiteral(call.Args[0]); name != "" {
+		param := ParamInfo{
+			Name:     name,
+			GoType:   goType,
+			Required: false,
+		}
+		if location == "query" {
+			info.QueryParams = append(info.QueryParams, param)
+		}
 	}
 }
 
@@ -549,13 +644,14 @@ func (a *HandlerAnalyzer) extractHelperResponse(args []ast.Expr, info *HandlerIn
 // and extracts response types from the arguments.
 // Unlike parseHandlerCall which handles c.XXX() method calls, this handles
 // bare function calls where the first arg is *gin.Context.
+//
+// Two detection strategies:
+//  1. Known helpers (done, respond, etc.) — extract types from call arguments directly
+//  2. Discovered helpers — trace into the function body to find c.JSON/c.XML calls
 func (a *HandlerAnalyzer) parseHelperCall(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
 	// Only handle simple function calls: done(...), not c.XXX() or pkg.Fn()
 	ident, ok := call.Fun.(*ast.Ident)
 	if !ok {
-		return
-	}
-	if !isKnownResponseHelper(ident.Name) {
 		return
 	}
 
@@ -564,5 +660,265 @@ func (a *HandlerAnalyzer) parseHelperCall(call *ast.CallExpr, info *HandlerInfo,
 		return
 	}
 
-	a.extractHelperResponse(call.Args, info, varTypeMap)
+	if isKnownResponseHelper(ident.Name) {
+		a.extractHelperResponse(call.Args, info, varTypeMap)
+		return
+	}
+
+	// Cross-function call tracking: trace into discovered helper functions
+	if helperDecl, exists := a.helperFuncs[ident.Name]; exists {
+		a.traceHelperResponse(helperDecl, call.Args, info, varTypeMap)
+	}
+}
+
+// traceHelperResponse traces into a helper function's body to find c.JSON/c.XML
+// response calls and extracts response types by mapping call-site arguments to
+// the helper's parameters.
+func (a *HandlerAnalyzer) traceHelperResponse(helperDecl *ast.FuncDecl, callArgs []ast.Expr, info *HandlerInfo, varTypeMap map[string]string) {
+	if helperDecl.Body == nil {
+		return
+	}
+
+	// Build param-to-argument mapping for the helper function
+	// e.g., helper(c *gin.Context, data any, err error) called as helper(c, project, nil)
+	// maps: data → project (with type from varTypeMap), err → nil
+	paramArgMap := a.buildParamArgMap(helperDecl, callArgs, varTypeMap)
+
+	// Scan helper body for c.JSON/c.XML calls
+	ast.Inspect(helperDecl.Body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		if _, ok = sel.X.(*ast.Ident); !ok {
+			return true
+		}
+
+		method := sel.Sel.Name
+		switch method {
+		case "JSON", "XML", "YAML":
+			if len(call.Args) >= 2 {
+				// Resolve the response argument through param mapping
+				resolvedArg := a.resolveThroughParamMap(call.Args[1], paramArgMap)
+				statusCode := extractStatusCode(call.Args[0])
+				goType := extractTypeFromResponseWithStatus(resolvedArg, varTypeMap, statusCode)
+				if goType != "" {
+					info.Responses = append(info.Responses, ResponseInfo{
+						StatusCode: statusCode,
+						GoType:     goType,
+					})
+					slog.Debug("Traced helper response", "helper", helperDecl.Name.Name, "status", statusCode, "type", goType)
+				}
+			}
+		}
+		return true
+	})
+}
+
+// buildParamArgMap maps helper function parameter names to their call-site arguments.
+// e.g., for helper(c *gin.Context, data any, err error) called as helper(c, project, nil):
+//
+//	"data" → *ast.Ident{Name: "project"}, "err" → *ast.Ident{Name: "nil"}
+func (a *HandlerAnalyzer) buildParamArgMap(helperDecl *ast.FuncDecl, callArgs []ast.Expr, _ map[string]string) map[string]ast.Expr {
+	paramArgMap := make(map[string]ast.Expr)
+	if helperDecl.Type.Params == nil {
+		return paramArgMap
+	}
+
+	params := helperDecl.Type.Params.List
+	for i, param := range params {
+		if i >= len(callArgs) {
+			break
+		}
+		// Skip the first param (*gin.Context) — it's always the context
+		if i == 0 {
+			continue
+		}
+		for _, name := range param.Names {
+			paramArgMap[name.Name] = callArgs[i]
+		}
+	}
+	return paramArgMap
+}
+
+// resolveThroughParamMap resolves an expression by substituting helper parameters
+// with their call-site arguments. If the expression is an Ident matching a helper
+// parameter name, the corresponding call-site argument is returned instead.
+func (a *HandlerAnalyzer) resolveThroughParamMap(expr ast.Expr, paramArgMap map[string]ast.Expr) ast.Expr {
+	if ident, ok := expr.(*ast.Ident); ok {
+		if arg, exists := paramArgMap[ident.Name]; exists {
+			return arg
+		}
+	}
+	return expr
+}
+
+// inferParamTypes scans the handler body for strconv conversions and conditional
+// comparisons that reveal the true type of query/path/header parameters previously
+// extracted as string.
+//
+// Detected patterns:
+//   - strconv.Atoi(c.Query("offset"))  → integer
+//   - strconv.ParseInt(c.Query("id"), ...)  → integer
+//   - strconv.ParseBool(c.Query("verbose"))  → boolean
+//   - strconv.ParseFloat(c.Query("rate"), ...)  → number
+//   - c.Query("x") == "true"  → boolean
+func (a *HandlerAnalyzer) inferParamTypes(body *ast.BlockStmt, info *HandlerInfo) {
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			// Also check for conditional bool inference: c.Query("x") == "true"
+			a.inferBoolFromComparison(n, info)
+			return true
+		}
+
+		// Check for strconv.Xxx(c.Query/Param(...))
+		a.inferTypeFromStrconv(call, info)
+		return true
+	})
+}
+
+// inferTypeFromStrconv checks if a call is strconv.Atoi/ParseInt/ParseBool/ParseFloat
+// wrapping a c.Query/c.Param/c.DefaultQuery call, and updates the parameter's GoType.
+func (a *HandlerAnalyzer) inferTypeFromStrconv(call *ast.CallExpr, info *HandlerInfo) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return
+	}
+	x, ok := sel.X.(*ast.Ident)
+	if !ok || x.Name != "strconv" {
+		return
+	}
+
+	// Determine target type from function name
+	targetType := ""
+	switch sel.Sel.Name {
+	case "Atoi", "ParseInt":
+		targetType = goTypeInteger
+	case "ParseBool":
+		targetType = goTypeBoolean
+	case "ParseFloat":
+		targetType = goTypeNumber
+	default:
+		return
+	}
+
+	// Find c.Query/c.Param/c.DefaultQuery in the arguments
+	if len(call.Args) < 1 {
+		return
+	}
+
+	paramName := a.findContextQueryParam(call.Args[0])
+	if paramName != "" {
+		a.updateParamType(info, paramName, targetType)
+	}
+}
+
+// inferBoolFromComparison checks for patterns like c.Query("x") == "true"
+// or verbose == "true" (where verbose was assigned from c.Query)
+// which suggest the parameter is boolean-typed.
+func (a *HandlerAnalyzer) inferBoolFromComparison(n ast.Node, info *HandlerInfo) {
+	binExpr, ok := n.(*ast.BinaryExpr)
+	if !ok || binExpr.Op.String() != "==" {
+		return
+	}
+
+	// Check if one side is "true"/"false" literal
+	var exprSide ast.Expr
+	var literalSide ast.Expr
+
+	litX, okX := binExpr.X.(*ast.BasicLit)
+	litY, okY := binExpr.Y.(*ast.BasicLit)
+	if okX && litX.Kind == token.STRING {
+		literalSide = binExpr.X
+		exprSide = binExpr.Y
+	} else if okY && litY.Kind == token.STRING {
+		literalSide = binExpr.Y
+		exprSide = binExpr.X
+	} else {
+		return
+	}
+
+	lit, ok := literalSide.(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return
+	}
+	value := strings.Trim(lit.Value, `"`)
+	if value != "true" && value != "false" {
+		return
+	}
+
+	// Check if the expression side is a c.Query/c.Param call
+	paramName := a.findContextQueryParam(exprSide)
+	if paramName != "" {
+		a.updateParamType(info, paramName, goTypeBoolean)
+		return
+	}
+
+	// Also check if the expression side is a variable assigned from c.Query/c.Param
+	// We check the existing query params — if a variable name matches a query param name,
+	// this comparison suggests the param is boolean
+	if ident, ok := exprSide.(*ast.Ident); ok {
+		for i := range info.QueryParams {
+			if info.QueryParams[i].Name == ident.Name {
+				info.QueryParams[i].GoType = goTypeBoolean
+				slog.Debug("Inferred parameter type from comparison", "param", ident.Name, "type", goTypeBoolean)
+				return
+			}
+		}
+	}
+}
+
+// findContextQueryParam checks if an expression is c.Query("name") or c.Param("name")
+// and returns the parameter name. Recursively unwraps simple wrappers (e.g., type casts).
+func (a *HandlerAnalyzer) findContextQueryParam(expr ast.Expr) string {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return ""
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	if _, ok := sel.X.(*ast.Ident); !ok {
+		return ""
+	}
+
+	switch sel.Sel.Name {
+	case "Query", "DefaultQuery", "Param":
+		if len(call.Args) >= 1 {
+			return extractStringLiteral(call.Args[0])
+		}
+	}
+	return ""
+}
+
+// updateParamType finds an existing parameter by name and updates its GoType.
+// Searches query, path, and header params. Does nothing if not found.
+func (a *HandlerAnalyzer) updateParamType(info *HandlerInfo, paramName, targetType string) {
+	for i := range info.QueryParams {
+		if info.QueryParams[i].Name == paramName {
+			info.QueryParams[i].GoType = targetType
+			slog.Debug("Inferred parameter type", "param", paramName, "type", targetType)
+			return
+		}
+	}
+	for i := range info.PathParams {
+		if info.PathParams[i].Name == paramName {
+			info.PathParams[i].GoType = targetType
+			slog.Debug("Inferred parameter type", "param", paramName, "type", targetType)
+			return
+		}
+	}
+	for i := range info.HeaderParams {
+		if info.HeaderParams[i].Name == paramName {
+			info.HeaderParams[i].GoType = targetType
+			slog.Debug("Inferred parameter type", "param", paramName, "type", targetType)
+			return
+		}
+	}
 }

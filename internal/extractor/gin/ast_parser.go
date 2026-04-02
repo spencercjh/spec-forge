@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -85,7 +86,7 @@ func (p *ASTParser) ParseFiles() error {
 }
 
 // ExtractRoutes extracts all Gin routes from parsed files.
-func (p *ASTParser) ExtractRoutes() ([]Route, error) {
+func (p *ASTParser) ExtractRoutes(excludeRoutes, excludePrefixes []string) ([]Route, error) {
 	slog.Debug("Extracting routes", "files", len(p.files))
 
 	// Routes count is unpredictable as it depends on AST analysis
@@ -108,7 +109,7 @@ func (p *ASTParser) ExtractRoutes() ([]Route, error) {
 	}
 
 	// Filter out non-API routes (swagger docs, static files, debug endpoints, etc.)
-	routes = filterRoutes(routes)
+	routes = filterRoutes(routes, excludeRoutes, excludePrefixes)
 
 	slog.Info("Extracted routes", "count", len(routes))
 	return routes, nil
@@ -323,11 +324,11 @@ var defaultExcludePrefixes = []string{
 	"/favicon.ico",
 }
 
-// filterRoutes removes non-API routes based on default exclude prefixes.
-func filterRoutes(routes []Route) []Route {
+// filterRoutes removes non-API routes based on default exclude prefixes and custom rules.
+func filterRoutes(routes []Route, extraExcludes, extraPrefixes []string) []Route {
 	var filtered []Route
 	for _, route := range routes {
-		if shouldExcludeRoute(route.FullPath) {
+		if shouldExcludeRoute(route.FullPath, extraExcludes, extraPrefixes) {
 			slog.Debug("Filtering out non-API route", "method", route.Method, "path", route.FullPath)
 			continue
 		}
@@ -340,11 +341,19 @@ func filterRoutes(routes []Route) []Route {
 }
 
 // shouldExcludeRoute checks if a route path should be excluded from the API spec.
-func shouldExcludeRoute(path string) bool {
+func shouldExcludeRoute(path string, extraExcludes, extraPrefixes []string) bool {
+	// Default prefix excludes
 	for _, prefix := range defaultExcludePrefixes {
 		if strings.HasPrefix(path, prefix) {
 			return true
 		}
 	}
-	return false
+	// Custom prefix excludes
+	for _, prefix := range extraPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	// Exact path excludes
+	return slices.Contains(extraExcludes, path)
 }

@@ -49,7 +49,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 	slog.DebugContext(ctx, "Parsed AST files", "count", len(parser.files))
 
 	// Step 2: Extract routes
-	routes, err := parser.ExtractRoutes()
+	routes, err := parser.ExtractRoutes(opts.ExcludeRoutes, opts.ExcludeRoutePrefixes)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to extract routes", "error", err)
 		return nil, fmt.Errorf("failed to extract routes: %w", err)
@@ -323,9 +323,19 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 		summary = route.Method + " " + route.FullPath
 	}
 
+	// Clean operationId: strip package prefix (e.g., "apis.CreateProject" → "CreateProject")
+	if idx := strings.LastIndex(operationID, "."); idx != -1 {
+		operationID = operationID[idx+1:]
+	}
+
 	operation := &openapi3.Operation{
 		OperationID: operationID,
 		Summary:     summary,
+	}
+
+	// Infer tag from route path
+	if tag := inferTag(route.FullPath); tag != "" {
+		operation.Tags = []string{tag}
 	}
 
 	if handlerInfo == nil {
@@ -360,7 +370,7 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 				In:          "query",
 				Required:    param.Required,
 				Description: "Query parameter",
-				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				Schema:      &openapi3.SchemaRef{Value: GoTypeToSchema(param.GoType)},
 			},
 		})
 	}
@@ -373,7 +383,7 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 				In:          "header",
 				Required:    param.Required,
 				Description: "Header parameter",
-				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				Schema:      &openapi3.SchemaRef{Value: GoTypeToSchema(param.GoType)},
 			},
 		})
 	}
@@ -554,6 +564,31 @@ func setOperationForMethod(pathItem *openapi3.PathItem, method string, operation
 	case http.MethodOptions:
 		pathItem.Options = operation
 	}
+}
+
+// inferTag infers an OpenAPI tag from a route path.
+// It extracts the first meaningful path segment after skipping API version prefixes.
+func inferTag(path string) string {
+	parts := strings.SplitSeq(strings.Trim(path, "/"), "/")
+	for p := range parts {
+		if p == "" || strings.HasPrefix(p, "{") {
+			continue
+		}
+		// Skip common API prefixes
+		lower := strings.ToLower(p)
+		if lower == "api" || strings.HasPrefix(lower, "v") && len(lower) > 1 {
+			// Check if it's a version like v1, v2, v3
+			if lower == "api" || (len(lower) == 2 && lower[1] >= '0' && lower[1] <= '9') {
+				continue
+			}
+		}
+		// Capitalize first letter
+		if p[0] >= 'a' && p[0] <= 'z' {
+			return string(p[0]-'a'+'A') + p[1:]
+		}
+		return p
+	}
+	return ""
 }
 
 // extractPathParamsFromRoute extracts path parameters from a route path.

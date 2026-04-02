@@ -85,6 +85,10 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	noStream, _ := cmd.Flags().GetBool("no-stream")
 	//nolint:errcheck
 	concurrency, _ := cmd.Flags().GetInt("concurrency")
+	//nolint:errcheck
+	excludeRoutes, _ := cmd.Flags().GetStringSlice("exclude-route")
+	//nolint:errcheck
+	excludeRoutePrefixes, _ := cmd.Flags().GetStringSlice("exclude-route-prefix")
 
 	// Step 1: Detect framework - try all registered extractors
 	extractorImpl, info, err := builtin.DetectFramework(path)
@@ -153,11 +157,13 @@ func runGenerate(cmd *cobra.Command, args []string) error { //nolint:gocyclo // 
 	}
 
 	genOpts := &extractor.GenerateOptions{
-		OutputDir:        outputDir,
-		Format:           outputFormat,
-		Timeout:          timeout,
-		SkipTests:        true,
-		ProtoImportPaths: protoImportPaths,
+		OutputDir:            outputDir,
+		Format:               outputFormat,
+		Timeout:              timeout,
+		SkipTests:            true,
+		ProtoImportPaths:     protoImportPaths,
+		ExcludeRoutes:        excludeRoutes,
+		ExcludeRoutePrefixes: excludeRoutePrefixes,
 	}
 
 	genResult, err := extractorImpl.Generate(ctx, path, info, genOpts)
@@ -321,6 +327,10 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 		"disable streaming to enable concurrent LLM calls (faster, but no real-time output)")
 	c.Flags().Int("concurrency", 3,
 		"max concurrent LLM calls (only effective with --no-stream)")
+	c.Flags().StringSlice("exclude-route", nil,
+		"exact route paths to exclude from the generated spec (can be specified multiple times)")
+	c.Flags().StringSlice("exclude-route-prefix", nil,
+		"route path prefixes to exclude from the generated spec (can be specified multiple times)")
 
 	registerCompletion(c, "output", []string{"yaml", "json"})
 	registerCompletion(c, "language", []string{"en", "zh"})
@@ -331,20 +341,22 @@ to preserve your project's formatting. Use --keep-patched to keep the changes.`,
 
 // generate command flag variables for global rootCmd only
 var (
-	generateKeepPatched      bool
-	generateSkipValidate     bool
-	generateTimeout          time.Duration
-	generateSkipEnrich       bool
-	generateLanguage         string
-	generateOutputDir        string
-	generateOutputFormat     string
-	generateSkipPublish      bool
-	generatePublishTarget    string
-	generatePublishOverwrite bool
-	generateOverwriteOutput  bool
-	generateProtoImportPaths []string
-	generateNoStream         bool
-	generateConcurrency      int
+	generateKeepPatched          bool
+	generateSkipValidate         bool
+	generateTimeout              time.Duration
+	generateSkipEnrich           bool
+	generateLanguage             string
+	generateOutputDir            string
+	generateOutputFormat         string
+	generateSkipPublish          bool
+	generatePublishTarget        string
+	generatePublishOverwrite     bool
+	generateOverwriteOutput      bool
+	generateProtoImportPaths     []string
+	generateNoStream             bool
+	generateConcurrency          int
+	generateExcludeRoutes        []string
+	generateExcludeRoutePrefixes []string
 )
 
 func init() {
@@ -378,6 +390,10 @@ func init() {
 		"disable streaming to enable concurrent LLM calls (faster, but no real-time output)")
 	generateCmd.Flags().IntVar(&generateConcurrency, "concurrency", 3,
 		"max concurrent LLM calls (only effective with --no-stream)")
+	generateCmd.Flags().StringSliceVar(&generateExcludeRoutes, "exclude-route", nil,
+		"exact route paths to exclude from the generated spec (can be specified multiple times)")
+	generateCmd.Flags().StringSliceVar(&generateExcludeRoutePrefixes, "exclude-route-prefix", nil,
+		"route path prefixes to exclude from the generated spec (can be specified multiple times)")
 
 	registerCompletion(generateCmd, "output", []string{"yaml", "json"})
 	registerCompletion(generateCmd, "language", []string{"en", "zh"})
