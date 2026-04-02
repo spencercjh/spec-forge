@@ -1,0 +1,310 @@
+package gin
+
+import (
+	"fmt"
+	"go/ast"
+	"go/token"
+	"slices"
+	"strings"
+)
+
+// isFormRelatedWord checks if text contains form-related words as whole words.
+// This prevents false positives like "performAction", "platform", "information".
+func isFormRelatedWord(text string) bool {
+	lower := strings.ToLower(text)
+
+	// Define whole-word patterns to match
+	patterns := []string{"form", "formdata", "form-data", "multipart"}
+
+	for _, pattern := range patterns {
+		// Check for pattern preceded by start of string or non-letter
+		// and followed by end of string or non-letter
+		for i := 0; i <= len(lower)-len(pattern); i++ {
+			if lower[i:i+len(pattern)] == pattern {
+				// Check prefix (start of string or non-letter)
+				prefixOK := i == 0 || !isLetter(lower[i-1])
+				// Check suffix (end of string or non-letter)
+				suffixOK := i+len(pattern) == len(lower) || !isLetter(lower[i+len(pattern)])
+				if prefixOK && suffixOK {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// isLetter checks if a byte is a letter (a-z).
+func isLetter(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+// knownResponseHelperNames lists common response helper function names.
+// These are standalone functions (not methods on gin.Context) that handle
+// responses, typically taking *gin.Context as the first parameter.
+var knownResponseHelperNames = []string{
+	"done", "respond", "response",
+	"writeJSON", "sendJSON", "reply",
+}
+
+// inferTypeFromVarName tries to infer type from variable name using common patterns.
+// e.g., "user" -> "User", "users" -> "User", "result" -> "Result"
+func inferTypeFromVarName(varName string) string {
+	if varName == "" {
+		return ""
+	}
+
+	// Common variable name -> type mappings
+	mappings := map[string]string{
+		"user":   "User",
+		"users":  "User",
+		"req":    "",
+		"result": "",
+		"data":   "",
+		"item":   "",
+		"items":  "",
+	}
+
+	if typ, ok := mappings[varName]; ok {
+		return typ
+	}
+
+	// Try to capitalize first letter (heuristic)
+	// e.g., "pageResult" -> "PageResult"
+	if varName[0] >= 'a' && varName[0] <= 'z' {
+		return string(varName[0]-'a'+'A') + varName[1:]
+	}
+
+	return varName
+}
+
+// isKnownResponseHelper checks if a function name is a known response helper.
+func isKnownResponseHelper(name string) bool {
+	return slices.Contains(knownResponseHelperNames, name)
+}
+
+// isErrorType checks if an expression represents an error value.
+func isErrorType(expr ast.Expr, varTypeMap map[string]string) bool {
+	// Check for variable named "err" or with "error" type
+	if ident, ok := expr.(*ast.Ident); ok {
+		if ident.Name == "err" || ident.Name == "e" {
+			return true
+		}
+		if vtype, ok := varTypeMap[ident.Name]; ok {
+			return vtype == "error" || vtype == "*errors.errorString"
+		}
+	}
+
+	// Check for nil (common in done(c, data, nil) pattern)
+	if ident, ok := expr.(*ast.Ident); ok && ident.Name == "nil" {
+		return true
+	}
+
+	return false
+}
+
+// extractTypeFromArg extracts type name from a binding argument.
+func extractTypeFromArg(expr ast.Expr, varTypeMap map[string]string) string {
+	// Pattern: &variable or &Struct{}
+	unary, ok := expr.(*ast.UnaryExpr)
+	if !ok || unary.Op != token.AND {
+		return ""
+	}
+
+	// Check for composite literal: &Type{}
+	if comp, ok := unary.X.(*ast.CompositeLit); ok {
+		if ident, ok := comp.Type.(*ast.Ident); ok {
+			return ident.Name
+		}
+		if sel, ok := comp.Type.(*ast.SelectorExpr); ok {
+			if x, ok := sel.X.(*ast.Ident); ok {
+				return x.Name + "." + sel.Sel.Name
+			}
+		}
+	}
+
+	// Check for variable: &variable
+	if ident, ok := unary.X.(*ast.Ident); ok {
+		// First check if we have type info from variable declaration
+		if varType, exists := varTypeMap[ident.Name]; exists {
+			return varType
+		}
+		// If we don't know the variable's type, treat it as unknown
+		return ""
+	}
+
+	return ""
+}
+
+// extractStatusCode extracts HTTP status code from expression.
+func extractStatusCode(expr ast.Expr) int {
+	// Integer literal
+	if lit, ok := expr.(*ast.BasicLit); ok {
+		if lit.Kind == token.INT {
+			var code int
+			// Try to parse
+			if _, err := fmt.Sscanf(lit.Value, "%d", &code); err == nil {
+				return code
+			}
+		}
+	}
+
+	// http.StatusOK reference
+	if sel, ok := expr.(*ast.SelectorExpr); ok {
+		if x, ok := sel.X.(*ast.Ident); ok && x.Name == "http" {
+			return statusCodeFromName(sel.Sel.Name)
+		}
+	}
+
+	return 200 // Default
+}
+
+// statusCodeFromName converts http.StatusXxx to code.
+func statusCodeFromName(name string) int {
+	switch name {
+	case "StatusOK":
+		return 200
+	case "StatusCreated":
+		return 201
+	case "StatusAccepted":
+		return 202
+	case "StatusNoContent":
+		return 204
+	case "StatusBadRequest":
+		return 400
+	case "StatusUnauthorized":
+		return 401
+	case "StatusForbidden":
+		return 403
+	case "StatusNotFound":
+		return 404
+	case "StatusInternalServerError":
+		return 500
+	case "StatusBadGateway":
+		return 502
+	case "StatusServiceUnavailable":
+		return 503
+	}
+	return 200
+}
+
+// extractTypeFromResponseWithStatus extracts type from response argument considering HTTP status code.
+// For success responses (200-299), it extracts the Data field type from wrapper types.
+// For error responses (>= 400), it returns the wrapper type itself.
+func extractTypeFromResponseWithStatus(expr ast.Expr, varTypeMap map[string]string, statusCode int) string {
+	return extractTypeFromResponseInternal(expr, varTypeMap, statusCode, true)
+}
+
+// isGenericMapType checks if a type is a generic map type (gin.H, map[string]any, etc.)
+// These types should have their Data field extracted rather than using the type itself.
+func isGenericMapType(typeName string) bool {
+	return typeName == "gin.H" ||
+		typeName == "map[string]any" ||
+		typeName == "map[string]interface{}" ||
+		typeName == "H"
+}
+
+// extractTypeFromResponseInternal is the internal implementation with full control.
+func extractTypeFromResponseInternal(expr ast.Expr, varTypeMap map[string]string, statusCode int, useStatus bool) string {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		// If it's a variable, try to get its actual type from the map
+		if actualType, ok := varTypeMap[e.Name]; ok {
+			return actualType
+		}
+		return e.Name
+	case *ast.CompositeLit:
+		return extractTypeFromCompositeLit(e, varTypeMap, statusCode, useStatus)
+	case *ast.CallExpr:
+		return extractTypeFromCallExpr(e, varTypeMap)
+	case *ast.UnaryExpr:
+		// &variable -> dereference and get the type
+		if e.Op == token.AND {
+			return extractTypeFromResponseInternal(e.X, varTypeMap, statusCode, useStatus)
+		}
+	}
+	return ""
+}
+
+// extractTypeFromCompositeLit extracts type from a composite literal expression.
+func extractTypeFromCompositeLit(e *ast.CompositeLit, varTypeMap map[string]string, statusCode int, useStatus bool) string {
+	// First extract the composite literal type itself
+	typeName := extractTypeNameFromExpr(e.Type)
+
+	// Normalize gin.H to ginHType for consistency
+	if typeName == "gin.H" || typeName == "H" {
+		typeName = ginHType
+	}
+
+	// Determine if this is a success response (2xx) or error response (>= 400)
+	isSuccess := !useStatus || (statusCode >= 200 && statusCode < 300)
+
+	// For error responses with wrapper types, return the wrapper type
+	// For success responses OR generic types, try to extract from Data field
+	if !isSuccess && typeName != "" && !isGenericMapType(typeName) {
+		// Error response with concrete wrapper type - return wrapper
+		return typeName
+	}
+
+	// Try to extract from Data field for success responses or generic types
+	if dataType := extractDataFieldType(e.Elts, varTypeMap, statusCode, useStatus); dataType != "" {
+		return dataType
+	}
+
+	// Return the type name if we have it (fallback)
+	if typeName != "" {
+		return typeName
+	}
+	return ""
+}
+
+// extractTypeNameFromExpr extracts the type name from an AST expression.
+func extractTypeNameFromExpr(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		if x, ok := t.X.(*ast.Ident); ok {
+			return x.Name + "." + t.Sel.Name
+		}
+	}
+	return ""
+}
+
+// extractDataFieldType extracts type from Data field in composite literal elements.
+func extractDataFieldType(elts []ast.Expr, varTypeMap map[string]string, statusCode int, useStatus bool) string {
+	for _, elt := range elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+		key, ok := kv.Key.(*ast.Ident)
+		if !ok || key.Name != "Data" {
+			continue
+		}
+		// Found Data field, recursively extract its type
+		dataType := extractTypeFromResponseInternal(kv.Value, varTypeMap, statusCode, useStatus)
+		if dataType != "" {
+			return dataType
+		}
+	}
+	return ""
+}
+
+// extractTypeFromCallExpr extracts type from a call expression.
+func extractTypeFromCallExpr(e *ast.CallExpr, varTypeMap map[string]string) string {
+	// gin.H or similar
+	if sel, ok := e.Fun.(*ast.SelectorExpr); ok {
+		if sel.Sel.Name == "H" {
+			return ginHType
+		}
+	}
+	// Could be a function call that returns a type, try to extract from return type
+	if ident, ok := e.Fun.(*ast.Ident); ok {
+		if actualType, ok := varTypeMap[ident.Name]; ok {
+			return actualType
+		}
+	}
+	return ""
+}

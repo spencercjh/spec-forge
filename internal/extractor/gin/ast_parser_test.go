@@ -243,3 +243,67 @@ func TestExtractStringLiteral(t *testing.T) {
 func TestExtractHandlerName(t *testing.T) {
 	// This function is tested indirectly through ExtractRoutes tests
 }
+
+func TestShouldExcludeRoute(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"/swagger/{any}", true},
+		{"/swagger/index.html", true},
+		{"/docs", true},
+		{"/docs/openapi.yaml", true},
+		{"/debug/pprof", true},
+		{"/static/css/main.css", true},
+		{"/public/image.png", true},
+		{"/favicon.ico", true},
+		{"/api/v1/users", false},
+		{"/api/v1/projects/{name}", false},
+		{"/ping", false},
+		{"/health", false},
+		{"/srv/ping", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := shouldExcludeRoute(tt.path)
+			if result != tt.expected {
+				t.Errorf("shouldExcludeRoute(%q) = %v, expected %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFilterRoutes(t *testing.T) {
+	routes := []Route{
+		{Method: "GET", FullPath: "/api/v1/users", HandlerName: "ListUsers"},
+		{Method: "GET", FullPath: "/swagger/{any}", HandlerName: "SwaggerUI"},
+		{Method: "POST", FullPath: "/api/v1/projects", HandlerName: "CreateProject"},
+		{Method: "GET", FullPath: "/docs/openapi.yaml", HandlerName: "Docs"},
+		{Method: "GET", FullPath: "/ping", HandlerName: "Ping"},
+		{Method: "GET", FullPath: "/debug/pprof", HandlerName: "Pprof"},
+	}
+
+	filtered := filterRoutes(routes)
+
+	if len(filtered) != 3 {
+		t.Errorf("expected 3 routes after filtering, got %d: %v", len(filtered), filtered)
+	}
+
+	expectedPaths := map[string]bool{
+		"/api/v1/users":    false,
+		"/api/v1/projects": false,
+		"/ping":            false,
+	}
+	for _, route := range filtered {
+		if _, ok := expectedPaths[route.FullPath]; !ok {
+			t.Errorf("unexpected route in filtered results: %s", route.FullPath)
+		}
+		expectedPaths[route.FullPath] = true
+	}
+	for path, found := range expectedPaths {
+		if !found {
+			t.Errorf("expected route %s not found in filtered results", path)
+		}
+	}
+}

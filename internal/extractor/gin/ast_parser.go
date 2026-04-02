@@ -107,6 +107,9 @@ func (p *ASTParser) ExtractRoutes() ([]Route, error) {
 		routes = append(routes, fileRoutes...)
 	}
 
+	// Filter out non-API routes (swagger docs, static files, debug endpoints, etc.)
+	routes = filterRoutes(routes)
+
 	slog.Info("Extracted routes", "count", len(routes))
 	return routes, nil
 }
@@ -307,4 +310,41 @@ func extractHandlerName(expr ast.Expr) string {
 		}
 	}
 	return ""
+}
+
+// defaultExcludePrefixes lists route path prefixes that are typically non-API routes
+// (documentation, debug, static assets, etc.) and should be excluded from the spec.
+var defaultExcludePrefixes = []string{
+	"/swagger",
+	"/docs",
+	"/debug",
+	"/static",
+	"/public",
+	"/favicon.ico",
+}
+
+// filterRoutes removes non-API routes based on default exclude prefixes.
+func filterRoutes(routes []Route) []Route {
+	var filtered []Route
+	for _, route := range routes {
+		if shouldExcludeRoute(route.FullPath) {
+			slog.Debug("Filtering out non-API route", "method", route.Method, "path", route.FullPath)
+			continue
+		}
+		filtered = append(filtered, route)
+	}
+	if len(filtered) < len(routes) {
+		slog.Info("Filtered non-API routes", "removed", len(routes)-len(filtered), "kept", len(filtered))
+	}
+	return filtered
+}
+
+// shouldExcludeRoute checks if a route path should be excluded from the API spec.
+func shouldExcludeRoute(path string) bool {
+	for _, prefix := range defaultExcludePrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
 }
