@@ -266,3 +266,125 @@ func TestDefaultOutput(t *testing.T) {
 
 	t.Logf("Spec correctly output to project root: %s", expectedPath)
 }
+
+// TestCrossPackageNameCollision verifies that findHandlerDecl correctly resolves
+// handler functions when the same function name exists across multiple packages.
+// Without the package-name filter fix, the extractor could non-deterministically
+// pick the wrong function (e.g., adapter.CreateProject instead of apis.CreateProject),
+// causing body types, path params, and query params to go undetected.
+func TestCrossPackageNameCollision(t *testing.T) {
+	projectPath := "./fixtures/gin-crosspkg"
+
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		t.Skip("Gin cross-package fixture not found")
+	}
+
+	goModPath := filepath.Join(projectPath, "go.mod")
+	if _, err := os.Stat(goModPath); os.IsNotExist(err) {
+		t.Skip("go.mod not found, skipping test")
+	}
+
+	outputDir := t.TempDir()
+
+	rootCmd := cmd.NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&stderr)
+	rootCmd.SetArgs([]string{
+		"generate",
+		projectPath,
+		"--output-dir", outputDir,
+		"--output", "json",
+		"--skip-enrich",
+		"--skip-publish",
+	})
+
+	err := rootCmd.Execute()
+	if err != nil {
+		t.Fatalf("command failed: %v\nstderr: %s", err, stderr.String())
+	}
+
+	specFile := helpers.FindSpecFile(t, outputDir, "json")
+	validator := helpers.NewSpecValidator(t, specFile)
+
+	// Validate the generated spec
+	validator.FullValidation(helpers.ValidationConfig{
+		ExpectedPaths: []string{
+			"/ping",
+			"/projects",
+			"/projects/{name}",
+		},
+		Operations: []helpers.OperationConfig{
+			{
+				Path:                  "/ping",
+				Method:                "get",
+				WantOperationID:       true,
+				ExpectedResponseCodes: []string{"200"},
+			},
+			{
+				Path:                  "/projects",
+				Method:                "post",
+				WantOperationID:       true,
+				ExpectedResponseCodes: []string{"201", "400"},
+				WantRequestBody:       "CreateProjectReq",
+			},
+			{
+				Path:                  "/projects/{name}",
+				Method:                "get",
+				WantOperationID:       true,
+				ExpectedResponseCodes: []string{"200"},
+				ExpectedParams:        []string{"name"},
+			},
+			{
+				Path:                  "/projects/{name}",
+				Method:                "put",
+				WantOperationID:       true,
+				ExpectedResponseCodes: []string{"200", "400"},
+				ExpectedParams:        []string{"name"},
+				WantRequestBody:       "UpdateProjectReq",
+			},
+			{
+				Path:                  "/projects/{name}",
+				Method:                "delete",
+				WantOperationID:       true,
+				ExpectedResponseCodes: []string{"200"},
+				ExpectedParams:        []string{"name"},
+			},
+		},
+		ExpectedSchemas: []string{
+			"Project",
+			"CreateProjectReq",
+			"UpdateProjectReq",
+		},
+	})
+
+	// Verify path parameters are extracted correctly from the route path
+	validator.ValidateParameterDetails("/projects/{name}", "get", []helpers.ParameterExpectation{
+		{Name: "name", In: "path", Required: true},
+	})
+	validator.ValidateParameterDetails("/projects/{name}", "put", []helpers.ParameterExpectation{
+		{Name: "name", In: "path", Required: true},
+	})
+	validator.ValidateParameterDetails("/projects/{name}", "delete", []helpers.ParameterExpectation{
+		{Name: "name", In: "path", Required: true},
+	})
+
+	// Verify request body schemas come from the correct handler (apis package),
+	// not from the adapter package which has no *gin.Context parameter.
+	validator.ValidateRequestBodySchema("/projects", "post", "CreateProjectReq")
+	validator.ValidateRequestBodySchema("/projects/{name}", "put", "UpdateProjectReq")
+
+	// Verify response schemas
+	validator.ValidateResponseSchema("/projects", "post", helpers.ResponseSchemaExpectation{
+		Code:        "201",
+		ContentType: "application/json",
+		SchemaRef:   "Project",
+	})
+	validator.ValidateResponseSchema("/projects/{name}", "get", helpers.ResponseSchemaExpectation{
+		Code:        "200",
+		ContentType: "application/json",
+		SchemaRef:   "Project",
+	})
+
+	t.Log("Cross-package name collision test passed!")
+}
