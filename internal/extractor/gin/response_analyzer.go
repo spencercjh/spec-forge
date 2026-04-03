@@ -4,84 +4,64 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"slices"
-	"strings"
+	"log/slog"
 )
 
-// isFormRelatedWord checks if text contains form-related words as whole words.
-// This prevents false positives like "performAction", "platform", "information".
-func isFormRelatedWord(text string) bool {
-	lower := strings.ToLower(text)
+// extractResponse extracts response information from c.JSON(), c.XML(), etc. calls.
+func (a *HandlerAnalyzer) extractResponse(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string, goType string) {
+	if len(call.Args) < 2 {
+		return
+	}
+	statusCode := extractStatusCode(call.Args[0])
+	if goType == "" {
+		// Pass status code to determine if we should unwrap Data field
+		goType = extractTypeFromResponseWithStatus(call.Args[1], varTypeMap, statusCode)
+	}
+	if goType != "" {
+		slog.Debug("Extracted response type", "status", statusCode, "type", goType)
+	}
+	info.Responses = append(info.Responses, ResponseInfo{
+		StatusCode: statusCode,
+		GoType:     goType,
+	})
+}
 
-	// Define whole-word patterns to match
-	patterns := []string{"form", "formdata", "form-data", "multipart"}
+// extractHelperResponse analyzes helper call arguments to extract response types.
+// Patterns:
+//   - done(c, err)           → only default error response
+//   - done(c, data)          → 200 success with data type
+//   - done(c, data, err)     → 200 success + default error
+func (a *HandlerAnalyzer) extractHelperResponse(args []ast.Expr, info *HandlerInfo, varTypeMap map[string]string) {
+	// Skip first arg (*gin.Context)
+	dataArgs := args[1:]
 
-	for _, pattern := range patterns {
-		// Check for pattern preceded by start of string or non-letter
-		// and followed by end of string or non-letter
-		for i := 0; i <= len(lower)-len(pattern); i++ {
-			if lower[i:i+len(pattern)] == pattern {
-				// Check prefix (start of string or non-letter)
-				prefixOK := i == 0 || !isLetter(lower[i-1])
-				// Check suffix (end of string or non-letter)
-				suffixOK := i+len(pattern) == len(lower) || !isLetter(lower[i+len(pattern)])
-				if prefixOK && suffixOK {
-					return true
-				}
-			}
+	for _, arg := range dataArgs {
+		if ident, ok := arg.(*ast.Ident); ok && ident.Name == "nil" {
+			continue
+		}
+
+		goType := extractTypeFromResponseInternal(arg, varTypeMap, 200, true)
+		if goType == "" {
+			continue
+		}
+
+		// Check if this looks like an error type (err variable, *gin.Error, etc.)
+		if isErrorType(arg, varTypeMap) {
+			// Generate default error response
+			info.Responses = append(info.Responses, ResponseInfo{
+				StatusCode: 0, // 0 = default
+				GoType:     goType,
+			})
+			slog.Debug("Extracted helper error response", "type", goType)
+		} else {
+			// Generate 200 success response
+			info.Responses = append(info.Responses, ResponseInfo{
+				StatusCode: 200,
+				GoType:     goType,
+			})
+			slog.Debug("Extracted helper success response", "type", goType)
 		}
 	}
-
-	return false
-}
-
-// isLetter checks if a byte is a letter (a-z).
-func isLetter(c byte) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-}
-
-// knownResponseHelperNames lists common response helper function names.
-// These are standalone functions (not methods on gin.Context) that handle
-// responses, typically taking *gin.Context as the first parameter.
-var knownResponseHelperNames = []string{
-	"done", "respond", "response",
-	"writeJSON", "sendJSON", "reply",
-}
-
-// inferTypeFromVarName tries to infer type from variable name using common patterns.
-// e.g., "user" -> "User", "users" -> "User", "result" -> "Result"
-func inferTypeFromVarName(varName string) string {
-	if varName == "" {
-		return ""
-	}
-
-	// Common variable name -> type mappings
-	mappings := map[string]string{
-		"user":   "User",
-		"users":  "User",
-		"req":    "",
-		"result": "",
-		"data":   "",
-		"item":   "",
-		"items":  "",
-	}
-
-	if typ, ok := mappings[varName]; ok {
-		return typ
-	}
-
-	// Try to capitalize first letter (heuristic)
-	// e.g., "pageResult" -> "PageResult"
-	if varName[0] >= 'a' && varName[0] <= 'z' {
-		return string(varName[0]-'a'+'A') + varName[1:]
-	}
-
-	return varName
-}
-
-// isKnownResponseHelper checks if a function name is a known response helper.
-func isKnownResponseHelper(name string) bool {
-	return slices.Contains(knownResponseHelperNames, name)
 }
 
 // isErrorType checks if an expression represents an error value.
