@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -85,7 +86,7 @@ func (p *ASTParser) ParseFiles() error {
 }
 
 // ExtractRoutes extracts all Gin routes from parsed files.
-func (p *ASTParser) ExtractRoutes() ([]Route, error) {
+func (p *ASTParser) ExtractRoutes(excludeRoutes, excludePrefixes []string) ([]Route, error) {
 	slog.Debug("Extracting routes", "files", len(p.files))
 
 	// Routes count is unpredictable as it depends on AST analysis
@@ -106,6 +107,9 @@ func (p *ASTParser) ExtractRoutes() ([]Route, error) {
 		fileRoutes := p.extractRoutesFromFile(path, file)
 		routes = append(routes, fileRoutes...)
 	}
+
+	// Filter out non-API routes (swagger docs, static files, debug endpoints, etc.)
+	routes = filterRoutes(routes, excludeRoutes, excludePrefixes)
 
 	slog.Info("Extracted routes", "count", len(routes))
 	return routes, nil
@@ -307,4 +311,69 @@ func extractHandlerName(expr ast.Expr) string {
 		}
 	}
 	return ""
+}
+
+// defaultExcludePrefixes lists route path prefixes that are typically non-API routes
+// (documentation, debug, static assets, etc.) and should be excluded from the spec.
+var defaultExcludePrefixes = []string{
+	"/swagger",
+	"/docs",
+	"/debug",
+	"/static",
+	"/public",
+	"/favicon.ico",
+}
+
+// filterRoutes removes non-API routes based on default exclude prefixes and custom rules.
+func filterRoutes(routes []Route, extraExcludes, extraPrefixes []string) []Route {
+	var filtered []Route
+	for _, route := range routes {
+		if shouldExcludeRoute(route.FullPath, extraExcludes, extraPrefixes) {
+			slog.Debug("Filtering out non-API route", "method", route.Method, "path", route.FullPath)
+			continue
+		}
+		filtered = append(filtered, route)
+	}
+	if len(filtered) < len(routes) {
+		slog.Info("Filtered non-API routes", "removed", len(routes)-len(filtered), "kept", len(filtered))
+	}
+	return filtered
+}
+
+// shouldExcludeRoute checks if a route path should be excluded from the API spec.
+func shouldExcludeRoute(path string, extraExcludes, extraPrefixes []string) bool {
+	normalized := normalizeRoutePath(path)
+
+	for _, prefix := range defaultExcludePrefixes {
+		if hasPathSegmentPrefix(normalized, prefix) {
+			return true
+		}
+	}
+	for _, prefix := range extraPrefixes {
+		normalizedPrefix := normalizeRoutePath(prefix)
+		if hasPathSegmentPrefix(normalized, normalizedPrefix) {
+			return true
+		}
+	}
+
+	normalizedExcludes := make([]string, len(extraExcludes))
+	for i, exc := range extraExcludes {
+		normalizedExcludes[i] = normalizeRoutePath(exc)
+	}
+	return slices.Contains(normalizedExcludes, normalized)
+}
+
+// normalizeRoutePath converts Gin-style :param and *wildcard to OpenAPI-style {param}.
+// Routes already pass through convertPathFormat before reaching shouldExcludeRoute,
+// so this is a defensive normalization for user-supplied filter values
+// (extraPrefixes, extraExcludes) which may still use Gin syntax.
+func normalizeRoutePath(path string) string {
+	return convertPathFormat(path)
+}
+
+func hasPathSegmentPrefix(path, prefix string) bool {
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	return len(path) == len(prefix) || path[len(prefix)] == '/'
 }

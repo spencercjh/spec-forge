@@ -223,15 +223,19 @@ func isPrimitiveType(name string) bool {
 // findTypeSpec finds a type definition by name.
 // Supports both local types ("User") and cross-package types ("models.User").
 func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
-	// For cross-package references (e.g., "models.User"), try to find by short name
+	pkgPrefix := ""
 	shortName := name
 	if idx := strings.LastIndex(name, "."); idx != -1 {
+		pkgPrefix = name[:idx]
 		shortName = name[idx+1:]
 	}
 
-	// Try full name first, then short name
-	for _, tryName := range []string{name, shortName} {
+	// Phase 1: If we have a package prefix, only search files from that package
+	if pkgPrefix != "" {
 		for _, file := range e.files {
+			if file.Name.Name != pkgPrefix {
+				continue
+			}
 			for _, decl := range file.Decls {
 				genDecl, ok := decl.(*ast.GenDecl)
 				if !ok || genDecl.Tok != token.TYPE {
@@ -239,9 +243,25 @@ func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
 				}
 				for _, spec := range genDecl.Specs {
 					typeSpec, ok := spec.(*ast.TypeSpec)
-					if ok && typeSpec.Name.Name == tryName {
+					if ok && typeSpec.Name.Name == shortName {
 						return typeSpec
 					}
+				}
+			}
+		}
+	}
+
+	// Phase 2: Fallback — search all files by short name
+	for _, file := range e.files {
+		for _, decl := range file.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if ok && typeSpec.Name.Name == shortName {
+					return typeSpec
 				}
 			}
 		}
@@ -250,15 +270,49 @@ func (e *SchemaExtractor) findTypeSpec(name string) *ast.TypeSpec {
 }
 
 // extractStructSchema extracts schema from a struct type.
-func (e *SchemaExtractor) extractStructSchema(_ *ast.TypeSpec, structType *ast.StructType) (*openapi3.Schema, error) {
+// The visited set prevents infinite recursion on circular embedded structs.
+func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec, structType *ast.StructType, visited ...map[string]bool) (*openapi3.Schema, error) {
 	schema := &openapi3.Schema{
 		Type:       &openapi3.Types{schemaTypeObject},
 		Properties: make(openapi3.Schemas),
 	}
 
+	// Initialize visited set for cycle detection
+	var visitedMap map[string]bool
+	if len(visited) > 0 {
+		visitedMap = visited[0]
+	} else {
+		visitedMap = make(map[string]bool)
+	}
+	typeName := typeSpec.Name.Name
+	visitedMap[typeName] = true
+
 	for _, field := range structType.Fields.List {
 		if len(field.Names) == 0 {
-			continue // Embedded field - skip for now
+			if field.Tag != nil {
+				tag := strings.Trim(field.Tag.Value, "`")
+				if jsonTag := extractTagValue(tag, "json"); jsonTag != "" {
+					parts := strings.Split(jsonTag, ",")
+					if parts[0] == "-" {
+						continue
+					}
+					if parts[0] != "" {
+						embeddedTypeName := e.resolveEmbeddedTypeName(field.Type)
+						if embeddedTypeName != "" {
+							// Use short name for consistency with fieldToSchemaRef
+							shortName := embeddedTypeName
+							if idx := strings.LastIndex(embeddedTypeName, "."); idx != -1 {
+								shortName = embeddedTypeName[idx+1:]
+							}
+							ref := "#/components/schemas/" + shortName
+							schema.Properties[parts[0]] = &openapi3.SchemaRef{Ref: ref}
+						}
+						continue
+					}
+				}
+			}
+			e.promoteEmbeddedFields(field, schema, visitedMap)
+			continue
 		}
 
 		fieldName := field.Names[0].Name
@@ -280,6 +334,72 @@ func (e *SchemaExtractor) extractStructSchema(_ *ast.TypeSpec, structType *ast.S
 	}
 
 	return schema, nil
+}
+
+// promoteEmbeddedFields resolves an embedded struct field and promotes its
+// properties into the parent schema, following Go's field promotion rules.
+func (e *SchemaExtractor) promoteEmbeddedFields(field *ast.Field, parentSchema *openapi3.Schema, visited map[string]bool) {
+	embeddedTypeName := e.resolveEmbeddedTypeName(field.Type)
+	if embeddedTypeName == "" {
+		return
+	}
+
+	// Prevent infinite recursion on circular embeddings
+	if visited[embeddedTypeName] {
+		slog.Debug("Skipping circular embedded field", "type", embeddedTypeName)
+		return
+	}
+
+	// Find the embedded type definition
+	typeSpec := e.findTypeSpec(embeddedTypeName)
+	if typeSpec == nil {
+		slog.Debug("Embedded type not found", "type", embeddedTypeName)
+		return
+	}
+
+	structType, ok := typeSpec.Type.(*ast.StructType)
+	if !ok {
+		slog.Debug("Embedded type is not a struct", "type", embeddedTypeName)
+		return
+	}
+
+	// Mark as visited for recursion
+	visited[embeddedTypeName] = true
+
+	// Extract the embedded struct's schema
+	embeddedSchema, err := e.extractStructSchema(typeSpec, structType, visited)
+	if err != nil {
+		slog.Warn("Failed to extract embedded struct schema", "type", embeddedTypeName, "error", err)
+		return
+	}
+
+	// Promote properties from embedded schema into parent
+	if embeddedSchema.Properties != nil {
+		for name, propRef := range embeddedSchema.Properties {
+			if _, exists := parentSchema.Properties[name]; !exists {
+				parentSchema.Properties[name] = propRef
+			}
+		}
+	}
+
+	parentSchema.Required = append(parentSchema.Required, embeddedSchema.Required...)
+}
+
+// resolveEmbeddedTypeName extracts the type name from an embedded field expression.
+// Handles simple identifiers (BaseRsp), qualified names (msgs.BaseRsp),
+// and pointer types (*BaseRsp).
+func (e *SchemaExtractor) resolveEmbeddedTypeName(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		if x, ok := t.X.(*ast.Ident); ok {
+			return x.Name + "." + t.Sel.Name
+		}
+	case *ast.StarExpr:
+		return e.resolveEmbeddedTypeName(t.X)
+	}
+	return ""
 }
 
 // fieldToSchemaRef converts a Go type to OpenAPI schema reference.
@@ -402,6 +522,15 @@ func GoTypeToSchema(goType string) *openapi3.Schema {
 	case "float64":
 		return &openapi3.Schema{Type: &openapi3.Types{"number"}, Format: "double"}
 	case "bool":
+		return &openapi3.Schema{Type: &openapi3.Types{"boolean"}}
+	// OpenAPI-style type names produced by type inference constants
+	// (goTypeInteger, goTypeNumber, goTypeBoolean). These are used when
+	// merging inferred path/query param types into the OpenAPI schema.
+	case "integer":
+		return &openapi3.Schema{Type: &openapi3.Types{"integer"}}
+	case "number":
+		return &openapi3.Schema{Type: &openapi3.Types{"number"}}
+	case "boolean":
 		return &openapi3.Schema{Type: &openapi3.Types{"boolean"}}
 	case "time.Time":
 		return &openapi3.Schema{Type: &openapi3.Types{goTypeString}, Format: "date-time"}

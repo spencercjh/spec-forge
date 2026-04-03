@@ -1,7 +1,6 @@
 package gin
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"log/slog"
@@ -9,29 +8,54 @@ import (
 )
 
 const (
-	goTypeString = "string"
-	goTypeArray  = "array"
+	goTypeString  = "string"
+	goTypeArray   = "array"
+	goTypeInteger = "integer"
+	goTypeBoolean = "boolean"
+	goTypeNumber  = "number"
 )
 
 // HandlerAnalyzer analyzes Gin handler functions.
 type HandlerAnalyzer struct {
-	fset      *token.FileSet
-	files     map[string]*ast.File
-	typeCache map[string]*ast.TypeSpec
+	fset        *token.FileSet
+	files       map[string]*ast.File
+	typeCache   map[string]*ast.TypeSpec
+	helperFuncs map[string]map[string]*ast.FuncDecl // pkg → name → package-level funcs taking *gin.Context as first param
+	callerPkg   string                              // set per AnalyzeHandler call for scoped helper lookup
 }
 
 // NewHandlerAnalyzer creates a new HandlerAnalyzer instance.
 func NewHandlerAnalyzer(fset *token.FileSet, files map[string]*ast.File) *HandlerAnalyzer {
-	return &HandlerAnalyzer{
-		fset:      fset,
-		files:     files,
-		typeCache: make(map[string]*ast.TypeSpec),
+	a := &HandlerAnalyzer{
+		fset:        fset,
+		files:       files,
+		typeCache:   make(map[string]*ast.TypeSpec),
+		helperFuncs: make(map[string]map[string]*ast.FuncDecl),
 	}
+	a.discoverHelperFuncs()
+	return a
+}
+
+// isGinContextType checks if an AST expression represents *gin.Context.
+func isGinContextType(expr ast.Expr) bool {
+	star, ok := expr.(*ast.StarExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := star.X.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	x, ok := sel.X.(*ast.Ident)
+	return ok && x.Name == "gin" && sel.Sel.Name == "Context"
 }
 
 // AnalyzeHandler analyzes a handler function and extracts information.
 func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error) {
 	slog.Debug("Analyzing handler", "name", fn.Name.Name)
+
+	// Determine caller's package for scoped helper function lookup
+	a.callerPkg = a.pkgForFunc(fn)
 
 	info := &HandlerInfo{
 		PathParams:   []ParamInfo{},
@@ -58,9 +82,13 @@ func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error)
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		if node, ok := n.(*ast.CallExpr); ok {
 			a.parseHandlerCall(node, info, varTypeMap, hasFormContext)
+			a.parseHelperCall(node, info, varTypeMap)
 		}
 		return true
 	})
+
+	// Infer parameter types from strconv conversions and conditional checks
+	a.inferParamTypes(fn.Body, info)
 
 	// For form binding, expand struct fields into form params
 	if info.BindingSrc == BindingSourceForm && info.BodyType != "" {
@@ -109,38 +137,6 @@ func (a *HandlerAnalyzer) hasFormContext(fn *ast.FuncDecl) bool {
 	}
 
 	return false
-}
-
-// isFormRelatedWord checks if text contains form-related words as whole words.
-// This prevents false positives like "performAction", "platform", "information".
-func isFormRelatedWord(text string) bool {
-	lower := strings.ToLower(text)
-
-	// Define whole-word patterns to match
-	patterns := []string{"form", "formdata", "form-data", "multipart"}
-
-	for _, pattern := range patterns {
-		// Check for pattern preceded by start of string or non-letter
-		// and followed by end of string or non-letter
-		for i := 0; i <= len(lower)-len(pattern); i++ {
-			if lower[i:i+len(pattern)] == pattern {
-				// Check prefix (start of string or non-letter)
-				prefixOK := i == 0 || !isLetter(lower[i-1])
-				// Check suffix (end of string or non-letter)
-				suffixOK := i+len(pattern) == len(lower) || !isLetter(lower[i+len(pattern)])
-				if prefixOK && suffixOK {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-// isLetter checks if a byte is a letter (a-z).
-func isLetter(c byte) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
 // buildVarTypeMap builds a map of variable names to their types.
@@ -235,37 +231,6 @@ func (a *HandlerAnalyzer) extractAssignTypes(node *ast.AssignStmt, varTypeMap ma
 	}
 }
 
-// inferTypeFromVarName tries to infer type from variable name using common patterns.
-// e.g., "user" -> "User", "users" -> "User", "result" -> "Result"
-func inferTypeFromVarName(varName string) string {
-	if varName == "" {
-		return ""
-	}
-
-	// Common variable name -> type mappings
-	mappings := map[string]string{
-		"user":   "User",
-		"users":  "User",
-		"req":    "",
-		"result": "",
-		"data":   "",
-		"item":   "",
-		"items":  "",
-	}
-
-	if typ, ok := mappings[varName]; ok {
-		return typ
-	}
-
-	// Try to capitalize first letter (heuristic)
-	// e.g., "pageResult" -> "PageResult"
-	if varName[0] >= 'a' && varName[0] <= 'z' {
-		return string(varName[0]-'a'+'A') + varName[1:]
-	}
-
-	return varName
-}
-
 // parseHandlerCall parses a call expression in a handler.
 func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string, hasFormContext bool) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
@@ -280,19 +245,39 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 
 	method := sel.Sel.Name
 
-	// Categorize methods and dispatch to specialized handlers
+	// Dispatch parameter extraction methods
+	if a.dispatchParamMethods(method, call, info, varTypeMap) {
+		return
+	}
+	// Dispatch binding methods
+	if a.dispatchBindingMethods(method, call, info, varTypeMap, hasFormContext) {
+		return
+	}
+	// Dispatch response methods
+	a.dispatchResponseMethods(method, call, info, varTypeMap)
+}
+
+// dispatchParamMethods handles parameter extraction methods (Param, Query, GetHeader, etc.).
+func (a *HandlerAnalyzer) dispatchParamMethods(method string, call *ast.CallExpr, info *HandlerInfo, _ map[string]string) bool {
 	switch method {
 	case "Param":
 		a.extractParam(call, info)
-	case "Query", "DefaultQuery":
+	case "Query", "DefaultQuery": //nolint:goconst // AST method name literals
 		a.extractQueryParam(call, info)
 	case "GetHeader":
 		a.extractHeaderParam(call, info)
+	default:
+		return false
+	}
+	return true
+}
+
+// dispatchBindingMethods handles body/form binding methods.
+func (a *HandlerAnalyzer) dispatchBindingMethods(method string, call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string, hasFormContext bool) bool {
+	switch method {
 	case "ShouldBindJSON", "BindJSON":
 		a.extractBodyType(call, info, varTypeMap, BindingSourceJSON)
 	case "ShouldBind", "Bind":
-		// ShouldBind auto-detects based on Content-Type
-		// Use form binding if we detect form context in the handler
 		if hasFormContext {
 			a.extractBodyType(call, info, varTypeMap, BindingSourceForm)
 		} else {
@@ -303,7 +288,6 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 	case "ShouldBindYAML", "BindYAML":
 		a.extractBodyType(call, info, varTypeMap, BindingSourceYAML)
 	case "ShouldBindQuery", "BindQuery":
-		// Query binding extracts query parameters, not body
 		a.extractQueryBinding(call, info, varTypeMap)
 	case "PostForm":
 		a.extractFormParam(call, info, true)
@@ -311,6 +295,15 @@ func (a *HandlerAnalyzer) parseHandlerCall(call *ast.CallExpr, info *HandlerInfo
 		a.extractFormParam(call, info, false)
 	case "FormFile":
 		a.extractFileParam(call, info)
+	default:
+		return false
+	}
+	return true
+}
+
+// dispatchResponseMethods handles response methods (JSON, XML, etc.).
+func (a *HandlerAnalyzer) dispatchResponseMethods(method string, call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string) {
+	switch method {
 	case "JSON", "XML", "YAML":
 		a.extractResponse(call, info, varTypeMap, "")
 	case "String":
@@ -553,228 +546,4 @@ func (a *HandlerAnalyzer) extractFileParam(call *ast.CallExpr, info *HandlerInfo
 			Required: true,
 		})
 	}
-}
-
-// extractResponse extracts response information from c.JSON(), c.XML(), etc. calls.
-func (a *HandlerAnalyzer) extractResponse(call *ast.CallExpr, info *HandlerInfo, varTypeMap map[string]string, goType string) {
-	if len(call.Args) < 2 {
-		return
-	}
-	statusCode := extractStatusCode(call.Args[0])
-	if goType == "" {
-		// Pass status code to determine if we should unwrap Data field
-		goType = extractTypeFromResponseWithStatus(call.Args[1], varTypeMap, statusCode)
-	}
-	if goType != "" {
-		slog.Debug("Extracted response type", "status", statusCode, "type", goType)
-	}
-	info.Responses = append(info.Responses, ResponseInfo{
-		StatusCode: statusCode,
-		GoType:     goType,
-	})
-}
-
-// extractTypeFromArg extracts type name from a binding argument.
-func extractTypeFromArg(expr ast.Expr, varTypeMap map[string]string) string {
-	// Pattern: &variable or &Struct{}
-	unary, ok := expr.(*ast.UnaryExpr)
-	if !ok || unary.Op != token.AND {
-		return ""
-	}
-
-	// Check for composite literal: &Type{}
-	if comp, ok := unary.X.(*ast.CompositeLit); ok {
-		if ident, ok := comp.Type.(*ast.Ident); ok {
-			return ident.Name
-		}
-		if sel, ok := comp.Type.(*ast.SelectorExpr); ok {
-			if x, ok := sel.X.(*ast.Ident); ok {
-				return x.Name + "." + sel.Sel.Name
-			}
-		}
-	}
-
-	// Check for variable: &variable
-	if ident, ok := unary.X.(*ast.Ident); ok {
-		// First check if we have type info from variable declaration
-		if varType, exists := varTypeMap[ident.Name]; exists {
-			return varType
-		}
-		// If we don't know the variable's type, treat it as unknown
-		return ""
-	}
-
-	return ""
-}
-
-// extractStatusCode extracts HTTP status code from expression.
-func extractStatusCode(expr ast.Expr) int {
-	// Integer literal
-	if lit, ok := expr.(*ast.BasicLit); ok {
-		if lit.Kind == token.INT {
-			var code int
-			// Try to parse
-			if _, err := fmt.Sscanf(lit.Value, "%d", &code); err == nil {
-				return code
-			}
-		}
-	}
-
-	// http.StatusOK reference
-	if sel, ok := expr.(*ast.SelectorExpr); ok {
-		if x, ok := sel.X.(*ast.Ident); ok && x.Name == "http" {
-			return statusCodeFromName(sel.Sel.Name)
-		}
-	}
-
-	return 200 // Default
-}
-
-// statusCodeFromName converts http.StatusXxx to code.
-func statusCodeFromName(name string) int {
-	switch name {
-	case "StatusOK":
-		return 200
-	case "StatusCreated":
-		return 201
-	case "StatusAccepted":
-		return 202
-	case "StatusNoContent":
-		return 204
-	case "StatusBadRequest":
-		return 400
-	case "StatusUnauthorized":
-		return 401
-	case "StatusForbidden":
-		return 403
-	case "StatusNotFound":
-		return 404
-	case "StatusInternalServerError":
-		return 500
-	case "StatusBadGateway":
-		return 502
-	case "StatusServiceUnavailable":
-		return 503
-	}
-	return 200
-}
-
-// extractTypeFromResponseWithStatus extracts type from response argument considering HTTP status code.
-// For success responses (200-299), it extracts the Data field type from wrapper types.
-// For error responses (>= 400), it returns the wrapper type itself.
-func extractTypeFromResponseWithStatus(expr ast.Expr, varTypeMap map[string]string, statusCode int) string {
-	return extractTypeFromResponseInternal(expr, varTypeMap, statusCode, true)
-}
-
-// isGenericMapType checks if a type is a generic map type (gin.H, map[string]any, etc.)
-// These types should have their Data field extracted rather than using the type itself.
-func isGenericMapType(typeName string) bool {
-	return typeName == "gin.H" ||
-		typeName == "map[string]any" ||
-		typeName == "map[string]interface{}" ||
-		typeName == "H"
-}
-
-// extractTypeFromResponseInternal is the internal implementation with full control.
-func extractTypeFromResponseInternal(expr ast.Expr, varTypeMap map[string]string, statusCode int, useStatus bool) string {
-	switch e := expr.(type) {
-	case *ast.Ident:
-		// If it's a variable, try to get its actual type from the map
-		if actualType, ok := varTypeMap[e.Name]; ok {
-			return actualType
-		}
-		return e.Name
-	case *ast.CompositeLit:
-		return extractTypeFromCompositeLit(e, varTypeMap, statusCode, useStatus)
-	case *ast.CallExpr:
-		return extractTypeFromCallExpr(e, varTypeMap)
-	case *ast.UnaryExpr:
-		// &variable -> dereference and get the type
-		if e.Op == token.AND {
-			return extractTypeFromResponseInternal(e.X, varTypeMap, statusCode, useStatus)
-		}
-	}
-	return ""
-}
-
-// extractTypeFromCompositeLit extracts type from a composite literal expression.
-func extractTypeFromCompositeLit(e *ast.CompositeLit, varTypeMap map[string]string, statusCode int, useStatus bool) string {
-	// First extract the composite literal type itself
-	typeName := extractTypeNameFromExpr(e.Type)
-
-	// Normalize gin.H to ginHType for consistency
-	if typeName == "gin.H" || typeName == "H" {
-		typeName = ginHType
-	}
-
-	// Determine if this is a success response (2xx) or error response (>= 400)
-	isSuccess := !useStatus || (statusCode >= 200 && statusCode < 300)
-
-	// For error responses with wrapper types, return the wrapper type
-	// For success responses OR generic types, try to extract from Data field
-	if !isSuccess && typeName != "" && !isGenericMapType(typeName) {
-		// Error response with concrete wrapper type - return wrapper
-		return typeName
-	}
-
-	// Try to extract from Data field for success responses or generic types
-	if dataType := extractDataFieldType(e.Elts, varTypeMap, statusCode, useStatus); dataType != "" {
-		return dataType
-	}
-
-	// Return the type name if we have it (fallback)
-	if typeName != "" {
-		return typeName
-	}
-	return ""
-}
-
-// extractTypeNameFromExpr extracts the type name from an AST expression.
-func extractTypeNameFromExpr(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		return t.Name
-	case *ast.SelectorExpr:
-		if x, ok := t.X.(*ast.Ident); ok {
-			return x.Name + "." + t.Sel.Name
-		}
-	}
-	return ""
-}
-
-// extractDataFieldType extracts type from Data field in composite literal elements.
-func extractDataFieldType(elts []ast.Expr, varTypeMap map[string]string, statusCode int, useStatus bool) string {
-	for _, elt := range elts {
-		kv, ok := elt.(*ast.KeyValueExpr)
-		if !ok {
-			continue
-		}
-		key, ok := kv.Key.(*ast.Ident)
-		if !ok || key.Name != "Data" {
-			continue
-		}
-		// Found Data field, recursively extract its type
-		dataType := extractTypeFromResponseInternal(kv.Value, varTypeMap, statusCode, useStatus)
-		if dataType != "" {
-			return dataType
-		}
-	}
-	return ""
-}
-
-// extractTypeFromCallExpr extracts type from a call expression.
-func extractTypeFromCallExpr(e *ast.CallExpr, varTypeMap map[string]string) string {
-	// gin.H or similar
-	if sel, ok := e.Fun.(*ast.SelectorExpr); ok {
-		if sel.Sel.Name == "H" {
-			return ginHType
-		}
-	}
-	// Could be a function call that returns a type, try to extract from return type
-	if ident, ok := e.Fun.(*ast.Ident); ok {
-		if actualType, ok := varTypeMap[ident.Name]; ok {
-			return actualType
-		}
-	}
-	return ""
 }

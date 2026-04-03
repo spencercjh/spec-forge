@@ -6,7 +6,8 @@
       "in": "query",
       "name": "page",
       "schema": {
-        "type": "string"
+        "format": "int32",
+        "type": "integer"
       }
     },
     {
@@ -14,7 +15,8 @@
       "in": "query",
       "name": "size",
       "schema": {
-        "type": "string"
+        "format": "int32",
+        "type": "integer"
       }
     },
     {
@@ -51,5 +53,8 @@
       "description": ""
     }
   },
-  "summary": "listUsers"
+  "summary": "listUsers",
+  "tags": [
+    "Users"
+  ]
 }

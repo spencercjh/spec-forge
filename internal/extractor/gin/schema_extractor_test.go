@@ -510,7 +510,7 @@ type Employee struct {
 	}
 
 	if len(schemas) != len(expectedTypes) {
-		t.Errorf("expected %d schemas, got %d: %v", len(expectedTypes), len(schemas), getSchemaKeys(schemas))
+		t.Errorf("expected %d schemas, got %d: %v", len(expectedTypes), len(schemas), getSchemaPropKeys(schemas))
 	}
 }
 
@@ -700,10 +700,142 @@ type Event struct {
 	}
 }
 
-// Helper function to get schema keys for error messages
-func getSchemaKeys(schemas openapi3.Schemas) []string {
-	keys := make([]string, 0, len(schemas))
-	for k := range schemas {
+// TestSchemaExtractor_EmbeddedStruct tests that embedded struct fields are
+// promoted into the parent schema following Go's field promotion rules.
+func TestSchemaExtractor_EmbeddedStruct(t *testing.T) {
+	src := `package main
+
+type BaseRsp struct {
+	Code int    ` + "`" + `json:"code"` + "`" + `
+	Msg  string ` + "`" + `json:"msg"` + "`" + `
+}
+
+type Rsp struct {
+	BaseRsp
+	Data any ` + "`" + `json:"data"` + "`" + `
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "test.go", src, 0)
+	if err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+	files := map[string]*ast.File{"test.go": file}
+
+	extractor := NewSchemaExtractor(files)
+	schema, err := extractor.ExtractSchema("Rsp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if schema == nil || schema.Value == nil {
+		t.Fatal("expected non-nil schema")
+	}
+
+	props := schema.Value.Properties
+
+	// Rsp should have 3 properties: code, msg (promoted from BaseRsp), and data
+	expectedProps := []string{"code", "msg", "data"}
+	for _, name := range expectedProps {
+		if _, exists := props[name]; !exists {
+			t.Errorf("expected property %q not found in Rsp schema (got: %v)", name, getSchemaPropKeys(props))
+		}
+	}
+	if len(props) != len(expectedProps) {
+		t.Errorf("expected %d properties, got %d: %v", len(expectedProps), len(props), getSchemaPropKeys(props))
+	}
+}
+
+// TestSchemaExtractor_NestedEmbeddedStruct tests multi-level embedded struct promotion.
+func TestSchemaExtractor_NestedEmbeddedStruct(t *testing.T) {
+	src := `package main
+
+type Inner struct {
+	Value string ` + "`" + `json:"value"` + "`" + `
+}
+
+type Middle struct {
+	Inner
+	Label string ` + "`" + `json:"label"` + "`" + `
+}
+
+type Outer struct {
+	Middle
+	Name string ` + "`" + `json:"name"` + "`" + `
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "test.go", src, 0)
+	if err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+	files := map[string]*ast.File{"test.go": file}
+
+	extractor := NewSchemaExtractor(files)
+	schema, err := extractor.ExtractSchema("Outer")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if schema == nil || schema.Value == nil {
+		t.Fatal("expected non-nil schema")
+	}
+
+	props := schema.Value.Properties
+
+	// Outer should have: value (from Inner via Middle), label (from Middle), name
+	expectedProps := []string{"value", "label", "name"}
+	for _, name := range expectedProps {
+		if _, exists := props[name]; !exists {
+			t.Errorf("expected property %q not found in Outer schema (got: %v)", name, getSchemaPropKeys(props))
+		}
+	}
+}
+
+// TestSchemaExtractor_PointerEmbeddedStruct tests that pointer embedded fields
+// are properly dereferenced and promoted.
+func TestSchemaExtractor_PointerEmbeddedStruct(t *testing.T) {
+	src := `package main
+
+type Metadata struct {
+	CreatedAt string ` + "`" + `json:"created_at"` + "`" + `
+	UpdatedAt string ` + "`" + `json:"updated_at"` + "`" + `
+}
+
+type Resource struct {
+	*Metadata
+	ID string ` + "`" + `json:"id"` + "`" + `
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "test.go", src, 0)
+	if err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+	files := map[string]*ast.File{"test.go": file}
+
+	extractor := NewSchemaExtractor(files)
+	schema, err := extractor.ExtractSchema("Resource")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if schema == nil || schema.Value == nil {
+		t.Fatal("expected non-nil schema")
+	}
+
+	props := schema.Value.Properties
+
+	// Resource should have: created_at, updated_at (from *Metadata), id
+	expectedProps := []string{"created_at", "updated_at", "id"}
+	for _, name := range expectedProps {
+		if _, exists := props[name]; !exists {
+			t.Errorf("expected property %q not found in Resource schema (got: %v)", name, getSchemaPropKeys(props))
+		}
+	}
+}
+
+// Helper function to get property keys for error messages
+func getSchemaPropKeys(props openapi3.Schemas) []string {
+	keys := make([]string, 0, len(props))
+	for k := range props {
 		keys = append(keys, k)
 	}
 	return keys

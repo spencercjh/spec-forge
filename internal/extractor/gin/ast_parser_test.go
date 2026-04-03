@@ -63,7 +63,7 @@ func createUser(c *gin.Context) {}
 	parser := NewASTParser(dir)
 	parser.ParseFiles()
 
-	routes, err := parser.ExtractRoutes()
+	routes, err := parser.ExtractRoutes(nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -114,7 +114,7 @@ func createUser(c *gin.Context) {}
 	parser := NewASTParser(dir)
 	parser.ParseFiles()
 
-	routes, err := parser.ExtractRoutes()
+	routes, err := parser.ExtractRoutes(nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -201,7 +201,7 @@ func main() {
 		t.Fatal("expected at least 1 parsed file with relative \".\" path, got 0")
 	}
 
-	routes, err := parser.ExtractRoutes()
+	routes, err := parser.ExtractRoutes(nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -242,4 +242,171 @@ func TestExtractStringLiteral(t *testing.T) {
 
 func TestExtractHandlerName(t *testing.T) {
 	// This function is tested indirectly through ExtractRoutes tests
+}
+
+func TestShouldExcludeRoute(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"/swagger/{any}", true},
+		{"/swagger/index.html", true},
+		{"/docs", true},
+		{"/docs/openapi.yaml", true},
+		{"/debug/pprof", true},
+		{"/static/css/main.css", true},
+		{"/public/image.png", true},
+		{"/favicon.ico", true},
+		{"/api/v1/users", false},
+		{"/api/v1/projects/{name}", false},
+		{"/ping", false},
+		{"/health", false},
+		{"/srv/ping", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := shouldExcludeRoute(tt.path, nil, nil)
+			if result != tt.expected {
+				t.Errorf("shouldExcludeRoute(%q) = %v, expected %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFilterRoutes(t *testing.T) {
+	routes := []Route{
+		{Method: "GET", FullPath: "/api/v1/users", HandlerName: "ListUsers"},
+		{Method: "GET", FullPath: "/swagger/{any}", HandlerName: "SwaggerUI"},
+		{Method: "POST", FullPath: "/api/v1/projects", HandlerName: "CreateProject"},
+		{Method: "GET", FullPath: "/docs/openapi.yaml", HandlerName: "Docs"},
+		{Method: "GET", FullPath: "/ping", HandlerName: "Ping"},
+		{Method: "GET", FullPath: "/debug/pprof", HandlerName: "Pprof"},
+	}
+
+	filtered := filterRoutes(routes, nil, nil)
+
+	if len(filtered) != 3 {
+		t.Errorf("expected 3 routes after filtering, got %d: %v", len(filtered), filtered)
+	}
+
+	expectedPaths := map[string]bool{
+		"/api/v1/users":    false,
+		"/api/v1/projects": false,
+		"/ping":            false,
+	}
+	for _, route := range filtered {
+		if _, ok := expectedPaths[route.FullPath]; !ok {
+			t.Errorf("unexpected route in filtered results: %s", route.FullPath)
+		}
+		expectedPaths[route.FullPath] = true
+	}
+	for path, found := range expectedPaths {
+		if !found {
+			t.Errorf("expected route %s not found in filtered results", path)
+		}
+	}
+}
+
+func TestShouldExcludeRoute_WithCustomRules(t *testing.T) {
+	tests := []struct {
+		name            string
+		path            string
+		excludeRoutes   []string
+		excludePrefixes []string
+		expected        bool
+	}{
+		{
+			name:            "exact match exclude",
+			path:            "/api/v1/users",
+			excludeRoutes:   []string{"/api/v1/users"},
+			excludePrefixes: nil,
+			expected:        true,
+		},
+		{
+			name:            "exact match no exclude",
+			path:            "/api/v1/users",
+			excludeRoutes:   []string{"/api/v1/projects"},
+			excludePrefixes: nil,
+			expected:        false,
+		},
+		{
+			name:            "prefix match exclude",
+			path:            "/api/v1/admin/users",
+			excludeRoutes:   nil,
+			excludePrefixes: []string{"/api/v1/admin"},
+			expected:        true,
+		},
+		{
+			name:            "prefix match no exclude",
+			path:            "/api/v1/users",
+			excludeRoutes:   nil,
+			excludePrefixes: []string{"/api/v1/admin"},
+			expected:        false,
+		},
+		{
+			name:            "default prefix still works with custom rules",
+			path:            "/swagger/index.html",
+			excludeRoutes:   nil,
+			excludePrefixes: nil,
+			expected:        true,
+		},
+		{
+			name:            "multiple exact excludes",
+			path:            "/internal/metrics",
+			excludeRoutes:   []string{"/internal/metrics", "/internal/health"},
+			excludePrefixes: nil,
+			expected:        true,
+		},
+		{
+			name:            "multiple prefix excludes",
+			path:            "/metrics/cpu",
+			excludeRoutes:   nil,
+			excludePrefixes: []string{"/metrics", "/health"},
+			expected:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldExcludeRoute(tt.path, tt.excludeRoutes, tt.excludePrefixes)
+			if result != tt.expected {
+				t.Errorf("shouldExcludeRoute(%q, %v, %v) = %v, expected %v",
+					tt.path, tt.excludeRoutes, tt.excludePrefixes, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFilterRoutes_WithCustomRules(t *testing.T) {
+	routes := []Route{
+		{Method: "GET", FullPath: "/api/v1/users", HandlerName: "ListUsers"},
+		{Method: "GET", FullPath: "/swagger/{any}", HandlerName: "SwaggerUI"},
+		{Method: "POST", FullPath: "/api/v1/projects", HandlerName: "CreateProject"},
+		{Method: "GET", FullPath: "/api/v1/admin/settings", HandlerName: "GetSettings"},
+		{Method: "GET", FullPath: "/ping", HandlerName: "Ping"},
+	}
+
+	// Exclude /api/v1/admin prefix and exact /ping
+	filtered := filterRoutes(routes, []string{"/ping"}, []string{"/api/v1/admin"})
+
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 routes after custom filtering, got %d: %v", len(filtered), filtered)
+	}
+
+	expectedPaths := map[string]bool{
+		"/api/v1/users":    false,
+		"/api/v1/projects": false,
+	}
+	for _, route := range filtered {
+		if _, ok := expectedPaths[route.FullPath]; !ok {
+			t.Errorf("unexpected route in filtered results: %s", route.FullPath)
+		}
+		expectedPaths[route.FullPath] = true
+	}
+	for path, found := range expectedPaths {
+		if !found {
+			t.Errorf("expected route %s not found in filtered results", path)
+		}
+	}
 }

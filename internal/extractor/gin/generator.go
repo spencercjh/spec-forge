@@ -49,7 +49,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 	slog.DebugContext(ctx, "Parsed AST files", "count", len(parser.files))
 
 	// Step 2: Extract routes
-	routes, err := parser.ExtractRoutes()
+	routes, err := parser.ExtractRoutes(opts.ExcludeRoutes, opts.ExcludeRoutePrefixes)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to extract routes", "error", err)
 		return nil, fmt.Errorf("failed to extract routes: %w", err)
@@ -62,7 +62,7 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 	handlerInfos := make(map[string]*HandlerInfo)
 	for _, route := range routes {
 		// Find handler function
-		handlerDecl := g.findHandlerDecl(route.HandlerName, parser.files)
+		handlerDecl := g.findHandlerDecl(route.HandlerName, parser.files, route.HandlerFile)
 		if handlerDecl != nil {
 			handlerInfo, analyzeErr := analyzer.AnalyzeHandler(handlerDecl)
 			if analyzeErr != nil {
@@ -153,26 +153,42 @@ func (g *Generator) Generate(ctx context.Context, projectPath string, info *extr
 // findHandlerDecl finds a handler function declaration by name.
 // Supports both local handlers ("getUser") and cross-package handlers ("handlers.GetUser").
 //
-// KNOWN LIMITATION: Cross-package handler references (e.g., "handlers.GetUser") are
-// resolved by searching for the function name only across all parsed files. If multiple
-// packages define the same function name, this may resolve to the wrong handler.
-//
-// TODO: Consider using Route.HandlerFile to constrain the search, or incorporate
-// import/package info when matching for more accurate cross-package resolution.
-func (g *Generator) findHandlerDecl(name string, files map[string]*ast.File) *ast.FuncDecl {
+// For cross-package references, the package prefix is resolved by checking imports
+// in the route registration file. This handles both direct package names and import
+// aliases (e.g., "customapis.CreateProject" resolves correctly when import uses an alias).
+// Only package-level functions (not methods) are considered, since Gin handlers
+// are always standalone functions accepting *gin.Context.
+func (g *Generator) findHandlerDecl(name string, files map[string]*ast.File, handlerFile string) *ast.FuncDecl {
 	if name == "" {
 		return nil
 	}
 
-	// Check if it's a cross-package reference (e.g., "handlers.GetUser")
 	parts := strings.Split(name, ".")
 	if len(parts) == 2 {
-		// Cross-package handler: packageName.FunctionName
-		// Try to find by function name only since we can't easily resolve imports
+		pkgRef := parts[0]
 		funcName := parts[1]
+
+		// Resolve the package reference (alias or direct name) to actual package names
+		pkgNames := g.resolvePkgRef(pkgRef, files, handlerFile)
+
+		// Primary: match by resolved package names + function name (no receiver)
+		for _, pkgName := range pkgNames {
+			for _, file := range files {
+				if file.Name.Name != pkgName {
+					continue
+				}
+				for _, decl := range file.Decls {
+					if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == funcName && fn.Recv == nil {
+						return fn
+					}
+				}
+			}
+		}
+
+		// Fallback: search all files for package-level functions
 		for _, file := range files {
 			for _, decl := range file.Decls {
-				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == funcName {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == funcName && fn.Recv == nil {
 					return fn
 				}
 			}
@@ -188,6 +204,75 @@ func (g *Generator) findHandlerDecl(name string, files map[string]*ast.File) *as
 		}
 	}
 	return nil
+}
+
+// resolvePkgRef resolves a package reference (e.g., "apis" or "customapis") to actual
+// package names by examining imports in the route registration file.
+// Returns the raw ref as a fallback if no imports match.
+func (g *Generator) resolvePkgRef(ref string, files map[string]*ast.File, handlerFile string) []string {
+	if handlerFile == "" {
+		return []string{ref}
+	}
+
+	// Find the route registration file's AST
+	hf, ok := files[handlerFile]
+	if !ok {
+		return []string{ref}
+	}
+
+	var resolved []string
+	for _, imp := range hf.Imports {
+		importPath := strings.Trim(imp.Path.Value, "\"")
+
+		if imp.Name != nil {
+			// Named import: import alias "gin-crosspkg/apis"
+			if imp.Name.Name == ref {
+				// Found alias match — resolve to actual package name from parsed files
+				if pkgName := pkgNameForImport(importPath, files); pkgName != "" {
+					resolved = append(resolved, pkgName)
+				}
+			}
+		} else {
+			// Unnamed import: last path segment is the default package name
+			lastSlash := strings.LastIndex(importPath, "/")
+			pkgName := importPath[lastSlash+1:]
+			if pkgName == ref {
+				resolved = append(resolved, pkgName)
+			}
+		}
+	}
+
+	if len(resolved) > 0 {
+		return resolved
+	}
+	return []string{ref}
+}
+
+// pkgNameForImport resolves an import path to its actual package name by finding
+// parsed files whose directory matches the import path suffix.
+func pkgNameForImport(importPath string, files map[string]*ast.File) string {
+	// Extract the directory suffix from the import path
+	// e.g., "gin-crosspkg/apis" → "apis"
+	lastSlash := strings.LastIndex(importPath, "/")
+	if lastSlash == -1 {
+		return ""
+	}
+	dirSuffix := "/" + importPath[lastSlash+1:] + "/"
+
+	for path, file := range files {
+		// Check if the file is in a directory matching the import path suffix
+		// e.g., "/home/user/project/apis/handlers.go" contains "/apis/"
+		lastDirSlash := strings.LastIndex(path, "/")
+		if lastDirSlash == -1 {
+			continue
+		}
+		dir := path[:lastDirSlash]
+		// Check if the directory ends with the expected suffix
+		if strings.HasSuffix(dir, dirSuffix[:len(dirSuffix)-1]) {
+			return file.Name.Name
+		}
+	}
+	return ""
 }
 
 // buildOpenAPIDoc builds the OpenAPI document.
@@ -238,9 +323,19 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 		summary = route.Method + " " + route.FullPath
 	}
 
+	// Clean operationId: strip package prefix (e.g., "apis.CreateProject" → "CreateProject")
+	if idx := strings.LastIndex(operationID, "."); idx != -1 {
+		operationID = operationID[idx+1:]
+	}
+
 	operation := &openapi3.Operation{
 		OperationID: operationID,
 		Summary:     summary,
+	}
+
+	// Infer tag from route path
+	if tag := inferTag(route.FullPath); tag != "" {
+		operation.Tags = []string{tag}
 	}
 
 	if handlerInfo == nil {
@@ -262,18 +357,23 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 	// Add parameters
 	operation.Parameters = make(openapi3.Parameters, 0)
 
-	// Path parameters
-	for _, param := range handlerInfo.PathParams {
-		operation.Parameters = append(operation.Parameters, &openapi3.ParameterRef{
-			Value: &openapi3.Parameter{
-				Name:        param.Name,
-				In:          "path",
-				Required:    param.Required,
-				Description: "Path parameter",
-				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
-			},
-		})
+	// Path parameters: extract from the route path (source of truth)
+	// rather than relying solely on c.Param() calls in the handler,
+	// since handlers may not explicitly call c.Param() for every path segment.
+	pathParams := g.extractPathParamsFromRoute(route.FullPath)
+
+	inferredTypes := make(map[string]string)
+	for _, pp := range handlerInfo.PathParams {
+		if pp.GoType != "" && pp.GoType != goTypeString {
+			inferredTypes[pp.Name] = pp.GoType
+		}
 	}
+	for _, p := range pathParams {
+		if inferred, ok := inferredTypes[p.Value.Name]; ok {
+			p.Value.Schema = &openapi3.SchemaRef{Value: GoTypeToSchema(inferred)}
+		}
+	}
+	operation.Parameters = append(operation.Parameters, pathParams...)
 
 	// Query parameters
 	for _, param := range handlerInfo.QueryParams {
@@ -283,7 +383,7 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 				In:          "query",
 				Required:    param.Required,
 				Description: "Query parameter",
-				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				Schema:      &openapi3.SchemaRef{Value: GoTypeToSchema(param.GoType)},
 			},
 		})
 	}
@@ -296,7 +396,7 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 				In:          "header",
 				Required:    param.Required,
 				Description: "Header parameter",
-				Schema:      &openapi3.SchemaRef{Value: &openapi3.Schema{Type: &openapi3.Types{"string"}}},
+				Schema:      &openapi3.SchemaRef{Value: GoTypeToSchema(param.GoType)},
 			},
 		})
 	}
@@ -308,6 +408,9 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 	operation.Responses = openapi3.NewResponses()
 	for _, resp := range handlerInfo.Responses {
 		desc := fmt.Sprintf("HTTP %d response", resp.StatusCode)
+		if resp.StatusCode == 0 {
+			desc = "Default error response"
+		}
 		response := &openapi3.Response{
 			Description: &desc,
 			Content:     openapi3.Content{},
@@ -339,8 +442,11 @@ func (g *Generator) buildOperation(route *Route, handlerInfo *HandlerInfo, schem
 			}
 		}
 
-		statusCode := strconv.Itoa(resp.StatusCode)
-		operation.Responses.Set(statusCode, &openapi3.ResponseRef{Value: response})
+		statusCodeKey := "default"
+		if resp.StatusCode != 0 {
+			statusCodeKey = strconv.Itoa(resp.StatusCode)
+		}
+		operation.Responses.Set(statusCodeKey, &openapi3.ResponseRef{Value: response})
 	}
 
 	// Default response if none specified
@@ -477,6 +583,31 @@ func setOperationForMethod(pathItem *openapi3.PathItem, method string, operation
 	case http.MethodOptions:
 		pathItem.Options = operation
 	}
+}
+
+// inferTag infers an OpenAPI tag from a route path.
+// It extracts the first meaningful path segment after skipping API version prefixes.
+func inferTag(path string) string {
+	parts := strings.SplitSeq(strings.Trim(path, "/"), "/")
+	for p := range parts {
+		if p == "" || strings.HasPrefix(p, "{") {
+			continue
+		}
+		// Skip common API prefixes
+		lower := strings.ToLower(p)
+		if lower == "api" || strings.HasPrefix(lower, "v") && len(lower) > 1 {
+			// Check if it's a version like v1, v2, v3
+			if lower == "api" || (len(lower) == 2 && lower[1] >= '0' && lower[1] <= '9') {
+				continue
+			}
+		}
+		// Capitalize first letter
+		if p[0] >= 'a' && p[0] <= 'z' {
+			return string(p[0]-'a'+'A') + p[1:]
+		}
+		return p
+	}
+	return ""
 }
 
 // extractPathParamsFromRoute extracts path parameters from a route path.

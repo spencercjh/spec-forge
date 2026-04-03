@@ -53,7 +53,9 @@ type OutputConfig struct {
 
 // ExtractConfig contains extraction settings.
 type ExtractConfig struct {
-	Strict bool `mapstructure:"strict"`
+	Strict               bool     `mapstructure:"strict"`
+	ExcludeRoutes        []string `mapstructure:"excludeRoutes"`
+	ExcludeRoutePrefixes []string `mapstructure:"excludeRoutePrefixes"`
 }
 
 // global is the global configuration instance.
