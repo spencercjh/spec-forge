@@ -518,6 +518,9 @@ func GoTypeToSchema(goType string) *openapi3.Schema {
 		return &openapi3.Schema{Type: &openapi3.Types{"number"}, Format: "double"}
 	case "bool":
 		return &openapi3.Schema{Type: &openapi3.Types{"boolean"}}
+	// OpenAPI-style type names produced by type inference constants
+	// (goTypeInteger, goTypeNumber, goTypeBoolean). These are used when
+	// merging inferred path/query param types into the OpenAPI schema.
 	case "integer":
 		return &openapi3.Schema{Type: &openapi3.Types{"integer"}}
 	case "number":

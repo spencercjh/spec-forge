@@ -366,6 +366,10 @@ func shouldExcludeRoute(path string, extraExcludes, extraPrefixes []string) bool
 
 var routeParamReplacer = regexp.MustCompile(`:([^/]+)`)
 
+// normalizeRoutePath converts Gin-style :param to OpenAPI-style {param}.
+// Routes already pass through convertPathFormat before reaching shouldExcludeRoute,
+// so this is a defensive normalization for user-supplied filter values
+// (extraPrefixes, extraExcludes) which may still use Gin syntax.
 func normalizeRoutePath(path string) string {
 	return routeParamReplacer.ReplaceAllString(path, `{$1}`)
 }

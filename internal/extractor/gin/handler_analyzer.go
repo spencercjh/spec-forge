@@ -20,7 +20,8 @@ type HandlerAnalyzer struct {
 	fset        *token.FileSet
 	files       map[string]*ast.File
 	typeCache   map[string]*ast.TypeSpec
-	helperFuncs map[string][]*ast.FuncDecl // package-level funcs taking *gin.Context as first param
+	helperFuncs map[string]map[string]*ast.FuncDecl // pkg → name → package-level funcs taking *gin.Context as first param
+	callerPkg   string                              // set per AnalyzeHandler call for scoped helper lookup
 }
 
 // NewHandlerAnalyzer creates a new HandlerAnalyzer instance.
@@ -29,7 +30,7 @@ func NewHandlerAnalyzer(fset *token.FileSet, files map[string]*ast.File) *Handle
 		fset:        fset,
 		files:       files,
 		typeCache:   make(map[string]*ast.TypeSpec),
-		helperFuncs: make(map[string][]*ast.FuncDecl),
+		helperFuncs: make(map[string]map[string]*ast.FuncDecl),
 	}
 	a.discoverHelperFuncs()
 	return a
@@ -38,8 +39,10 @@ func NewHandlerAnalyzer(fset *token.FileSet, files map[string]*ast.File) *Handle
 // discoverHelperFuncs scans all parsed files for package-level functions
 // that accept *gin.Context as their first parameter. These are potential
 // response helpers that can be traced for cross-function response extraction.
+// Helpers are stored per-package to avoid cross-package name collisions.
 func (a *HandlerAnalyzer) discoverHelperFuncs() {
 	for _, file := range a.files {
+		pkg := file.Name.Name
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || fn.Recv != nil || fn.Type.Params == nil || len(fn.Type.Params.List) == 0 {
@@ -48,15 +51,51 @@ func (a *HandlerAnalyzer) discoverHelperFuncs() {
 			// Check if first parameter is *gin.Context
 			firstParam := fn.Type.Params.List[0]
 			if isGinContextType(firstParam.Type) {
-				key := file.Name.Name + "." + fn.Name.Name
-				a.helperFuncs[key] = append(a.helperFuncs[key], fn)
-				a.helperFuncs[fn.Name.Name] = append(a.helperFuncs[fn.Name.Name], fn)
+				if a.helperFuncs[pkg] == nil {
+					a.helperFuncs[pkg] = make(map[string]*ast.FuncDecl)
+				}
+				a.helperFuncs[pkg][fn.Name.Name] = fn
 			}
 		}
 	}
-	if len(a.helperFuncs) > 0 {
-		slog.Debug("Discovered potential helper functions", "count", len(a.helperFuncs))
+	count := 0
+	for _, funcs := range a.helperFuncs {
+		count += len(funcs)
 	}
+	if count > 0 {
+		slog.Debug("Discovered potential helper functions", "count", count)
+	}
+}
+
+// pkgForFunc determines which package a function declaration belongs to
+// by searching all parsed files for a pointer match.
+func (a *HandlerAnalyzer) pkgForFunc(fn *ast.FuncDecl) string {
+	for _, file := range a.files {
+		for _, decl := range file.Decls {
+			if f, ok := decl.(*ast.FuncDecl); ok && f == fn {
+				return file.Name.Name
+			}
+		}
+	}
+	return ""
+}
+
+// lookupHelper finds a helper function by name, preferring the caller's package
+// scope and falling back to a global search across all packages.
+func (a *HandlerAnalyzer) lookupHelper(callerPkg, name string) *ast.FuncDecl {
+	// Try caller's package first
+	if pkgFuncs, ok := a.helperFuncs[callerPkg]; ok {
+		if fn, ok := pkgFuncs[name]; ok {
+			return fn
+		}
+	}
+	// Fallback: search all packages
+	for _, pkgFuncs := range a.helperFuncs {
+		if fn, ok := pkgFuncs[name]; ok {
+			return fn
+		}
+	}
+	return nil
 }
 
 // isGinContextType checks if an AST expression represents *gin.Context.
@@ -76,6 +115,9 @@ func isGinContextType(expr ast.Expr) bool {
 // AnalyzeHandler analyzes a handler function and extracts information.
 func (a *HandlerAnalyzer) AnalyzeHandler(fn *ast.FuncDecl) (*HandlerInfo, error) {
 	slog.Debug("Analyzing handler", "name", fn.Name.Name)
+
+	// Determine caller's package for scoped helper function lookup
+	a.callerPkg = a.pkgForFunc(fn)
 
 	info := &HandlerInfo{
 		PathParams:   []ParamInfo{},
@@ -651,8 +693,8 @@ func (a *HandlerAnalyzer) parseHelperCall(call *ast.CallExpr, info *HandlerInfo,
 	}
 
 	// Cross-function call tracking: trace into discovered helper functions
-	if helpers, exists := a.helperFuncs[ident.Name]; exists && len(helpers) > 0 {
-		a.traceHelperResponse(helpers[0], call.Args, info, varTypeMap)
+	if helper := a.lookupHelper(a.callerPkg, ident.Name); helper != nil {
+		a.traceHelperResponse(helper, call.Args, info, varTypeMap)
 	}
 }
 
@@ -688,7 +730,7 @@ func (a *HandlerAnalyzer) traceHelperResponse(helperDecl *ast.FuncDecl, callArgs
 		case "JSON", "XML", "YAML":
 			if len(call.Args) >= 2 {
 				// Resolve the response argument through param mapping
-				resolvedArg := a.resolveThroughParamMap(call.Args[1], paramArgMap, nil)
+				resolvedArg := a.resolveThroughParamMap(call.Args[1], paramArgMap)
 				statusCode := extractStatusCode(call.Args[0])
 				goType := extractTypeFromResponseWithStatus(resolvedArg, varTypeMap, statusCode)
 				if goType != "" {
@@ -733,7 +775,7 @@ func (a *HandlerAnalyzer) buildParamArgMap(helperDecl *ast.FuncDecl, callArgs []
 // resolveThroughParamMap resolves an expression by substituting helper parameters
 // with their call-site arguments. If the expression is an Ident matching a helper
 // parameter name, the corresponding call-site argument is returned instead.
-func (a *HandlerAnalyzer) resolveThroughParamMap(expr ast.Expr, paramToArg map[string]ast.Expr, paramNames []string) ast.Expr {
+func (a *HandlerAnalyzer) resolveThroughParamMap(expr ast.Expr, paramToArg map[string]ast.Expr) ast.Expr {
 	switch e := expr.(type) {
 	case *ast.Ident:
 		if arg, exists := paramToArg[e.Name]; exists {
@@ -741,10 +783,10 @@ func (a *HandlerAnalyzer) resolveThroughParamMap(expr ast.Expr, paramToArg map[s
 		}
 	case *ast.CompositeLit:
 		for i, elt := range e.Elts {
-			e.Elts[i] = a.resolveThroughParamMap(elt, paramToArg, paramNames)
+			e.Elts[i] = a.resolveThroughParamMap(elt, paramToArg)
 		}
 	case *ast.KeyValueExpr:
-		e.Value = a.resolveThroughParamMap(e.Value, paramToArg, paramNames)
+		e.Value = a.resolveThroughParamMap(e.Value, paramToArg)
 	}
 	return expr
 }
