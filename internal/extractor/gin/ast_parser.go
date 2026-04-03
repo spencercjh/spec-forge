@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 )
@@ -364,14 +363,12 @@ func shouldExcludeRoute(path string, extraExcludes, extraPrefixes []string) bool
 	return slices.Contains(normalizedExcludes, normalized)
 }
 
-var routeParamReplacer = regexp.MustCompile(`:([^/]+)`)
-
-// normalizeRoutePath converts Gin-style :param to OpenAPI-style {param}.
+// normalizeRoutePath converts Gin-style :param and *wildcard to OpenAPI-style {param}.
 // Routes already pass through convertPathFormat before reaching shouldExcludeRoute,
 // so this is a defensive normalization for user-supplied filter values
 // (extraPrefixes, extraExcludes) which may still use Gin syntax.
 func normalizeRoutePath(path string) string {
-	return routeParamReplacer.ReplaceAllString(path, `{$1}`)
+	return convertPathFormat(path)
 }
 
 func hasPathSegmentPrefix(path, prefix string) bool {

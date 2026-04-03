@@ -106,6 +106,9 @@ func getItems(c *gin.Context) {
 			break
 		}
 	}
+	if fn == nil {
+		t.Fatal("getItems handler not found")
+	}
 
 	info, err := analyzer.AnalyzeHandler(fn)
 	if err != nil {

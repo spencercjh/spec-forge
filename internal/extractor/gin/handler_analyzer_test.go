@@ -97,6 +97,9 @@ func listUsers(c *gin.Context) {
 			break
 		}
 	}
+	if handlerDecl == nil {
+		t.Fatal("listUsers handler not found")
+	}
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
 
@@ -134,6 +137,9 @@ func createUser(c *gin.Context) {
 			handlerDecl = fn
 			break
 		}
+	}
+	if handlerDecl == nil {
+		t.Fatal("handler not found")
 	}
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
@@ -177,6 +183,9 @@ func createUser(c *gin.Context) {
 			handlerDecl = fn
 			break
 		}
+	}
+	if handlerDecl == nil {
+		t.Fatal("handler not found")
 	}
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
@@ -235,6 +244,9 @@ func listUsers(c *gin.Context) {
 			break
 		}
 	}
+	if handlerDecl == nil {
+		t.Fatal("handler not found")
+	}
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
 
@@ -267,6 +279,9 @@ func uploadFile(c *gin.Context) {
 			handlerDecl = fn
 			break
 		}
+	}
+	if handlerDecl == nil {
+		t.Fatal("handler not found")
 	}
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)

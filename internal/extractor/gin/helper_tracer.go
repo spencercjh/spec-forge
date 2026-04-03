@@ -101,14 +101,16 @@ func (a *HandlerAnalyzer) parseHelperCall(call *ast.CallExpr, info *HandlerInfo,
 		return
 	}
 
-	if isKnownResponseHelper(ident.Name) {
-		a.extractHelperResponse(call.Args, info, varTypeMap)
+	// Prefer traced helper declaration when available — the actual body gives
+	// more accurate response types/statuses than the name-based heuristic.
+	if helper := a.lookupHelper(a.callerPkg, ident.Name); helper != nil {
+		a.traceHelperResponse(helper, call.Args, info, varTypeMap)
 		return
 	}
 
-	// Cross-function call tracking: trace into discovered helper functions
-	if helper := a.lookupHelper(a.callerPkg, ident.Name); helper != nil {
-		a.traceHelperResponse(helper, call.Args, info, varTypeMap)
+	// Fallback: known helper names without discovered implementation
+	if isKnownResponseHelper(ident.Name) {
+		a.extractHelperResponse(call.Args, info, varTypeMap)
 	}
 }
 
@@ -187,8 +189,8 @@ func (a *HandlerAnalyzer) buildParamArgMap(helperDecl *ast.FuncDecl, callArgs []
 }
 
 // resolveThroughParamMap resolves an expression by substituting helper parameters
-// with their call-site arguments. If the expression is an Ident matching a helper
-// parameter name, the corresponding call-site argument is returned instead.
+// with their call-site arguments. Returns new AST nodes instead of mutating originals
+// to avoid corrupting shared helper declarations across multiple handler analyses.
 func (a *HandlerAnalyzer) resolveThroughParamMap(expr ast.Expr, paramToArg map[string]ast.Expr) ast.Expr {
 	switch e := expr.(type) {
 	case *ast.Ident:
@@ -196,11 +198,22 @@ func (a *HandlerAnalyzer) resolveThroughParamMap(expr ast.Expr, paramToArg map[s
 			return arg
 		}
 	case *ast.CompositeLit:
+		newElts := make([]ast.Expr, len(e.Elts))
 		for i, elt := range e.Elts {
-			e.Elts[i] = a.resolveThroughParamMap(elt, paramToArg)
+			newElts[i] = a.resolveThroughParamMap(elt, paramToArg)
+		}
+		return &ast.CompositeLit{
+			Type:   e.Type,
+			Lbrace: e.Lbrace,
+			Elts:   newElts,
+			Rbrace: e.Rbrace,
 		}
 	case *ast.KeyValueExpr:
-		e.Value = a.resolveThroughParamMap(e.Value, paramToArg)
+		return &ast.KeyValueExpr{
+			Key:   e.Key,
+			Colon: e.Colon,
+			Value: a.resolveThroughParamMap(e.Value, paramToArg),
+		}
 	}
 	return expr
 }

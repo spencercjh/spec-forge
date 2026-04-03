@@ -180,6 +180,9 @@ func GetUsers(c *gin.Context) {
 			break
 		}
 	}
+	if fn == nil {
+		t.Fatal("GetUsers handler not found")
+	}
 
 	info, err := analyzer.AnalyzeHandler(fn)
 	if err != nil {
@@ -215,6 +218,9 @@ func Handler(c *gin.Context) {
 			fn = f
 			break
 		}
+	}
+	if fn == nil {
+		t.Fatal("Handler not found")
 	}
 
 	info, err := analyzer.AnalyzeHandler(fn)
@@ -252,6 +258,9 @@ func Handler(c *gin.Context) {
 			fn = f
 			break
 		}
+	}
+	if fn == nil {
+		t.Fatal("Handler not found")
 	}
 
 	info, err := analyzer.AnalyzeHandler(fn)

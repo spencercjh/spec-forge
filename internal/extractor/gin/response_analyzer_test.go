@@ -95,6 +95,9 @@ func hello(c *gin.Context) {
 			break
 		}
 	}
+	if handlerDecl == nil {
+		t.Fatal("hello handler not found")
+	}
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)
 
@@ -130,6 +133,9 @@ func redirect(c *gin.Context) {
 			handlerDecl = fn
 			break
 		}
+	}
+	if handlerDecl == nil {
+		t.Fatal("redirect handler not found")
 	}
 
 	info, _ := analyzer.AnalyzeHandler(handlerDecl)

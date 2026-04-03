@@ -299,7 +299,12 @@ func (e *SchemaExtractor) extractStructSchema(typeSpec *ast.TypeSpec, structType
 					if parts[0] != "" {
 						embeddedTypeName := e.resolveEmbeddedTypeName(field.Type)
 						if embeddedTypeName != "" {
-							ref := "#/components/schemas/" + embeddedTypeName
+							// Use short name for consistency with fieldToSchemaRef
+							shortName := embeddedTypeName
+							if idx := strings.LastIndex(embeddedTypeName, "."); idx != -1 {
+								shortName = embeddedTypeName[idx+1:]
+							}
+							ref := "#/components/schemas/" + shortName
 							schema.Properties[parts[0]] = &openapi3.SchemaRef{Ref: ref}
 						}
 						continue

@@ -123,8 +123,9 @@ func (a *HandlerAnalyzer) inferBoolFromComparison(n ast.Node, info *HandlerInfo)
 	}
 }
 
-// findContextQueryParam checks if an expression is c.Query("name") or c.Param("name")
-// and returns the parameter name. Recursively unwraps simple wrappers (e.g., type casts).
+// findContextQueryParam checks whether an expression is a direct call to
+// c.Query("name"), c.DefaultQuery("name"), c.Param("name"), or c.GetHeader("name")
+// and returns the parameter name.
 func (a *HandlerAnalyzer) findContextQueryParam(expr ast.Expr) string {
 	call, ok := expr.(*ast.CallExpr)
 	if !ok {
@@ -139,7 +140,7 @@ func (a *HandlerAnalyzer) findContextQueryParam(expr ast.Expr) string {
 	}
 
 	switch sel.Sel.Name {
-	case "Query", "DefaultQuery", "Param": //nolint:goconst // AST method name literals
+	case "Query", "DefaultQuery", "Param", "GetHeader": //nolint:goconst // AST method name literals
 		if len(call.Args) >= 1 {
 			return extractStringLiteral(call.Args[0])
 		}
